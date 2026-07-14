@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/chess-gantry/board-state.schema.json",
+  "title": "Chess gantry persistent board state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "revision", "pieces", "processed_events"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "revision": {"type": "integer", "minimum": 0},
+    "processed_events": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^[A-Za-z0-9_.:-]{1,80}$"}
+    },
+    "pieces": {
+      "type": "object",
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["status", "x", "y"],
+            "properties": {
+              "status": {"const": "board"},
+              "x": {"type": "integer", "minimum": 0, "maximum": 7},
+              "y": {"type": "integer", "minimum": 0, "maximum": 7},
+              "metadata": {"type": "object"}
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["status", "x", "y", "capture_slot"],
+            "properties": {
+              "status": {"const": "captured"},
+              "x": {"type": "null"},
+              "y": {"type": "null"},
+              "capture_slot": {"type": "integer", "minimum": 0},
+              "metadata": {"type": "object"}
+            }
+          }
+        ]
+      }
+    }
+  }
+}

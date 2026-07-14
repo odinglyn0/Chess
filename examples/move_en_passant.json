@@ -1,0 +1,13 @@
+{
+  "event_id": "en-passant-demo-ply-001",
+  "position": "white_pawn_e",
+  "px": 4,
+  "py": 4,
+  "nx": 3,
+  "ny": 5,
+  "capture": {
+    "id": "black_pawn_d",
+    "x": 3,
+    "y": 4
+  }
+}

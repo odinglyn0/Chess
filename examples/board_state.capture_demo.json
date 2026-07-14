@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "revision": 0,
+  "pieces": {
+    "black_pawn_d": {
+      "status": "board",
+      "x": 3,
+      "y": 4,
+      "metadata": {
+        "color": "black",
+        "kind": "pawn"
+      }
+    },
+    "white_pawn_e": {
+      "status": "board",
+      "x": 4,
+      "y": 3,
+      "metadata": {
+        "color": "white",
+        "kind": "pawn"
+      }
+    }
+  },
+  "processed_events": []
+}

@@ -1,15 +1,13 @@
-FROM ghcr.io/astral-sh/uv:latest AS uv
-
 FROM cgr.dev/chainguard/python:latest-dev AS builder
 
 ENV UV_LINK_MODE=copy \
     UV_COMPILE_BYTECODE=1 \
-    VIRTUAL_ENV=/opt/venv \
-    PATH="/opt/venv/bin:$PATH"
-
-COPY --from=uv /uv /uvx /usr/local/bin/
+    VIRTUAL_ENV=/home/nonroot/venv \
+    PATH="/home/nonroot/venv/bin:/home/nonroot/.local/bin:$PATH"
 
 WORKDIR /app
+
+RUN python -m pip install --no-cache-dir --user uv
 
 RUN uv venv "$VIRTUAL_ENV"
 
@@ -20,8 +18,8 @@ RUN uv pip install --no-cache .
 
 FROM cgr.dev/chainguard/python:latest AS runtime
 
-ENV VIRTUAL_ENV=/opt/venv \
-    PATH="/opt/venv/bin:$PATH" \
+ENV VIRTUAL_ENV=/home/nonroot/venv \
+    PATH="/home/nonroot/venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     CHESS_STREAM_HOST=0.0.0.0 \
@@ -30,7 +28,7 @@ ENV VIRTUAL_ENV=/opt/venv \
 
 WORKDIR /app
 
-COPY --from=builder /opt/venv /opt/venv
+COPY --from=builder /home/nonroot/venv /home/nonroot/venv
 COPY schemas /app/schemas
 
 EXPOSE 8000

@@ -29,7 +29,7 @@ def run() -> None:
         port=settings.port,
         log_level=settings.log_level,
         loop=_select_loop(),
-        ws="websockets",
+        ws="auto",
         proxy_headers=True,
         forwarded_allow_ips="*",
     )

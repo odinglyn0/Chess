@@ -1,13 +1,69 @@
-"""Small, blocking Marlin serial client with explicit acknowledgement handling."""
+"""Reliable Marlin serial transport with Fedora/macOS/Windows discovery.
+
+The transport sends one ASCII G-code command at a time and waits for Marlin's
+``ok`` acknowledgement.  It deliberately keeps motion planning out of this
+module: this file only owns USB serial discovery, connection verification, and
+command/response handling.
+"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
+import threading
 from time import monotonic, sleep
 from typing import Any, Callable, Iterable, List, Optional, Sequence, Tuple
 
 from .config import SerialSettings
 from .errors import SerialProtocolError
+
+
+_PRINTER_TOKENS = (
+    "creality",
+    "ender",
+    "ch340",
+    "ch341",
+    "wch",
+    "usb serial",
+    "usb-serial",
+    "usbserial",
+    "usbmodem",
+    "1a86",
+    "10c4",
+    "ftdi",
+    "cp210",
+    "arduino",
+)
+
+
+@dataclass(frozen=True)
+class PortInfo:
+    device: str
+    description: str
+    hwid: str
+    likely_printer: bool
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "device": self.device,
+            "description": self.description,
+            "hwid": self.hwid,
+            "likely_printer": self.likely_printer,
+        }
+
+
+@dataclass(frozen=True)
+class ConnectionInfo:
+    port: str
+    baudrate: int
+    firmware: Optional[str]
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "port": self.port,
+            "baudrate": self.baudrate,
+            "firmware": self.firmware,
+        }
 
 
 @dataclass(frozen=True)
@@ -16,81 +72,159 @@ class CommandResult:
     responses: Tuple[str, ...]
 
 
+def _looks_like_printer(device: str, description: str, hwid: str) -> bool:
+    text = f"{device} {description} {hwid}".lower()
+    if any(token in text for token in _PRINTER_TOKENS):
+        return True
+    return (
+        device.startswith("/dev/ttyUSB")
+        or device.startswith("/dev/ttyACM")
+        or device.startswith("/dev/serial/by-id/")
+        or device.startswith("/dev/cu.usb")
+        or bool(re.fullmatch(r"COM\d+", device, re.IGNORECASE))
+    )
+
+
+def discover_serial_ports(
+    port_provider: Optional[Callable[[], Iterable[Any]]] = None,
+) -> Tuple[PortInfo, ...]:
+    """Return ranked serial ports without applying macOS-only filtering."""
+
+    if port_provider is None:
+        try:
+            from serial.tools import list_ports  # type: ignore
+        except ImportError as exc:
+            raise SerialProtocolError("pyserial is not installed") from exc
+        port_provider = list_ports.comports
+
+    found: List[PortInfo] = []
+    for port in port_provider():
+        device = str(getattr(port, "device", "") or "").strip()
+        if not device:
+            continue
+        description = str(getattr(port, "description", "") or "USB serial device")
+        hwid = str(getattr(port, "hwid", "") or "")
+        combined = f"{device} {description} {hwid}".lower()
+        if "bluetooth" in combined:
+            continue
+        found.append(
+            PortInfo(
+                device=device,
+                description=description,
+                hwid=hwid,
+                likely_printer=_looks_like_printer(device, description, hwid),
+            )
+        )
+
+    found.sort(key=lambda item: (not item.likely_printer, item.device.lower()))
+    return tuple(found)
+
+
+def list_serial_ports() -> Tuple[Tuple[str, str], ...]:
+    """Backward-compatible two-column port listing used by the CLI."""
+
+    return tuple((item.device, item.description) for item in discover_serial_ports())
+
+
 class MarlinSerial:
-    """Send one command at a time and wait for Marlin's ``ok`` response."""
+    """Send one command at a time and wait for Marlin's acknowledgement.
+
+    ``serial.port`` may be a concrete path such as ``/dev/ttyUSB0`` or the word
+    ``auto``.  In auto mode, detected ports are ranked and tried with the
+    configured primary/fallback baud rates.  A connection is accepted only
+    after ``M115`` identifies Marlin when ``verify_marlin`` is enabled.
+    """
 
     def __init__(
         self,
         settings: SerialSettings,
         serial_factory: Optional[Callable[..., Any]] = None,
+        port_provider: Optional[Callable[[], Iterable[Any]]] = None,
     ) -> None:
         self.settings = settings
         self._serial_factory = serial_factory
+        self._port_provider = port_provider
         self._serial: Optional[Any] = None
+        self._connection_info: Optional[ConnectionInfo] = None
+        self._lifecycle_lock = threading.RLock()
+        self._command_lock = threading.RLock()
 
     @property
     def connected(self) -> bool:
-        return self._serial is not None
-
-    def connect(self) -> None:
-        if self._serial is not None:
-            return
-        factory = self._serial_factory
-        if factory is None:
-            try:
-                import serial  # type: ignore
-            except ImportError as exc:
-                raise SerialProtocolError(
-                    "pyserial is not installed; run 'python -m pip install -e .'"
-                ) from exc
-            factory = serial.Serial
-        try:
-            self._serial = factory(
-                port=self.settings.port,
-                baudrate=self.settings.baudrate,
-                timeout=self.settings.read_timeout_s,
-                write_timeout=self.settings.write_timeout_s,
-                rtscts=False,
-                dsrdtr=False,
-            )
-            if self.settings.startup_wait_s:
-                sleep(self.settings.startup_wait_s)
-            reset = getattr(self._serial, "reset_input_buffer", None)
-            if callable(reset):
-                reset()
-        except Exception as exc:
-            self._serial = None
-            raise SerialProtocolError(
-                f"could not open {self.settings.port} at {self.settings.baudrate} baud: {exc}"
-            ) from exc
-
-    def close(self) -> None:
         serial_object = self._serial
-        self._serial = None
-        if serial_object is not None:
+        if serial_object is None:
+            return False
+        is_open = getattr(serial_object, "is_open", True)
+        return bool(is_open)
+
+    @property
+    def connection_info(self) -> Optional[ConnectionInfo]:
+        return self._connection_info
+
+    @property
+    def active_port(self) -> Optional[str]:
+        return None if self._connection_info is None else self._connection_info.port
+
+    @property
+    def active_baudrate(self) -> Optional[int]:
+        return None if self._connection_info is None else self._connection_info.baudrate
+
+    @property
+    def firmware_identity(self) -> Optional[str]:
+        return None if self._connection_info is None else self._connection_info.firmware
+
+    def _factory(self) -> Callable[..., Any]:
+        if self._serial_factory is not None:
+            return self._serial_factory
+        try:
+            import serial  # type: ignore
+        except ImportError as exc:
+            raise SerialProtocolError(
+                "pyserial is not installed; run 'python -m pip install -e .'"
+            ) from exc
+        return serial.Serial
+
+    def _candidate_ports(self) -> Tuple[str, ...]:
+        if not self.settings.auto_detect:
+            return (self.settings.port,)
+        ports = discover_serial_ports(self._port_provider)
+        return tuple(item.device for item in ports)
+
+    @staticmethod
+    def _close_object(serial_object: Any) -> None:
+        try:
             close = getattr(serial_object, "close", None)
             if callable(close):
                 close()
+        except Exception:
+            pass
 
-    def __enter__(self) -> "MarlinSerial":
-        self.connect()
-        return self
+    @staticmethod
+    def _identity_from(lines: Sequence[str]) -> Optional[str]:
+        for line in lines:
+            upper = line.upper()
+            if "FIRMWARE_NAME" in upper or "MARLIN" in upper:
+                return line
+        return None
 
-    def __exit__(self, exc_type: Any, exc: Any, traceback: Any) -> None:
-        self.close()
-
-    def _require_connected(self) -> Any:
-        if self._serial is None:
-            raise SerialProtocolError("serial link is not connected")
-        return self._serial
-
-    def send_command(self, command: str, timeout_s: Optional[float] = None) -> CommandResult:
-        serial_object = self._require_connected()
+    @staticmethod
+    def _clean_command(command: str) -> str:
         stripped = command.split(";", 1)[0].strip()
-        if not stripped:
-            return CommandResult(command="", responses=())
         if "\n" in stripped or "\r" in stripped:
             raise SerialProtocolError("a serial command cannot contain a newline")
+        return stripped
+
+    @classmethod
+    def _send_on_connection(
+        cls,
+        serial_object: Any,
+        command: str,
+        *,
+        timeout_s: float,
+    ) -> CommandResult:
+        stripped = cls._clean_command(command)
+        if not stripped:
+            return CommandResult(command="", responses=())
         try:
             payload = (stripped + "\n").encode("ascii")
         except UnicodeEncodeError as exc:
@@ -104,64 +238,194 @@ class MarlinSerial:
         except Exception as exc:
             raise SerialProtocolError(f"failed to write command {stripped!r}: {exc}") from exc
 
-        deadline = monotonic() + (timeout_s if timeout_s is not None else self.settings.command_timeout_s)
+        deadline = monotonic() + timeout_s
         responses: List[str] = []
         while monotonic() < deadline:
             try:
                 raw = serial_object.readline()
             except Exception as exc:
-                raise SerialProtocolError(f"failed while reading response to {stripped!r}: {exc}") from exc
+                raise SerialProtocolError(
+                    f"failed while reading response to {stripped!r}: {exc}"
+                ) from exc
             if not raw:
                 continue
             if isinstance(raw, bytes):
+                # Printer resets and bad baud probes can produce non-UTF-8 bytes.
+                # Replacement keeps diagnostics visible without crashing.
                 line = raw.decode("utf-8", errors="replace").strip()
             else:
                 line = str(raw).strip()
             if not line:
                 continue
             responses.append(line)
-            lower = line.lower()
-            if lower.startswith("ok"):
+            lowered = line.lower()
+            if lowered == "ok" or lowered.startswith("ok "):
                 return CommandResult(command=stripped, responses=tuple(responses))
             if (
-                lower.startswith("error")
-                or lower.startswith("!!")
-                or "unknown command" in lower
-                or "printer halted" in lower
-                or "kill() called" in lower
+                lowered.startswith("error:")
+                or lowered.startswith("error ")
+                or lowered.startswith("!!")
+                or "unknown command" in lowered
+                or "printer halted" in lowered
+                or "kill() called" in lowered
             ):
                 raise SerialProtocolError(
                     f"Marlin rejected {stripped!r}: {' | '.join(responses[-8:])}"
                 )
-            if lower.startswith("resend:") or lower.startswith("rs "):
+            if lowered.startswith("resend:") or lowered.startswith("rs "):
                 raise SerialProtocolError(
-                    "Marlin requested a numbered-line resend, which this simple USB protocol does not use: "
+                    "Marlin requested a numbered-line resend, which this USB transport does not use: "
                     + line
                 )
-            # echo:, busy:, wait, temperatures, and startup text are informational.
+            # echo:, busy:, wait, temperatures, startup text and replacement
+            # characters are informational until ok/error arrives.
 
         detail = " | ".join(responses[-8:]) if responses else "no response"
-        raise SerialProtocolError(f"timeout waiting for Marlin acknowledgement of {stripped!r}: {detail}")
+        raise SerialProtocolError(
+            f"timeout waiting for Marlin acknowledgement of {stripped!r}: {detail}"
+        )
 
-    def send_program(self, commands: Iterable[str]) -> Tuple[CommandResult, ...]:
-        results = []
-        for command in commands:
-            result = self.send_command(command)
-            if result.command:
-                results.append(result)
-        return tuple(results)
-
-    def best_effort(self, commands: Sequence[str]) -> None:
-        for command in commands:
-            try:
-                self.send_command(command, timeout_s=min(5.0, self.settings.command_timeout_s))
-            except Exception:
+    def connect(self) -> None:
+        with self._lifecycle_lock:
+            if self.connected:
                 return
 
+            candidate_ports = self._candidate_ports()
+            if not candidate_ports:
+                raise SerialProtocolError(
+                    "no USB serial port was found. On Fedora, check for /dev/ttyUSB* or "
+                    "/dev/ttyACM*, use a USB data cable, and close other printer software"
+                )
+
+            factory = self._factory()
+            errors: List[str] = []
+            for device in candidate_ports:
+                for baudrate in self.settings.candidate_baudrates:
+                    serial_object = None
+                    try:
+                        serial_object = factory(
+                            port=device,
+                            baudrate=baudrate,
+                            timeout=self.settings.read_timeout_s,
+                            write_timeout=self.settings.write_timeout_s,
+                            rtscts=False,
+                            dsrdtr=False,
+                        )
+                        if self.settings.startup_wait_s:
+                            sleep(self.settings.startup_wait_s)
+                        reset = getattr(serial_object, "reset_input_buffer", None)
+                        if callable(reset):
+                            reset()
+
+                        firmware = None
+                        if self.settings.verify_marlin:
+                            result = self._send_on_connection(
+                                serial_object,
+                                "M115",
+                                timeout_s=self.settings.handshake_timeout_s,
+                            )
+                            firmware = self._identity_from(result.responses)
+                            if firmware is None:
+                                raise SerialProtocolError(
+                                    "M115 was acknowledged but did not identify Marlin"
+                                )
+
+                        self._serial = serial_object
+                        self._connection_info = ConnectionInfo(
+                            port=device,
+                            baudrate=baudrate,
+                            firmware=firmware,
+                        )
+                        return
+                    except Exception as exc:
+                        errors.append(f"{device} at {baudrate}: {exc}")
+                        if serial_object is not None:
+                            self._close_object(serial_object)
+
+            self._serial = None
+            self._connection_info = None
+            detail = "; ".join(errors[-6:])
+            hint = (
+                " Check serial permissions (often the dialout group), close Cura/Pronterface, "
+                "and verify that the board is running Marlin."
+            )
+            raise SerialProtocolError(
+                "serial ports were found, but none completed the Marlin handshake. "
+                f"Details: {detail}.{hint}"
+            )
+
+    def close(self) -> None:
+        with self._lifecycle_lock:
+            serial_object = self._serial
+            self._serial = None
+            self._connection_info = None
+            if serial_object is not None:
+                self._close_object(serial_object)
+
+    def __enter__(self) -> "MarlinSerial":
+        self.connect()
+        return self
+
+    def __exit__(self, exc_type: Any, exc: Any, traceback: Any) -> None:
+        self.close()
+
+    def _require_connected(self) -> Any:
+        if not self.connected or self._serial is None:
+            raise SerialProtocolError("serial link is not connected")
+        return self._serial
+
+    def send_command(
+        self,
+        command: str,
+        timeout_s: Optional[float] = None,
+    ) -> CommandResult:
+        with self._command_lock:
+            serial_object = self._require_connected()
+            return self._send_on_connection(
+                serial_object,
+                command,
+                timeout_s=(
+                    timeout_s
+                    if timeout_s is not None
+                    else self.settings.command_timeout_s
+                ),
+            )
+
+    def send_program(self, commands: Iterable[str]) -> Tuple[CommandResult, ...]:
+        with self._command_lock:
+            serial_object = self._require_connected()
+            results = []
+            for command in commands:
+                result = self._send_on_connection(
+                    serial_object,
+                    command,
+                    timeout_s=self.settings.command_timeout_s,
+                )
+                if result.command:
+                    results.append(result)
+            return tuple(results)
+
+    def best_effort(self, commands: Sequence[str]) -> None:
+        with self._command_lock:
+            if not self.connected or self._serial is None:
+                return
+            for command in commands:
+                try:
+                    self._send_on_connection(
+                        self._serial,
+                        command,
+                        timeout_s=min(5.0, self.settings.command_timeout_s),
+                    )
+                except Exception:
+                    return
+
     def emergency_stop(self, command: str = "M112") -> None:
+        # Deliberately bypass the normal command lock. A different thread could
+        # be blocked in M400 and an emergency stop must still be writable.
         serial_object = self._require_connected()
         try:
-            serial_object.write((command.strip() + "\n").encode("ascii"))
+            payload = (self._clean_command(command) + "\n").encode("ascii")
+            serial_object.write(payload)
             flush = getattr(serial_object, "flush", None)
             if callable(flush):
                 flush()
@@ -169,9 +433,94 @@ class MarlinSerial:
             raise SerialProtocolError(f"failed to send emergency stop: {exc}") from exc
 
 
-def list_serial_ports() -> Tuple[Tuple[str, str], ...]:
-    try:
-        from serial.tools import list_ports  # type: ignore
-    except ImportError as exc:
-        raise SerialProtocolError("pyserial is not installed") from exc
-    return tuple((port.device, port.description or "") for port in list_ports.comports())
+class DemoMarlinSerial:
+    """In-memory Marlin-like link used by the browser demo and tests."""
+
+    POSITION_RE = re.compile(r"\bX(-?\d+(?:\.\d+)?)\s+Y(-?\d+(?:\.\d+)?)")
+
+    def __init__(self, settings: SerialSettings) -> None:
+        self.settings = settings
+        self._connected = False
+        self._x = 0.0
+        self._y = 0.0
+        self.commands: List[str] = []
+
+    @property
+    def connected(self) -> bool:
+        return self._connected
+
+    @property
+    def active_port(self) -> Optional[str]:
+        return "DEMO" if self._connected else None
+
+    @property
+    def active_baudrate(self) -> Optional[int]:
+        return self.settings.baudrate if self._connected else None
+
+    @property
+    def firmware_identity(self) -> Optional[str]:
+        return "FIRMWARE_NAME:Marlin DEMO" if self._connected else None
+
+    @property
+    def connection_info(self) -> Optional[ConnectionInfo]:
+        if not self._connected:
+            return None
+        return ConnectionInfo("DEMO", self.settings.baudrate, self.firmware_identity)
+
+    def connect(self) -> None:
+        self._connected = True
+
+    def close(self) -> None:
+        self._connected = False
+
+    def __enter__(self) -> "DemoMarlinSerial":
+        self.connect()
+        return self
+
+    def __exit__(self, exc_type: Any, exc: Any, traceback: Any) -> None:
+        self.close()
+
+    def send_command(self, command: str, timeout_s: Optional[float] = None) -> CommandResult:
+        if not self._connected:
+            raise SerialProtocolError("serial link is not connected")
+        stripped = MarlinSerial._clean_command(command)
+        if not stripped:
+            return CommandResult("", ())
+        self.commands.append(stripped)
+        upper = stripped.upper()
+        if upper.startswith("G28"):
+            self._x = 0.0
+            self._y = 0.0
+        elif upper.startswith(("G0 ", "G1 ")):
+            match = self.POSITION_RE.search(upper)
+            if match:
+                self._x = float(match.group(1))
+                self._y = float(match.group(2))
+        if upper == "M115":
+            responses = ("FIRMWARE_NAME:Marlin DEMO", "ok")
+        elif upper == "M119":
+            responses = ("Reporting endstop status", "x_min: open", "y_min: open", "ok")
+        elif upper == "M114":
+            responses = (f"X:{self._x:.3f} Y:{self._y:.3f} Z:0.000 E:0.000", "ok")
+        else:
+            responses = ("ok",)
+        return CommandResult(stripped, responses)
+
+    def send_program(self, commands: Iterable[str]) -> Tuple[CommandResult, ...]:
+        return tuple(
+            result
+            for command in commands
+            if (result := self.send_command(command)).command
+        )
+
+    def best_effort(self, commands: Sequence[str]) -> None:
+        for command in commands:
+            try:
+                self.send_command(command)
+            except Exception:
+                return
+
+    def emergency_stop(self, command: str = "M112") -> None:
+        if self._connected:
+            self.commands.append(MarlinSerial._clean_command(command))
+        self._connected = False

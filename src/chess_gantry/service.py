@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Union
 
@@ -195,63 +195,149 @@ class GantryService:
             next_state=next_state,
         )
 
-    def execute(self, move: MoveDelta) -> MotionPlan:
+    def _require_execution_unlocked(self) -> None:
         if not self.config.safety.calibrated:
             raise ConfigurationError(
                 "hardware execution is locked because safety.calibrated is false. Dry-run, measure, home, "
                 "and verify coordinates before changing it to true"
             )
 
-        with self.store.locked():
-            if self.journal.exists():
-                raise PendingTransactionError(
-                    f"pending transaction exists at {self.journal.path}; inspect and reconcile it first"
-                )
-            state = self.store.load()
-            plan = self.plan(move, state)
-            self.journal.create(plan.journal_payload())
-            self.audit.append({"status": "prepared", **plan.summary()})
+    def _prepare_transaction(self, move: MoveDelta) -> MotionPlan:
+        if self.journal.exists():
+            raise PendingTransactionError(
+                f"pending transaction exists at {self.journal.path}; inspect and reconcile it first"
+            )
+        state = self.store.load()
+        plan = self.plan(move, state)
+        self.journal.create(plan.journal_payload())
+        self.audit.append({"status": "prepared", **plan.summary()})
+        return plan
 
+    def _stream_plan(self, plan: MotionPlan, link: Any) -> None:
+        if self.config.safety.preflight_commands:
+            link.send_program(self.config.safety.preflight_commands)
+        if self.config.safety.home_before_execute:
+            link.send_program(self.config.safety.home_commands)
+        try:
+            link.send_program(plan.program.commands)
+        except Exception:
+            link.best_effort(self.config.magnet.off_commands)
+            raise
+
+    def _complete_transaction(self, plan: MotionPlan) -> MotionPlan:
+        self.store.save(plan.next_state)
+        self.audit.append({"status": "completed", **plan.summary()})
+        self.journal.clear()
+        return plan
+
+    def _fail_transaction(self, plan: MotionPlan, exc: Exception) -> None:
+        self.journal.mark_failed(str(exc))
+        self.audit.append(
+            {"status": "failed_or_unknown", "error": str(exc), **plan.summary()}
+        )
+
+    def execute(self, move: MoveDelta) -> MotionPlan:
+        """Open the configured serial link, execute one move, then close it."""
+
+        self._require_execution_unlocked()
+        with self.store.locked():
+            plan = self._prepare_transaction(move)
             try:
                 link = self._link_factory(self.config.serial)
                 with link:
-                    if self.config.safety.preflight_commands:
-                        link.send_program(self.config.safety.preflight_commands)
-                    if self.config.safety.home_before_execute:
-                        link.send_program(self.config.safety.home_commands)
-                    try:
-                        link.send_program(plan.program.commands)
-                    except Exception:
-                        link.best_effort(self.config.magnet.off_commands)
-                        raise
-                self.store.save(plan.next_state)
-                self.audit.append({"status": "completed", **plan.summary()})
-                self.journal.clear()
-                return plan
+                    self._stream_plan(plan, link)
+                return self._complete_transaction(plan)
             except Exception as exc:
-                self.journal.mark_failed(str(exc))
-                self.audit.append({"status": "failed_or_unknown", "error": str(exc), **plan.summary()})
+                self._fail_transaction(plan, exc)
                 raise
+
+    def execute_with_link(self, move: MoveDelta, link: Any) -> MotionPlan:
+        """Execute using an already-connected link owned by another interface.
+
+        The local web controller uses this method so manual coordinate tests and
+        JSON chess moves share one verified Marlin connection instead of two
+        processes fighting over the same USB device.
+        """
+
+        self._require_execution_unlocked()
+        if not getattr(link, "connected", False):
+            raise ConfigurationError("cannot execute: the supplied Marlin link is not connected")
+        with self.store.locked():
+            plan = self._prepare_transaction(move)
+            try:
+                self._stream_plan(plan, link)
+                return self._complete_transaction(plan)
+            except Exception as exc:
+                self._fail_transaction(plan, exc)
+                raise
+
+    def home_with_link(self, link: Any) -> None:
+        if not getattr(link, "connected", False):
+            raise ConfigurationError("cannot home: the supplied Marlin link is not connected")
+        link.send_program(self.config.magnet.off_commands)
+        link.send_program(self.config.safety.home_commands)
 
     def home(self) -> None:
         link = self._link_factory(self.config.serial)
         with link:
-            link.send_program(self.config.magnet.off_commands)
-            link.send_program(self.config.safety.home_commands)
+            self.home_with_link(link)
+
+    def motor_test_program(self) -> Tuple[str, ...]:
+        """Return the fixed, synchronized 150 mm by 100 mm motor test program."""
+
+        points = (
+            MachinePoint(0.0, 0.0),
+            MachinePoint(150.0, 0.0),
+            MachinePoint(150.0, 100.0),
+            MachinePoint(0.0, 0.0),
+        )
+        for point in points:
+            if not self.config.workspace.contains(point):
+                raise ConfigurationError(
+                    f"motor-test point X{point.x:g} Y{point.y:g} is outside the configured workspace"
+                )
+        return (
+            "G21",
+            "G90",
+            *self.config.magnet.off_commands,
+            "G0 X0 Y0",
+            "M400",
+            "G1 X150 F1000",
+            "M400",
+            "G1 Y100 F1000",
+            "M400",
+            "G1 X0 Y0 F1000",
+            "M400",
+            "M84",
+        )
+
+    def motor_test(self) -> Tuple[str, ...]:
+        """Home and run the fixed motor-only test after calibration is approved."""
+
+        self._require_execution_unlocked()
+        program = self.motor_test_program()
+        link = self._link_factory(self.config.serial)
+        with link:
+            if self.config.safety.preflight_commands:
+                link.send_program(self.config.safety.preflight_commands)
+            self.home_with_link(link)
+            try:
+                link.send_program(program)
+            except Exception:
+                link.best_effort(self.config.magnet.off_commands)
+                raise
+        self.audit.append({"status": "motor_test_completed", "commands": list(program)})
+        return program
+
+    def emergency_stop_with_link(self, link: Any) -> None:
+        if not getattr(link, "connected", False):
+            raise ConfigurationError("cannot stop: the supplied Marlin link is not connected")
+        link.emergency_stop(self.config.safety.emergency_stop_command)
 
     def emergency_stop(self) -> None:
         link = self._link_factory(self.config.serial)
-        # Avoid the normal post-open wait for an emergency command when using the default link.
         if isinstance(link, MarlinSerial):
-            original = link.settings
-            link.settings = type(original)(
-                port=original.port,
-                baudrate=original.baudrate,
-                read_timeout_s=original.read_timeout_s,
-                write_timeout_s=original.write_timeout_s,
-                command_timeout_s=original.command_timeout_s,
-                startup_wait_s=0.0,
-            )
+            link.settings = replace(link.settings, startup_wait_s=0.0)
         with link:
             link.emergency_stop(self.config.safety.emergency_stop_command)
 

@@ -20,7 +20,11 @@ Installed.
 Next:
   source .venv/bin/activate
   chess-gantry --config config.json ports
-  chess-gantry --config config.json plan examples/move_e2_e4.json
+  ./scripts/run_move.sh examples/move_e2_e4.json
+  ./scripts/run_move.sh examples/move_e2_e4.json --confirm-motion
+
+The first command dry-runs: JSON coordinates become G-code on stdout.
+The second streams that G-code to the Marlin controller over serial.
 
 Hardware execution remains locked until you calibrate config.json and set
 safety.calibrated to true.

@@ -2,6 +2,42 @@
 
 A tested Python framework that accepts a chess move as JSON, checks it against persistent board state, converts board squares to machine coordinates, plans a physical path, generates Marlin G-code, and optionally streams that G-code over USB serial.
 
+## Fedora quick start: one integrated interface
+
+The working direct-coordinate controller and the chess workflow now use the same serial transport and the same verified Marlin connection. From the project root:
+
+```bash
+./scripts/install_pi.sh
+source .venv/bin/activate
+chess-gantry --config config.json --state data/board_state.json web
+```
+
+The browser opens at:
+
+```text
+http://127.0.0.1:8000
+```
+
+The page provides, in order:
+
+1. Fedora/macOS/Windows serial-port discovery and an `M115` Marlin handshake.
+2. Endstop inspection, X/Y homing, and guarded manual X/Y moves in millimetres.
+3. Read-only planning from your `position / px / py / nx / ny` JSON.
+4. Physical execution through the same connection, with the existing calibration lock, journal, audit log, and atomic state commit.
+5. `M112` emergency stop.
+
+To test the complete page without hardware:
+
+```bash
+chess-gantry --config config.json --state data/board_state.json web --demo
+```
+
+For a terminal-only connection test that does not move motors:
+
+```bash
+chess-gantry --config config.json diagnose
+```
+
 This architecture assumes:
 
 - A Raspberry Pi runs this Python project.
@@ -22,11 +58,11 @@ The framework deliberately leaves `safety.calibrated` set to `false`. Planning w
 - Board orientation controls: X/Y flips and axis swapping.
 - A direct planner and an occupancy-aware A* planner.
 - Marlin G-code with absolute millimetres, travel/drag feed rates, magnet dwell times, and `M400` synchronization.
-- Blocking serial communication that waits for `ok` and rejects Marlin errors, unknown commands, resends, and timeouts.
+- Cross-platform serial discovery, automatic `115200`/`250000` probing, an `M115` Marlin handshake, invalid-byte-safe decoding, and command-by-command `ok` handling.
 - Atomic state writes, a process lock, an audit log, and a pending-move journal.
-- Dry-run, validation, home, serial-port listing, execution, emergency stop, and recovery commands.
+- Dry-run, validation, diagnostics, local web control, manual coordinates, home, serial-port listing, execution, emergency stop, and recovery commands.
 - A matrix-difference example that produces the move JSON.
-- Thirty-two automated tests covering normal and failure paths.
+- Forty automated tests covering normal moves, failures, Fedora port discovery, malformed serial bytes, fallback baud probing, browser APIs, and persistent-state commits.
 
 ## Data flow
 
@@ -87,10 +123,12 @@ chess_gantry_pi/
 │   └── matrix_adapter.py
 ├── scripts/
 │   ├── install_pi.sh
+│   ├── run_fedora.sh
 │   └── check.sh
 ├── src/chess_gantry/
 │   ├── cli.py
 │   ├── config.py
+│   ├── controller.py
 │   ├── errors.py
 │   ├── gcode.py
 │   ├── kinematics.py
@@ -98,7 +136,8 @@ chess_gantry_pi/
 │   ├── path_planning.py
 │   ├── persistence.py
 │   ├── serial_link.py
-│   └── service.py
+│   ├── service.py
+│   └── web_app.py
 └── tests/
 ```
 
@@ -229,10 +268,29 @@ mkdir -p data
 cp examples/board_state.standard.json data/board_state.json
 ```
 
-List serial devices:
+List serial devices, with likely printer ports ranked first:
 
 ```bash
 chess-gantry --config config.json ports
+```
+
+Verify the controller without moving it:
+
+```bash
+chess-gantry --config config.json diagnose
+```
+
+Launch the combined local web controller:
+
+```bash
+chess-gantry --config config.json --state data/board_state.json web
+```
+
+Dry-run or execute a single move from the terminal (no browser):
+
+```bash
+./scripts/run_fedora.sh examples/move_e2_e4.json              # dry-run G-code to stdout
+./scripts/run_fedora.sh examples/move_e2_e4.json --confirm-motion  # hardware execute
 ```
 
 If the controller appears as `/dev/ttyUSB0` or `/dev/ttyACM0` but access is denied, inspect its owning group:
@@ -306,12 +364,21 @@ Set the detected port and the baud rate used by your Marlin build:
 
 ```json
 "serial": {
-  "port": "/dev/ttyUSB0",
-  "baudrate": 115200
+  "port": "auto",
+  "baudrate": 115200,
+  "fallback_baudrates": [115200, 250000],
+  "read_timeout_s": 0.25,
+  "write_timeout_s": 2.0,
+  "command_timeout_s": 120.0,
+  "startup_wait_s": 2.5,
+  "verify_marlin": true,
+  "handshake_timeout_s": 5.0
 }
 ```
 
-Opening some printer controllers over USB resets the controller, which is why the config has `startup_wait_s` and why homing before execution is enabled in the example.
+`"port": "auto"` ranks devices reported by PySerial, including Fedora paths such as `/dev/ttyUSB0` and `/dev/ttyACM0`, and accepts a connection only after `M115` identifies Marlin. To force one device, replace `auto` with its exact path. To force one baud for diagnosis, use `diagnose --baudrate 115200` or select it in the browser.
+
+Opening some printer controllers over USB resets the controller, which is why the config has `startup_wait_s`. Invalid startup bytes are replaced for diagnostics instead of causing a `UnicodeDecodeError`.
 
 ### 2. Board geometry
 

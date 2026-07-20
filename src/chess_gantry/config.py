@@ -47,6 +47,17 @@ def _integer(value: Any, name: str, *, positive: bool = False, non_negative: boo
     return value
 
 
+def _integer_sequence(value: Any, name: str) -> Tuple[int, ...]:
+    if not isinstance(value, list):
+        raise ConfigurationError(f"{name} must be an array of positive integers")
+    result = []
+    for index, item in enumerate(value):
+        parsed = _integer(item, f"{name}[{index}]", positive=True)
+        if parsed not in result:
+            result.append(parsed)
+    return tuple(result)
+
+
 def _boolean(value: Any, name: str) -> bool:
     if not isinstance(value, bool):
         raise ConfigurationError(f"{name} must be true or false")
@@ -79,25 +90,57 @@ def _commands(value: Any, name: str, *, allow_empty: bool = False) -> Tuple[str,
 class SerialSettings:
     port: str
     baudrate: int
+    fallback_baudrates: Tuple[int, ...]
     read_timeout_s: float
     write_timeout_s: float
     command_timeout_s: float
     startup_wait_s: float
+    verify_marlin: bool
+    handshake_timeout_s: float
+
+    @property
+    def auto_detect(self) -> bool:
+        return self.port.strip().lower() in {"auto", "detect", ""}
+
+    @property
+    def candidate_baudrates(self) -> Tuple[int, ...]:
+        ordered = [self.baudrate, *self.fallback_baudrates]
+        return tuple(dict.fromkeys(ordered))
 
     @classmethod
     def from_mapping(cls, raw: Mapping[str, Any]) -> "SerialSettings":
         _unknown(
             raw,
-            {"port", "baudrate", "read_timeout_s", "write_timeout_s", "command_timeout_s", "startup_wait_s"},
+            {
+                "port",
+                "baudrate",
+                "fallback_baudrates",
+                "read_timeout_s",
+                "write_timeout_s",
+                "command_timeout_s",
+                "startup_wait_s",
+                "verify_marlin",
+                "handshake_timeout_s",
+            },
             "serial",
         )
         return cls(
-            port=_string(raw.get("port", "/dev/ttyUSB0"), "serial.port"),
+            port=_string(raw.get("port", "auto"), "serial.port"),
             baudrate=_integer(raw.get("baudrate", 115200), "serial.baudrate", positive=True),
+            fallback_baudrates=_integer_sequence(
+                raw.get("fallback_baudrates", [115200, 250000]),
+                "serial.fallback_baudrates",
+            ),
             read_timeout_s=_number(raw.get("read_timeout_s", 0.25), "serial.read_timeout_s", positive=True),
             write_timeout_s=_number(raw.get("write_timeout_s", 2.0), "serial.write_timeout_s", positive=True),
             command_timeout_s=_number(raw.get("command_timeout_s", 120.0), "serial.command_timeout_s", positive=True),
             startup_wait_s=_number(raw.get("startup_wait_s", 2.5), "serial.startup_wait_s", non_negative=True),
+            verify_marlin=_boolean(raw.get("verify_marlin", True), "serial.verify_marlin"),
+            handshake_timeout_s=_number(
+                raw.get("handshake_timeout_s", 5.0),
+                "serial.handshake_timeout_s",
+                positive=True,
+            ),
         )
 
 

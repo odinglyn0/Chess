@@ -11,3 +11,7 @@ data/pending_move.json
 data/audit.jsonl
 config.json
 *.gcode
+*.lock
+data/*.json
+data/lichess/
+!data/.gitkeep

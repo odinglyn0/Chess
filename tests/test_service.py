@@ -28,6 +28,7 @@ def test_config(*, calibrated: bool = True, capture: bool = True) -> AppConfig:
 class FakeLink:
     def __init__(self, fail: bool = False) -> None:
         self.fail = fail
+        self.connected = True
         self.programs = []
         self.best_effort_programs = []
         self.stopped = False
@@ -217,6 +218,34 @@ class ServiceTests(unittest.TestCase):
             with self.assertRaisesRegex(ConfigurationError, "calibrated is false"):
                 service.execute(move)
             self.assertFalse(journal_path.exists())
+
+    def test_motor_test_homes_runs_fixed_program_and_does_not_change_board_state(self) -> None:
+        with TemporaryDirectory() as directory:
+            temp = Path(directory)
+            state_path, journal_path, audit_path = self.paths(temp)
+            atomic_write_json(state_path, self.minimal_state().to_dict())
+            fake = FakeLink()
+            service = GantryService(
+                test_config(), state_path, journal_path, audit_path, link_factory=lambda settings: fake
+            )
+            program = service.motor_test()
+            self.assertEqual(fake.programs[0], ("M107",))
+            self.assertEqual(fake.programs[1], ("M107", "G28 X Y", "M400"))
+            self.assertEqual(fake.programs[2], program)
+            self.assertIn("G1 X150 F1000", program)
+            self.assertIn("G1 Y100 F1000", program)
+            self.assertEqual(program[-1], "M84")
+            self.assertEqual(service.store.load().revision, 0)
+            self.assertFalse(journal_path.exists())
+
+    def test_motor_test_requires_workspace_and_calibration(self) -> None:
+        with TemporaryDirectory() as directory:
+            temp = Path(directory)
+            state_path, journal_path, audit_path = self.paths(temp)
+            atomic_write_json(state_path, self.minimal_state().to_dict())
+            locked = GantryService(test_config(calibrated=False), state_path, journal_path, audit_path)
+            with self.assertRaisesRegex(ConfigurationError, "calibrated is false"):
+                locked.motor_test()
 
 
 if __name__ == "__main__":

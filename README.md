@@ -1,149 +1,155 @@
-# Chess Gantry for Raspberry Pi + Marlin
+# Chess Gantry
 
-A tested Python framework that accepts a chess move as JSON, checks it against persistent board state, converts board squares to machine coordinates, plans a physical path, generates Marlin G-code, and optionally streams that G-code over USB serial.
+Chess Gantry is a Python 3.9+ motion-control framework for a Raspberry Pi connected over USB serial to an X/Y gantry running Marlin. It accepts a chess move as JSON, validates it against persistent physical board state, converts board squares to machine coordinates, plans a collision-aware path, generates G-code, and can execute that G-code on the controller.
 
-## Fedora quick start: one integrated interface
+The package manages physical consistency, not chess legality. A game engine, Lichess, or another upstream system must decide whether a move is legal before passing it to the gantry.
 
-The working direct-coordinate controller and the chess workflow now use the same serial transport and the same verified Marlin connection. From the project root:
+## Safety first
+
+The example configuration has `safety.calibrated` set to `false`. Planning and demo mode work immediately, but real movement remains locked until the machine has been measured and tested.
+
+- Keep an independent power cutoff accessible whenever the gantry is energized.
+- Verify axis directions, endstops, workspace limits, board geometry, speeds, capture slots, and magnet control before setting `safety.calibrated` to `true`.
+- Keep Marlin endstops and software limits enabled. The Python workspace check is an additional guard, not a replacement.
+- The example magnet commands, `M106 S255` and `M107`, are not universal. Use a correctly rated driver and suitable flyback protection; never drive an electromagnet directly from Raspberry Pi GPIO.
+- A valid 2-D path does not prove that real pieces, belts, wiring, or the magnet will clear every obstruction.
+- A Marlin `ok` confirms firmware acknowledgement, not successful physical movement. Belt slip, a dropped piece, or magnet failure requires sensing or manual verification.
+- `M112` normally requires a controller reset or power cycle followed by re-homing.
+
+## Features
+
+- Flat and nested move-delta JSON with strict validation.
+- Persistent, versioned board state keyed by stable piece IDs.
+- Normal moves, destination captures, and explicit off-destination captures such as en passant.
+- Capture-slot allocation and tracking.
+- Configurable board orientation, workspace, feed rates, magnet commands, homing, and parking.
+- Direct and occupancy-aware A* path planners.
+- Marlin G-code generation with synchronization and magnet dwell times.
+- Cross-platform serial discovery, fallback baud probing, `M115` verification, and command-by-command acknowledgement handling.
+- Transaction journals, process locking, atomic board-state commits, and audit logging.
+- Terminal, browser, UCI, public Lichess PGN, and WebSocket-stream workflows.
+- Hardware-free planning, diagnostics, web demo, and motor-test simulation.
+
+## How it works
+
+```text
+legal move or game event
+        |
+        v
+move-delta JSON -> validate against stored BoardState
+        |
+        +-> detect capture and allocate capture slot
+        |
+        v
+board coordinates -> machine millimetres -> path planner
+        |
+        v
+piece transfers -> Marlin G-code
+        |
+        +-> dry run: print or save only
+        |
+        v
+pending journal -> USB serial -> all commands acknowledged
+        |
+        v
+atomic board-state commit + audit record
+```
+
+Persistent state changes only after the complete serial program succeeds. If execution fails or becomes uncertain, the pending journal remains and blocks further execution until the physical board is inspected and reconciled.
+
+## Requirements
+
+- Python 3.9 or newer
+- A Python installation with `venv` and `pip`
+- For physical execution, a Marlin-compatible controller connected by USB serial
+- Optional Docker with Compose for the external Lichess stream service
+
+Python dependencies are installed from `pyproject.toml`:
+
+- `pyserial`
+- `websockets`
+- `python-chess`
+
+## Installation
+
+Clone the main branch and enter the repository:
+
+```bash
+git clone https://github.com/odinglyn0/Chess.git
+cd Chess
+```
+
+Run the setup script:
 
 ```bash
 ./scripts/install_pi.sh
 source .venv/bin/activate
-chess-gantry --config config.json --state data/board_state.json web
 ```
 
-The browser opens at:
+The script creates `.venv`, installs the package in editable mode, copies `config.example.json` to `config.json` if needed, and creates `data/board_state.json` from the standard example if needed.
 
-```text
-http://127.0.0.1:8000
+Manual equivalent:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e .
+cp config.example.json config.json
+mkdir -p data
+cp examples/board_state.standard.json data/board_state.json
 ```
 
-The page provides, in order:
+Runtime files such as `config.json`, board state, journals, audit logs, generated G-code, and Lichess sessions are intentionally ignored by Git.
 
-1. Fedora/macOS/Windows serial-port discovery and an `M115` Marlin handshake.
-2. Endstop inspection, X/Y homing, and guarded manual X/Y moves in millimetres.
-3. Read-only planning from your `position / px / py / nx / ny` JSON.
-4. Physical execution through the same connection, with the existing calibration lock, journal, audit log, and atomic state commit.
-5. `M112` emergency stop.
+## Quick start
 
-To test the complete page without hardware:
+Activate the environment before using the CLI:
+
+```bash
+source .venv/bin/activate
+```
+
+Plan a move without opening the serial port or changing board state:
+
+```bash
+chess-gantry --config config.json --state data/board_state.json \
+  plan examples/move_e2_e4.json
+```
+
+Launch the browser controller with simulated hardware:
 
 ```bash
 chess-gantry --config config.json --state data/board_state.json web --demo
 ```
 
-For a terminal-only connection test that does not move motors:
+It opens at `http://127.0.0.1:8000` by default.
+
+List serial devices and perform a non-moving Marlin diagnostic:
 
 ```bash
+chess-gantry --config config.json ports
 chess-gantry --config config.json diagnose
 ```
 
-This architecture assumes:
+After calibration, execute a move physically:
 
-- A Raspberry Pi runs this Python project.
-- An Ender-style controller running Marlin drives the X/Y stepper motors.
-- The Pi communicates with Marlin over USB serial.
-- An electromagnet is controlled through a properly rated driver. The example uses configurable `M106`/`M107` commands, but the coil must **not** be connected directly to a Pi GPIO pin, and it must not be connected directly to a fan output unless the load and protection circuit have been verified.
-
-The framework deliberately leaves `safety.calibrated` set to `false`. Planning works immediately; physical execution stays locked until you have measured and checked the machine.
-
-## What is implemented
-
-- Your original flat JSON format: `position`, `px`, `py`, `nx`, `ny`.
-- A clearer `id` alias and an optional nested format.
-- Strict validation, including rejecting misspelled fields and boolean “coordinates.”
-- Persistent, versioned JSON board state keyed by stable piece IDs.
-- Normal moves, destination captures, and explicit off-destination captures such as en passant.
-- Capture-slot tracking so two removed pieces cannot be assigned to the same physical location.
-- Board orientation controls: X/Y flips and axis swapping.
-- A direct planner and an occupancy-aware A* planner.
-- Marlin G-code with absolute millimetres, travel/drag feed rates, magnet dwell times, and `M400` synchronization.
-- Cross-platform serial discovery, automatic `115200`/`250000` probing, an `M115` Marlin handshake, invalid-byte-safe decoding, and command-by-command `ok` handling.
-- Atomic state writes, a process lock, an audit log, and a pending-move journal.
-- Dry-run, validation, diagnostics, local web control, manual coordinates, home, serial-port listing, execution, emergency stop, and recovery commands.
-- A matrix-difference example that produces the move JSON.
-- Forty automated tests covering normal moves, failures, Fedora port discovery, malformed serial bytes, fallback baud probing, browser APIs, and persistent-state commits.
-
-## Data flow
-
-```text
-new game/vision state
-        |
-        v
-move-delta JSON
-        |
-        v
-MoveDelta validation
-        |
-        v
-stored BoardState check
-        |
-        +--> capture detection and slot assignment
-        |
-        v
-board coordinates -> machine millimetres
-        |
-        v
-path planner -> PieceTransfer list
-        |
-        v
-Marlin G-code generator
-        |
-        +--> dry-run: print/write .gcode only
-        |
-        v
-transaction journal -> USB serial -> Marlin
-        |
-        v
-all commands acknowledged
-        |
-        v
-atomic board-state commit
+```bash
+chess-gantry \
+  --config config.json \
+  --state data/board_state.json \
+  --journal data/pending_move.json \
+  --audit data/audit.jsonl \
+  execute examples/move_e2_e4.json \
+  --confirm-motion
 ```
 
-The important rule is: **the stored board state changes only after the complete serial program succeeds**. If execution becomes uncertain, a journal remains and later motion is blocked until you inspect the real board and reconcile it.
-
-## Project layout
-
-```text
-chess_gantry_pi/
-├── config.example.json
-├── pyproject.toml
-├── README.md
-├── schemas/
-│   ├── move.schema.json
-│   └── board_state.schema.json
-├── examples/
-│   ├── board_state.standard.json
-│   ├── board_state.capture_demo.json
-│   ├── board_state.en_passant_demo.json
-│   ├── move_e2_e4.json
-│   ├── move_capture_demo.json
-│   ├── move_en_passant.json
-│   └── matrix_adapter.py
-├── scripts/
-│   ├── install_pi.sh
-│   ├── run_fedora.sh
-│   └── check.sh
-├── src/chess_gantry/
-│   ├── cli.py
-│   ├── config.py
-│   ├── controller.py
-│   ├── errors.py
-│   ├── gcode.py
-│   ├── kinematics.py
-│   ├── models.py
-│   ├── path_planning.py
-│   ├── persistence.py
-│   ├── serial_link.py
-│   ├── service.py
-│   └── web_app.py
-└── tests/
-```
+Global options such as `--config`, `--state`, `--journal`, and `--audit` should be placed before the subcommand.
 
 ## Move JSON
 
-Your requested format is accepted unchanged. Here `position` is the stable piece ID:
+Coordinates use `x = 0..7` for files `a..h`, `y = 0..7` for ranks `1..8`, and `matrix[y][x]` in matrix integrations.
+
+The original flat format is supported. `position` is the stable physical piece ID:
 
 ```json
 {
@@ -156,45 +162,9 @@ Your requested format is accepted unchanged. Here `position` is the stable piece
 }
 ```
 
-Coordinate convention:
+`id` may be used instead of `position`, and a nested `position` object is also accepted. `event_id` is optional but recommended; replaying an already processed event is rejected.
 
-- `x = 0..7` means files `a..h`.
-- `y = 0..7` means ranks `1..8`.
-- The matrix convention is `matrix[y][x]`.
-- `event_id` is optional, but recommended. Reusing a processed event ID is rejected.
-
-A clearer `id` key is also accepted:
-
-```json
-{
-  "id": "white_pawn_e",
-  "px": 4,
-  "py": 1,
-  "nx": 4,
-  "ny": 3
-}
-```
-
-The nested version is accepted too:
-
-```json
-{
-  "event_id": "game-17-ply-23",
-  "position": {
-    "id": "white_pawn_e",
-    "px": 4,
-    "py": 1,
-    "nx": 4,
-    "ny": 3
-  }
-}
-```
-
-### Captures
-
-A normal capture needs no extra fields. If the destination is occupied in stored state, the framework removes that piece to the next free capture slot before moving the attacking piece.
-
-En passant needs the captured piece and its actual square because that square is different from the destination:
+A normal destination capture is inferred from persistent board state. En passant and other off-destination captures must identify the captured piece and its actual location:
 
 ```json
 {
@@ -212,9 +182,11 @@ En passant needs the captured piece and its actual square because that square is
 }
 ```
 
-## Persistent board state
+JSON schemas are available in `schemas/move.schema.json` and `schemas/board_state.schema.json`.
 
-`data/board_state.json` stores each physical piece by ID:
+## Board state
+
+`data/board_state.json` records every physical piece, its board or capture status, a monotonically increasing revision, and processed event IDs:
 
 ```json
 {
@@ -235,304 +207,202 @@ En passant needs the captured piece and its actual square because that square is
 }
 ```
 
-After capture, the removed piece becomes:
+Install or replace an initial state and inspect the active state with:
+
+```bash
+chess-gantry --state data/board_state.json init-state examples/board_state.standard.json
+chess-gantry --state data/board_state.json show-state
+```
+
+Add `--overwrite` to `init-state` only when intentionally replacing an existing state file.
+
+## CLI reference
+
+Both `chess-gantry` and `python -m chess_gantry` invoke the CLI.
+
+| Command | Purpose |
+| --- | --- |
+| `plan MOVE` | Validate and print G-code without hardware or state mutation. Supports `--output` and `--summary-json`. |
+| `validate MOVE` | Validate the move, state transition, and planned path without printing G-code. |
+| `execute MOVE --confirm-motion` | Execute on Marlin and commit state only after success. |
+| `run MOVE` | Dry-run by default; add `--confirm-motion` to execute. |
+| `init-state SOURCE` | Validate and install initial board state; `--overwrite` permits replacement. |
+| `show-state` | Print persistent board state. |
+| `uci-to-json UCI` | Convert a four-character move such as `e2e4`; supports `--event-id`, `--en-passant`, and `--output`. |
+| `lichess-event EVENT` | Convert one saved stream event and plan it; supports move and G-code output paths. |
+| `lichess-watch GAME_ID` | Consume WebSocket move events; dry-run by default or execute with explicit confirmation. |
+| `lichess-pgn GAME_ID` | Fetch and dry-run all currently recorded moves in a public game. |
+| `lichess-follow GAME_ID` | Poll public PGN and generate files for new moves, optionally executing them. |
+| `ports` | List serial devices with likely printer controllers ranked first. |
+| `diagnose` | Verify Marlin and query endstops and position without movement. |
+| `web` | Start the browser controller. |
+| `home --confirm-motion` | Turn the magnet off and run configured X/Y homing commands. |
+| `motor-test --confirm-motion` | Home, run a fixed guarded X/Y test path, and disable motors. |
+| `stop` | Send the configured emergency-stop command. |
+| `reconcile` | Inspect or resolve a pending transaction after checking the physical board. |
+
+Get complete options for any command with:
+
+```bash
+chess-gantry --help
+chess-gantry lichess-follow --help
+```
+
+## Configuration and calibration
+
+Edit the generated `config.json`; keep `config.example.json` as a reference. Unknown sections and fields are rejected.
+
+### Serial
+
+The example explicitly uses `/dev/ttyUSB0` at `115200` baud and also permits fallback probing at `250000`. Set `serial.port` to the actual device, or use `"auto"` to rank available serial devices and accept one only after `M115` identifies Marlin.
+
+Opening some USB controllers resets them, so `startup_wait_s` allows firmware startup before probing. Use `diagnose --port PATH --baudrate RATE` to test explicit values without moving motors.
+
+On Linux, if the device exists but access is denied, inspect its group and add your account to that group. Log out and back in afterward:
+
+```bash
+stat -c '%n group=%G permissions=%A' /dev/ttyUSB0
+sudo usermod -aG dialout "$USER"
+```
+
+Replace `dialout` with the group reported on the system.
+
+### Board and workspace
+
+`origin_x_mm` and `origin_y_mm` are the machine coordinates of the centre of logical square `(0, 0)`. Other square centres use `square_size_mm`. Use `flip_x`, `flip_y`, and `swap_xy` to describe how the physical board is mounted rather than altering incoming chess coordinates.
+
+The workspace is the allowed software envelope for magnet-centre coordinates. Board centres, park position, and capture slots must fit within it. Capture slots must be unique and outside the playing area.
+
+### Motion and planner
+
+Configure travel and drag feed rates, magnet dwell times, and optional parking under `motion`.
+
+The default A* planner treats stationary pieces as circular keep-out regions. `obstacle_keepout_mm` must account for the moving piece radius, stationary piece radius, and a safety margin. If no route fits, the move is rejected. The `direct` planner is useful for controlled empty-board tests but intentionally ignores occupied pieces.
+
+### Magnet and safety
+
+Verify the configured magnet commands with the coil disconnected before testing a properly protected, current-limited load. Verify homing and preflight commands against the installed Marlin configuration.
+
+Only set the following after completing physical calibration:
 
 ```json
 {
-  "status": "captured",
-  "x": null,
-  "y": null,
-  "capture_slot": 0
+  "safety": {
+    "calibrated": true
+  }
 }
 ```
 
-`revision` increases after every successfully committed move. The write is performed with a temporary file, `fsync`, and an atomic replacement to reduce the chance of a half-written state file.
+The real configuration must retain the other required `safety` fields shown in `config.example.json`; the snippet only highlights the lock.
 
-## Install on the Pi or Fedora computer
+## Browser controller
 
-From the project folder:
-
-```bash
-./scripts/install_pi.sh
-source .venv/bin/activate
-```
-
-Equivalent manual setup:
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -e .
-cp config.example.json config.json
-mkdir -p data
-cp examples/board_state.standard.json data/board_state.json
-```
-
-List serial devices, with likely printer ports ranked first:
-
-```bash
-chess-gantry --config config.json ports
-```
-
-Verify the controller without moving it:
-
-```bash
-chess-gantry --config config.json diagnose
-```
-
-Launch the combined local web controller:
+Start the local controller with:
 
 ```bash
 chess-gantry --config config.json --state data/board_state.json web
 ```
 
-Dry-run or execute a single move from the terminal (no browser):
+The interface supports serial connection, Marlin verification, endstop inspection, homing, guarded manual coordinates, move planning, physical execution, board-state inspection, and emergency stop. Use `--demo` for a simulated controller and `--no-browser` to suppress automatic browser launch.
 
-```bash
-./scripts/run_fedora.sh examples/move_e2_e4.json              # dry-run G-code to stdout
-./scripts/run_fedora.sh examples/move_e2_e4.json --confirm-motion  # hardware execute
-```
+The server binds only to `127.0.0.1` by default. A non-loopback host requires `--allow-network`. The application provides no authentication or TLS, so do not expose it to an untrusted network.
 
-If the controller appears as `/dev/ttyUSB0` or `/dev/ttyACM0` but access is denied, inspect its owning group:
+## Lichess and UCI
 
-```bash
-stat -c '%n  group=%G  permissions=%A' /dev/ttyUSB0
-```
+### UCI conversion
 
-Add your user to the group printed by that command, then log out and back in. For example, when the group is `dialout`:
-
-```bash
-sudo usermod -aG dialout "$USER"
-```
-
-## First dry run
-
-This does not open the serial port and does not edit board state:
-
-```bash
-chess-gantry \
-  --config config.json \
-  --state data/board_state.json \
-  plan examples/move_e2_e4.json
-```
-
-Write the result to a file:
-
-```bash
-chess-gantry \
-  --config config.json \
-  --state data/board_state.json \
-  plan examples/move_e2_e4.json \
-  --summary-json \
-  --output move.gcode
-```
-
-Validate without printing the program:
+Convert a move using the current physical board state:
 
 ```bash
 chess-gantry --config config.json --state data/board_state.json \
-  validate examples/move_e2_e4.json
+  uci-to-json e2e4 --event-id game-17-ply-1 --output data/e2e4.json
 ```
 
-## How the generated G-code works
+The UCI adapter supports normal moves, captures, and explicit `--en-passant`. Castling and promotion are rejected because they require physical operations not represented by one standard move delta.
 
-A normal transfer is generated in this order:
+### Public PGN replay
 
-```gcode
-G21                 ; millimetres
-G90                 ; absolute coordinates
-M107                ; magnet-control output off
-G0 X... Y... F...   ; travel to source with magnet off
-M400                ; wait until travel has physically finished
-M106 S255           ; configured magnet-on command
-G4 P300             ; allow the magnet to engage
-G1 X... Y... F...   ; drag through one or more planned waypoints
-M400                ; wait until drag has physically finished
-M107                ; release piece
-G4 P300              ; allow the piece to settle
+Fetch the current PGN for a public Lichess game, generate JSON and G-code for each move, and advance only an in-memory simulated board:
+
+```bash
+chess-gantry --config config.json --state data/board_state.json \
+  lichess-pgn GAME_ID
 ```
 
-The project does not automatically home inside the generated file. During hardware execution, `home_before_execute` can send the configured homing commands before the move program. This separation makes a dry-run G-code file predictable and keeps homing policy in configuration.
+Generated files are written to `data/lichess` by default. Persistent board state is not changed.
 
-## Configuration and calibration
+### Polling a live public game
 
-Copy `config.example.json` to `config.json`, then edit the copy. Every number in the example is a placeholder until measured on your machine.
+Poll every five seconds and emit files for newly observed moves:
 
-### 1. Serial settings
-
-Set the detected port and the baud rate used by your Marlin build:
-
-```json
-"serial": {
-  "port": "auto",
-  "baudrate": 115200,
-  "fallback_baudrates": [115200, 250000],
-  "read_timeout_s": 0.25,
-  "write_timeout_s": 2.0,
-  "command_timeout_s": 120.0,
-  "startup_wait_s": 2.5,
-  "verify_marlin": true,
-  "handshake_timeout_s": 5.0
-}
+```bash
+chess-gantry --config config.json --state data/board_state.json \
+  lichess-follow GAME_ID
 ```
 
-`"port": "auto"` ranks devices reported by PySerial, including Fedora paths such as `/dev/ttyUSB0` and `/dev/ttyACM0`, and accepts a connection only after `M115` identifies Marlin. To force one device, replace `auto` with its exact path. To force one baud for diagnosis, use `diagnose --baudrate 115200` or select it in the browser.
+Useful options include `--once`, `--interval SECONDS`, `--reset-session`, and the dry-run-only `--obstacle-keepout-mm VALUE`. Hardware execution requires both `--execute` and `--confirm-motion`. Adding `--execute-existing` also runs moves already recorded by a previous dry-run session; it must be used with extreme care.
 
-Opening some printer controllers over USB resets the controller, which is why the config has `startup_wait_s`. Invalid startup bytes are replaced for diagnostics instead of causing a `UnicodeDecodeError`.
+### WebSocket stream
 
-### 2. Board geometry
+`lichess-watch` connects by default to `ws://127.0.0.1:8010/ws/GAME_ID`, converts incoming move envelopes, and advances simulated state between planned events. Use `lichess-event` to convert a previously saved event.
 
-`origin_x_mm` and `origin_y_mm` are the machine coordinates of the centre of physical board index `(0, 0)`. The centre of every other square is calculated with `square_size_mm`.
+The external service under `services/lichess_stream` is currently recorded as a Git submodule that points back to this repository at a pin that is not available from the current public `main` history. Therefore `git submodule update --init --recursive` and `./scripts/start_lichess_stream.sh` may fail. Public `lichess-pgn` and `lichess-follow` do not depend on that service. Repair the submodule pin and service layout before relying on `lichess-watch` or the Docker Compose configuration.
 
-```text
-machine_x = origin_x + physical_x_index * square_size
-machine_y = origin_y + physical_y_index * square_size
-```
+## Hardware commands
 
-Use `flip_x`, `flip_y`, and `swap_xy` to match how the physical board is mounted. Do not compensate by changing incoming chess coordinates; keep the game layer consistent and fix physical orientation in configuration.
-
-### 3. Workspace
-
-The workspace is a hard software envelope for magnet-centre coordinates. A planned point outside it is rejected rather than clipped:
-
-```json
-"workspace": {
-  "min_x_mm": 0.0,
-  "max_x_mm": 235.0,
-  "min_y_mm": 0.0,
-  "max_y_mm": 170.0
-}
-```
-
-Keep Marlin software endstops enabled as another independent boundary. This Python check is not a replacement for correctly configured endstops.
-
-### 4. Planner clearance
-
-The A* planner treats each stationary piece as a circular keep-out area. Configure:
-
-```text
-obstacle_keepout_mm = moving piece radius
-                    + stationary piece radius
-                    + safety margin
-```
-
-If that value is wider than the gaps between pieces, a route may genuinely not exist on a two-axis drag-only machine. The planner then rejects the move. Do not reduce the value merely to silence the error unless measurements show the piece can pass safely.
-
-`planner.kind` can be changed to `direct` for an empty-board test, but direct mode intentionally does not avoid occupied pieces.
-
-### 5. Capture slots
-
-Every configured capture slot is an absolute machine coordinate outside the playing squares. It must be physically reachable and must not overlap the board, frame, or another slot. A capture is refused when capture support is disabled or all slots are occupied.
-
-### 6. Magnet commands
-
-The example uses:
-
-```json
-"magnet": {
-  "on_commands": ["M106 S255"],
-  "off_commands": ["M107"]
-}
-```
-
-These are only command defaults. Verify which output your Marlin configuration controls. Use a rated switching/driver circuit with the correct electrical protection for the coil. Test the command with the electromagnet disconnected first, then with a current-limited and supervised setup.
-
-### 7. Unlock execution last
-
-Only after homing, board-coordinate checks, low-speed empty-board tests, capture-slot checks, and magnet-output checks should you change:
-
-```json
-"safety": {
-  "calibrated": true
-}
-```
-
-## Physical commands
-
-Home with magnet-off first:
+Home X and Y:
 
 ```bash
 chess-gantry --config config.json home --confirm-motion
 ```
 
-Execute one move:
+Run the fixed motor test in simulation first:
 
 ```bash
-chess-gantry \
-  --config config.json \
-  --state data/board_state.json \
-  --journal data/pending_move.json \
-  --audit data/audit.jsonl \
-  execute incoming_move.json \
-  --confirm-motion
+chess-gantry --config config.json motor-test --confirm-motion --demo
 ```
 
-`--confirm-motion` is deliberately required. Keep a physical power cutoff accessible, clear the travel area, and begin with low speeds.
+The test path is `(0,0) -> (150,0) -> (150,100) -> (0,0)` at `F1000`, followed by `M84`. Real execution requires calibration and a workspace containing every test point:
 
-Send the configured Marlin emergency-stop command:
+```bash
+chess-gantry --config config.json motor-test --confirm-motion
+```
+
+Send the configured emergency stop:
 
 ```bash
 chess-gantry --config config.json stop
 ```
 
-Marlin normally needs a controller reset after an emergency stop.
+The standalone command must open the serial port, so it may not be able to seize a port held by another process. The browser controller sends stop over its existing connection.
 
-## Recovery after an interrupted or uncertain move
+## Recovery
 
-Before serial execution, the program writes `data/pending_move.json`. If any command fails, times out, the process crashes, or power is lost, that journal remains and another move is refused.
+Before physical execution, the program writes `data/pending_move.json`. A command error, timeout, crash, or power loss leaves that journal in place and blocks another move.
 
-Inspect it:
+Inspect the pending transaction:
 
 ```bash
 chess-gantry --config config.json reconcile
 ```
 
-After physically checking the board:
-
-- If the complete move did happen, commit the journal’s expected state:
+After inspecting and, if necessary, manually restoring the physical board, either commit the journal's expected state:
 
 ```bash
 chess-gantry --config config.json reconcile \
   --mark-applied --confirm-physical-state
 ```
 
-- If it did not happen and the existing state is still correct, discard the journal:
+Or retain the current stored state and discard the journal:
 
 ```bash
 chess-gantry --config config.json reconcile \
   --discard --confirm-physical-state
 ```
 
-If the hardware stopped halfway between squares, neither option alone is enough. Manually put the physical board into a known state first, then choose the state that matches reality.
+Never reconcile until stored state and physical reality are known to match one of those outcomes.
 
-## Connecting your dictionary and matrix
-
-The core package intentionally does not decide chess legality. Your game layer should decide the legal move and maintain piece types. This project handles physical-state consistency and motion.
-
-Use stable piece IDs in both your dictionary and matrix:
-
-```python
-piece_catalog = {
-    "white_pawn_e": {"color": "white", "kind": "pawn"},
-    "black_king_e": {"color": "black", "kind": "king"},
-}
-
-board = [[None for _ in range(8)] for _ in range(8)]
-board[1][4] = "white_pawn_e"   # matrix[y][x]
-board[7][4] = "black_king_e"
-```
-
-`examples/matrix_adapter.py` compares an old and new matrix:
-
-```python
-from examples.matrix_adapter import diff_matrices
-
-move_deltas = diff_matrices(old_board, new_board, event_prefix="game-42-ply-17")
-```
-
-For a normal move it returns one object in your format. For a capture it adds the captured piece. For en passant it records the off-destination capture square. Castling returns two deltas because two physical pieces changed positions.
-
-A direct Python integration looks like this:
+## Python integration
 
 ```python
 import json
@@ -551,155 +421,67 @@ service = GantryService(
     audit_path="data/audit.jsonl",
 )
 
-# Safe: creates a plan but does not move or update persistent state.
+# Planning neither opens serial nor mutates persistent state.
 plan = service.plan(move)
 print(plan.program.text())
 
-# Physical execution, once calibrated:
+# Physical execution is locked until safety.calibrated is true.
 # service.execute(move)
 ```
 
-### Updating your matrix correctly
+Update an external game matrix only after `execute` returns successfully, or rebuild it from the committed board state. Generating G-code alone is not evidence that the physical move occurred.
 
-Do not update your main game matrix merely because G-code was generated. Use this order:
+## Testing
 
-1. Produce the move delta from the game/vision layer.
-2. Call `service.plan(move)` and inspect/log the plan.
-3. Call `service.execute(move)` only when ready.
-4. Update the external game matrix after `execute` returns successfully, or rebuild it from the newly committed `board_state.json`.
-
-This prevents the game layer from getting one move ahead of the physical board.
-
-## Special chess cases
-
-- **Normal capture:** inferred from the occupied destination.
-- **En passant:** use the explicit `capture` object.
-- **Castling:** two physical pieces move. The matrix adapter returns two deltas; execute them in an order your path planner can complete. A future batch transaction can wrap both if required.
-- **Promotion:** keep the physical piece ID stable. Update `metadata.kind` in your own game/catalog layer after the physical promotion handling is complete.
-- **Chess legality:** intentionally outside this package. Use your game engine before sending a delta.
-
-## Run the tests
+Install dependencies, then run the full compile and unit-test check:
 
 ```bash
 ./scripts/check.sh
 ```
 
-Or directly:
+Equivalent commands:
 
 ```bash
-PYTHONPATH=src:. python -m compileall -q src tests examples
-PYTHONPATH=src:. python -m unittest discover -s tests -v
+PYTHONPATH=src python -m compileall -q src tests examples
+PYTHONPATH=src python -m unittest discover -s tests -v
 ```
 
-## Clone `basil-dev` and replace PlatformIO safely
+The current suite contains 55 tests covering validation, planning, serial behavior, state transactions, browser APIs, UCI conversion, and Lichess adapters.
 
-Use the remote name that actually exists. It is usually `origin`; `chess-origin` only works if you created a remote with that exact name.
+## Project layout
 
-### Recommended authentication on Fedora
-
-GitHub CLI avoids pasting a token into Git commands and can connect Git to the system credential store:
-
-```bash
-sudo dnf install gh
-gh auth login
-gh auth setup-git
-gh auth status
+```text
+Chess/
+|-- config.example.json
+|-- docker-compose.lichess.yml
+|-- examples/
+|-- schemas/
+|-- scripts/
+|-- services/lichess_stream/   # external service submodule; see Lichess note
+|-- src/chess_gantry/
+|   |-- cli.py
+|   |-- config.py
+|   |-- controller.py
+|   |-- gcode.py
+|   |-- kinematics.py
+|   |-- lichess_adapter.py
+|   |-- lichess_follow.py
+|   |-- lichess_pgn.py
+|   |-- lichess_watch.py
+|   |-- models.py
+|   |-- path_planning.py
+|   |-- persistence.py
+|   |-- serial_link.py
+|   |-- service.py
+|   |-- uci_adapter.py
+|   `-- web_app.py
+`-- tests/
 ```
 
-Do not use `git config --global credential.helper store` for a valuable token unless you understand that it can store credentials in plaintext.
+## Limitations
 
-### Fresh clone of the branch
-
-```bash
-cd ~/Documents
-gh repo clone odinglyn0/Chess chess-work -- --branch basil-dev --single-branch
-cd chess-work
-git branch --show-current
-git remote -v
-git status
-```
-
-The branch command should print `basil-dev`.
-
-Without GitHub CLI, after authentication is configured:
-
-```bash
-cd ~/Documents
-git clone --branch basil-dev --single-branch \
-  https://github.com/odinglyn0/Chess.git chess-work
-cd chess-work
-```
-
-### Existing clone
-
-```bash
-cd ~/Documents/Chess
-git remote -v
-git fetch origin
-git switch basil-dev || git switch -c basil-dev --track origin/basil-dev
-git branch --show-current
-```
-
-### Inspect before deleting
-
-Create a local safety branch first:
-
-```bash
-git status
-git branch backup/before-python-gantry
-find . -maxdepth 3 -type f | sort
-```
-
-Remove only unambiguous PlatformIO artifacts at first:
-
-```bash
-rm -rf .pio
-git rm --ignore-unmatch platformio.ini
-```
-
-`src/`, `lib/`, and `include/` are generic directory names. Inspect them before removal:
-
-```bash
-for directory in src lib include; do
-  if [[ -d "$directory" ]]; then
-    echo "--- $directory"
-    find "$directory" -maxdepth 3 -type f -print
-  fi
-done
-```
-
-Only after confirming that those directories contain the old PlatformIO project:
-
-```bash
-git rm -r --ignore-unmatch src lib include
-git commit -m "Remove PlatformIO gantry firmware"
-```
-
-### Copy this framework into the clone
-
-Assuming the downloaded archive is in `~/Downloads`:
-
-```bash
-rm -rf /tmp/chess-gantry-package
-mkdir -p /tmp/chess-gantry-package
-unzip ~/Downloads/chess_gantry_pi.zip -d /tmp/chess-gantry-package
-rsync -a /tmp/chess-gantry-package/chess_gantry_pi/ ./
-```
-
-Then test and commit:
-
-```bash
-./scripts/check.sh
-git add .
-git status
-git commit -m "Add Raspberry Pi JSON-to-G-code gantry framework"
-git push -u origin basil-dev
-```
-
-## Design limitations that are intentional
-
-- This is a physical-motion framework, not a chess rules engine.
-- The A* planner uses a 2-D circular keep-out model. Real pieces may have irregular bases or flexible motion, so measured clearance still matters.
-- A two-axis magnet cannot solve a route that is physically blocked by tightly packed pieces. A lift axis, smaller pieces, wider squares, or an outside-board corridor may be required.
-- USB acknowledgements prove what Marlin reported, not what a slipping belt or detached magnet physically achieved. Sensors or vision should verify the resulting board before the next game move.
-- The default `M106`/`M107` magnet commands are configurable examples, not a guarantee about your board’s electrical wiring or firmware configuration.
+- Chess legality is intentionally delegated to the upstream game engine.
+- A two-axis drag mechanism cannot solve routes physically blocked by tightly packed pieces; smaller pieces, wider spacing, an outside-board corridor, or a lift axis may be required.
+- Castling needs two physical transfers and is not accepted as one UCI or Lichess adapter move.
+- Promotion needs an external physical replacement process and is rejected by the UCI and Lichess adapters.
+- Planner geometry and USB acknowledgements cannot replace physical sensing and supervised calibration.

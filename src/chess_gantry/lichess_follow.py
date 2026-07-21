@@ -1,5 +1,3 @@
-"""Poll public Lichess PGN exports and feed new moves to the gantry pipeline."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -65,8 +63,6 @@ def follow_game(
     reset_session: bool,
     once: bool,
 ) -> None:
-    """Continuously create files and print G-code for newly exported Lichess moves."""
-
     if interval_s <= 0:
         raise ConfigurationError("poll interval must be positive")
     if service.journal.exists():
@@ -114,8 +110,6 @@ def follow_game(
 def _state_before(
     moves: Iterable[MoveDelta], target: MoveDelta, base: BoardState, service: GantryService
 ) -> BoardState:
-    """Recreate the state preceding one PGN move without changing disk state."""
-
     state = base
     for move in moves:
         if move.event_id == target.event_id:

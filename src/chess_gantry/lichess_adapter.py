@@ -1,5 +1,3 @@
-"""Adapt events from odinglyn0/Chess's Lichess stream into gantry moves."""
-
 from __future__ import annotations
 
 from typing import Any, Mapping
@@ -14,14 +12,6 @@ def stream_event_to_move(
     height: int = 8,
     state: BoardState | None = None,
 ) -> MoveDelta:
-    """Convert one ``type: move`` Lichess-stream envelope to a gantry move.
-
-    The upstream tracker has already established stable physical piece IDs and
-    capture positions, so this intentionally does not infer chess rules.
-    Castling produces two physical transfers and must be submitted separately.
-    Promotions are rejected until a physical replacement mechanism is fitted.
-    """
-
     if not isinstance(raw, Mapping):
         raise ValidationError("Lichess stream event must be a JSON object")
     if raw.get("type") != "move":

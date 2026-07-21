@@ -1,5 +1,3 @@
-"""High-level move validation, planning, execution, and reconciliation."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
@@ -237,8 +235,6 @@ class GantryService:
         )
 
     def execute(self, move: MoveDelta) -> MotionPlan:
-        """Open the configured serial link, execute one move, then close it."""
-
         self._require_execution_unlocked()
         with self.store.locked():
             plan = self._prepare_transaction(move)
@@ -252,13 +248,6 @@ class GantryService:
                 raise
 
     def execute_with_link(self, move: MoveDelta, link: Any) -> MotionPlan:
-        """Execute using an already-connected link owned by another interface.
-
-        The local web controller uses this method so manual coordinate tests and
-        JSON chess moves share one verified Marlin connection instead of two
-        processes fighting over the same USB device.
-        """
-
         self._require_execution_unlocked()
         if not getattr(link, "connected", False):
             raise ConfigurationError("cannot execute: the supplied Marlin link is not connected")
@@ -283,8 +272,6 @@ class GantryService:
             self.home_with_link(link)
 
     def motor_test_program(self) -> Tuple[str, ...]:
-        """Return the no-homing test for coupled outer X/Y and independent inner E."""
-
         mirror_origin = self.config.workspace.min_y_mm + self.config.workspace.max_y_mm
         mirror_target = mirror_origin - 5.0
         points = (
@@ -328,8 +315,6 @@ class GantryService:
         return program
 
     def motor_test(self) -> Tuple[str, ...]:
-        """Run the fixed motor-only test without issuing any homing command."""
-
         self._require_execution_unlocked()
         program = self.motor_test_program()
         link = self._link_factory(self.config.serial)

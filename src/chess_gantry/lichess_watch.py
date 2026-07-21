@@ -1,5 +1,3 @@
-"""Consume odinglyn0/Chess WebSocket events into the gantry service."""
-
 from __future__ import annotations
 
 import asyncio
@@ -19,8 +17,6 @@ async def watch_game(
     *,
     execute: bool,
 ) -> None:
-    """Receive game move envelopes and plan or execute them in event order."""
-
     try:
         from websockets.asyncio.client import connect
     except ImportError as exc:  # pragma: no cover - installation error path.

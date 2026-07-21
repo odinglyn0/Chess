@@ -1,5 +1,3 @@
-"""Generate conservative Marlin G-code from physical piece transfers."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -46,8 +44,6 @@ class GCodeGenerator:
             yield f"G4 P{milliseconds}"
 
     def _outer_axes(self, position: float) -> Tuple[float, float]:
-        """Map one logical outer position to mechanically mirrored X/Y motors."""
-
         mirrored = self.config.workspace.min_y_mm + self.config.workspace.max_y_mm - position
         return position, mirrored
 

@@ -1,5 +1,3 @@
-"""Allow ``python -m chess_gantry examples/move_e2_e4.json`` as a shortcut."""
-
 from __future__ import annotations
 
 import sys

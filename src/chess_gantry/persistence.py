@@ -1,5 +1,3 @@
-"""Atomic JSON state, transaction journal, and audit persistence."""
-
 from __future__ import annotations
 
 from contextlib import contextmanager

@@ -1,5 +1,3 @@
-"""Conversion between logical chess-board coordinates and machine millimetres."""
-
 from __future__ import annotations
 
 from typing import Iterable, Tuple
@@ -10,12 +8,6 @@ from .models import GridPosition, MachinePoint
 
 
 def grid_to_machine(position: GridPosition, geometry: BoardGeometry) -> MachinePoint:
-    """Convert a zero-based square coordinate to the square centre in machine space.
-
-    ``origin_x_mm``/``origin_y_mm`` describe the centre of physical index (0, 0).
-    Flips are applied before an optional axis swap, allowing any board orientation.
-    """
-
     if not 0 <= position.x < geometry.width or not 0 <= position.y < geometry.height:
         raise PlanningError(f"grid position ({position.x}, {position.y}) is outside configured board")
 
@@ -31,8 +23,6 @@ def grid_to_machine(position: GridPosition, geometry: BoardGeometry) -> MachineP
 
 
 def validate_board_inside_workspace(geometry: BoardGeometry, workspace: Workspace) -> None:
-    """Reject a configuration whose square centres exceed the motion envelope."""
-
     points = (
         grid_to_machine(GridPosition(0, 0), geometry),
         grid_to_machine(GridPosition(geometry.width - 1, 0), geometry),

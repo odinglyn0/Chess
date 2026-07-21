@@ -1,5 +1,3 @@
-"""Validated data models for move deltas and board state."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
@@ -32,8 +30,6 @@ def _valid_identifier(value: Any, name: str) -> str:
 
 @dataclass(frozen=True, order=True)
 class GridPosition:
-    """Zero-based logical board coordinate."""
-
     x: int
     y: int
 
@@ -53,8 +49,6 @@ class GridPosition:
 
 @dataclass(frozen=True)
 class CaptureSpec:
-    """Optional explicit capture location, needed for moves such as en passant."""
-
     piece_id: str
     position: GridPosition
 
@@ -64,12 +58,6 @@ class CaptureSpec:
 
 @dataclass(frozen=True)
 class MoveDelta:
-    """A single piece displacement supplied by the game/vision layer.
-
-    The user's original schema calls the piece identifier ``position``. This
-    parser keeps that format and also accepts the clearer alias ``id``.
-    """
-
     piece_id: str
     previous: GridPosition
     new: GridPosition
@@ -160,8 +148,6 @@ class MoveDelta:
 
 @dataclass(frozen=True)
 class PieceState:
-    """Persistent location of a physical chess piece."""
-
     piece_id: str
     status: str = _STATUS_BOARD
     x: Optional[int] = None
@@ -234,8 +220,6 @@ class PieceState:
 
 @dataclass(frozen=True)
 class BoardState:
-    """Versioned board state persisted as JSON."""
-
     schema_version: int
     revision: int
     pieces: Mapping[str, PieceState]
@@ -416,8 +400,6 @@ class MachinePoint:
 
 @dataclass(frozen=True)
 class PieceTransfer:
-    """One physical drag with the magnet on."""
-
     piece_id: str
     purpose: str
     start: MachinePoint

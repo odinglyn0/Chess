@@ -1,5 +1,3 @@
-"""Load and validate the gantry JSON configuration."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass

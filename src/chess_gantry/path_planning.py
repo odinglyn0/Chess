@@ -1,5 +1,3 @@
-"""Direct and occupancy-aware A* path planners."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -53,8 +51,6 @@ def direct_path(
     workspace: Workspace,
     settings: PlannerSettings,
 ) -> Tuple[MachinePoint, ...]:
-    """Return a straight path. This mode intentionally does not avoid pieces."""
-
     del obstacles, settings
     _assert_in_workspace(start, workspace, "path start")
     _assert_in_workspace(goal, workspace, "path goal")
@@ -101,12 +97,6 @@ def astar_path(
     workspace: Workspace,
     settings: PlannerSettings,
 ) -> Tuple[MachinePoint, ...]:
-    """Plan around circular keep-out regions using a configurable 2-D lattice.
-
-    The obstacle radius is a centre-to-centre distance. For physical collision
-    avoidance, configure it as moving-piece radius + stationary-piece radius + margin.
-    """
-
     _assert_in_workspace(start, workspace, "path start")
     _assert_in_workspace(goal, workspace, "path goal")
     if start == goal:

@@ -1,5 +1,3 @@
-"""Fetch and replay a public Lichess PGN through the gantry planner."""
-
 from __future__ import annotations
 
 from io import StringIO

@@ -1,11 +1,3 @@
-"""Reliable Marlin serial transport with Fedora/macOS/Windows discovery.
-
-The transport sends one ASCII G-code command at a time and waits for Marlin's
-``ok`` acknowledgement.  It deliberately keeps motion planning out of this
-module: this file only owns USB serial discovery, connection verification, and
-command/response handling.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -88,8 +80,6 @@ def _looks_like_printer(device: str, description: str, hwid: str) -> bool:
 def discover_serial_ports(
     port_provider: Optional[Callable[[], Iterable[Any]]] = None,
 ) -> Tuple[PortInfo, ...]:
-    """Return ranked serial ports without applying macOS-only filtering."""
-
     if port_provider is None:
         try:
             from serial.tools import list_ports  # type: ignore
@@ -121,20 +111,10 @@ def discover_serial_ports(
 
 
 def list_serial_ports() -> Tuple[Tuple[str, str], ...]:
-    """Backward-compatible two-column port listing used by the CLI."""
-
     return tuple((item.device, item.description) for item in discover_serial_ports())
 
 
 class MarlinSerial:
-    """Send one command at a time and wait for Marlin's acknowledgement.
-
-    ``serial.port`` may be a concrete path such as ``/dev/ttyUSB0`` or the word
-    ``auto``.  In auto mode, detected ports are ranked and tried with the
-    configured primary/fallback baud rates.  A connection is accepted only
-    after ``M115`` identifies Marlin when ``verify_marlin`` is enabled.
-    """
-
     def __init__(
         self,
         settings: SerialSettings,
@@ -447,8 +427,6 @@ class MarlinSerial:
 
 
 class DemoMarlinSerial:
-    """In-memory Marlin-like link used by the browser demo and tests."""
-
     POSITION_RE = re.compile(
         r"\bX(-?\d+(?:\.\d+)?)\s+Y(-?\d+(?:\.\d+)?)"
         r"(?:\s+Z(-?\d+(?:\.\d+)?))?(?:\s+E(-?\d+(?:\.\d+)?))?"

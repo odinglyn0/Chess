@@ -1,5 +1,3 @@
-"""Translate a standard UCI chess move into the gantry move-delta schema."""
-
 from __future__ import annotations
 
 from typing import Any, Dict, Optional
@@ -30,12 +28,6 @@ def uci_to_move(
     width: int = 8,
     height: int = 8,
 ) -> MoveDelta:
-    """Build one physical move from UCI using the persisted gantry board state.
-
-    This is a transport adapter, not a chess-rules engine. The caller should
-    obtain legal moves from Lichess or an engine before passing them here.
-    """
-
     normalized = uci.strip().lower()
     if not _UCI_RE.fullmatch(normalized):
         raise ValidationError("UCI move must look like e2e4 or e7e8q")

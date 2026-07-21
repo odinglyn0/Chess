@@ -1,5 +1,3 @@
-"""Command-line interface for dry-running and executing gantry moves."""
-
 from __future__ import annotations
 
 from argparse import ArgumentParser, Namespace

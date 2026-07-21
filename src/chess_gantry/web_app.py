@@ -1,5 +1,3 @@
-"""Local browser controller for manual checks and JSON chess moves."""
-
 from __future__ import annotations
 
 import json

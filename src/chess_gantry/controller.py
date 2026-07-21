@@ -1,14 +1,3 @@
-"""Shared controller used by the local browser interface.
-
-This module joins the two workflows:
-
-* manual inner E plus coupled outer X/Y checks that send direct Marlin coordinates; and
-* validated JSON chess moves handled by :class:`GantryService`.
-
-Both workflows share one serial connection, so two processes never compete for
-exclusive ownership of the Ender controller's USB port.
-"""
-
 from __future__ import annotations
 
 from dataclasses import replace
@@ -32,8 +21,6 @@ _POSITION_RE = re.compile(
 
 
 class GantryController:
-    """Stateful, thread-safe façade for web and interactive control."""
-
     def __init__(
         self,
         config: AppConfig,

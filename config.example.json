@@ -30,7 +30,7 @@
     "max_y_mm": 170.0
   },
   "motion": {
-    "travel_feed_mm_min": 3000.0,
+    "travel_feed_mm_min": 12000.0,
     "drag_feed_mm_min": 600.0,
     "magnet_on_dwell_ms": 300,
     "magnet_off_dwell_ms": 300,

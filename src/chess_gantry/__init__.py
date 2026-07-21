@@ -1,5 +1,3 @@
-"""Raspberry Pi chess-gantry planning and Marlin serial framework."""
-
 from .config import AppConfig
 from .controller import GantryController
 from .models import BoardState, CaptureSpec, GridPosition, MoveDelta

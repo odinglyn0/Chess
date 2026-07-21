@@ -381,8 +381,8 @@ chess-gantry --config config.json motor-test
 The sample path is:
 
 ```text
-inner E: 0 -> 300 -> 0
-outer X/Y: 0/350 -> 300/50 -> 0/350
+inner E: 0 -> 200 -> 0
+outer X/Y: 0/350 -> 200/150 -> 0/350
 ```
 
 You can also pass the program through the in-memory Marlin transport without real hardware:
@@ -391,7 +391,7 @@ You can also pass the program through the in-memory Marlin transport without rea
 chess-gantry --config config.json motor-test --confirm-motion --demo
 ```
 
-The full-range test moves approximately 30 cm in each mechanical direction. Inner E uses `F3000` at 50 mm/s. Mirrored outer X/Y use `F16971`, which gives each motor approximately 200 mm/s after Marlin applies diagonal vector speed. The test returns each group separately, restores cold-extrusion protection, and ends with `M84`.
+The test moves 20 cm in each mechanical direction. Inner E uses `F3000` at 50 mm/s. Mirrored outer X/Y use `F16971`, which gives each motor approximately 200 mm/s after Marlin applies diagonal vector speed. The test returns each group separately, restores cold-extrusion protection, and ends with `M84`.
 
 Before moving, the test applies matching calibration with a fast outer profile and a controlled inner profile:
 

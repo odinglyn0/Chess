@@ -141,7 +141,7 @@ physical travel limits, send the same fixed program to Marlin:
 
 The real command prints the exact transmitted G-code after every Marlin command
 has acknowledged. It requires `safety.calibrated: true` and rejects a workspace
-that does not include 300 mm of inner E travel and 300 mm of mirrored outer X/Y
+that does not include 200 mm of inner E travel and 200 mm of mirrored outer X/Y
 travel in both directions.
 
 With the gantry manually placed and squared at a safe starting position, the

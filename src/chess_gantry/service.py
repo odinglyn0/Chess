@@ -273,11 +273,11 @@ class GantryService:
 
     def motor_test_program(self) -> Tuple[str, ...]:
         mirror_origin = self.config.workspace.min_y_mm + self.config.workspace.max_y_mm
-        mirror_target = mirror_origin - 300.0
+        mirror_target = mirror_origin - 200.0
         points = (
             MachinePoint(0.0, 0.0),
-            MachinePoint(300.0, 0.0),
-            MachinePoint(300.0, 300.0),
+            MachinePoint(200.0, 0.0),
+            MachinePoint(200.0, 200.0),
             MachinePoint(0.0, 0.0),
         )
         for point in points:
@@ -298,9 +298,9 @@ class GantryService:
             "M211 S0",
             f"G92 X0 Y{mirror_origin:g} E0",
             "M400",
-            "G1 E300 F3000",
+            "G1 E200 F3000",
             "M400",
-            f"G1 X300 Y{mirror_target:g} F16971",
+            f"G1 X200 Y{mirror_target:g} F16971",
             "M400",
             "G1 E0 F3000",
             "M400",

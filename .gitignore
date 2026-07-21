@@ -9,7 +9,6 @@ data/board_state.json
 data/board_state.json.lock
 data/pending_move.json
 data/audit.jsonl
-config.json
 *.gcode
 *.lock
 data/*.json

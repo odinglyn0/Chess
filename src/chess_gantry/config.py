@@ -350,10 +350,25 @@ class SafetySettings:
         return cls(
             calibrated=_boolean(raw.get("calibrated", False), "safety.calibrated"),
             home_before_execute=_boolean(
-                raw.get("home_before_execute", True), "safety.home_before_execute"
+                raw.get("home_before_execute", False), "safety.home_before_execute"
             ),
             home_commands=_commands(
-                raw.get("home_commands", ["M107", "G28 X Y", "M400"]), "safety.home_commands"
+                raw.get(
+                    "home_commands",
+                    [
+                        "M107",
+                        "M82",
+                        "M302 P1",
+                        "M92 X80 Y80 E80",
+                        "M203 X50 Y50 E50",
+                        "M201 X500 Y500 E500",
+                        "M205 X5 Y5 E5",
+                        "G92 X0 Y170 E0",
+                        "M302 P0",
+                        "M400",
+                    ],
+                ),
+                "safety.home_commands",
             ),
             preflight_commands=_commands(
                 raw.get("preflight_commands", ["M115"]), "safety.preflight_commands", allow_empty=True

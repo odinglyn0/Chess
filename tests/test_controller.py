@@ -60,12 +60,14 @@ class ControllerTests(unittest.TestCase):
             self.assertTrue(status["connected"])
             self.assertEqual(status["port"], "DEMO")
 
-            with self.assertRaisesRegex(ConfigurationError, "home X and Y"):
+            with self.assertRaisesRegex(ConfigurationError, "outer X/Y"):
                 controller.move_to_mm(x_mm=10, y_mm=10, feed_mm_min=600)
 
             controller.home_xy()
             status = controller.move_to_mm(x_mm=25.5, y_mm=30.25, feed_mm_min=600)
             self.assertEqual(status["position_mm"], {"x": 25.5, "y": 30.25})
+            self.assertIn("G1 X30.250 Y139.750 E25.500 F600", controller._link.commands)
+            self.assertIn("M302 P0", controller._link.commands)
 
     def test_plan_is_read_only_and_execute_commits_through_same_link(self) -> None:
         with TemporaryDirectory() as directory:

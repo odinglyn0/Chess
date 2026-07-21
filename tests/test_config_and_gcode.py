@@ -19,7 +19,7 @@ class ConfigAndGCodeTests(unittest.TestCase):
     def test_example_config_is_hardware_locked(self) -> None:
         config = AppConfig.from_mapping(self.raw_config())
         self.assertFalse(config.safety.calibrated)
-        self.assertTrue(config.safety.home_before_execute)
+        self.assertFalse(config.safety.home_before_execute)
 
     def test_rejects_capture_slot_outside_workspace(self) -> None:
         raw = self.raw_config()
@@ -55,12 +55,22 @@ class ConfigAndGCodeTests(unittest.TestCase):
         )
         commands = GCodeGenerator(config).generate([transfer]).commands
         on_index = commands.index("M106 S255")
-        first_drag = commands.index("G1 X20 Y15 F600")
-        final_drag = commands.index("G1 X30 Y30 F600")
+        self.assertIn("M82", commands)
+        self.assertIn("M302 P1", commands)
+        self.assertIn("G0 X10 Y160 E10 F3000", commands)
+        first_drag = commands.index("G1 X15 Y155 E20 F600")
+        final_drag = commands.index("G1 X30 Y140 E30 F600")
         off_after_drag = next(index for index in range(final_drag + 1, len(commands)) if commands[index] == "M107")
         self.assertEqual(commands[on_index - 1], "M400")
         self.assertLess(on_index, first_drag)
         self.assertEqual(commands[off_after_drag - 1], "M400")
+        self.assertEqual(commands[-2:], ("M302 P0", "M211 S1"))
+        self.assertFalse(any(" Z" in command for command in commands))
+        for command in commands:
+            if command.startswith(("G0 ", "G1 ")) and " Y" in command:
+                x_word = next(word for word in command.split() if word.startswith("X"))
+                y_word = next(word for word in command.split() if word.startswith("Y"))
+                self.assertAlmostEqual(float(x_word[1:]) + float(y_word[1:]), 170.0)
 
 
 if __name__ == "__main__":

@@ -103,7 +103,7 @@ class ServiceTests(unittest.TestCase):
             commands = plan.program.commands
             self.assertIn("M106 S255", commands)
             self.assertIn("M107", commands)
-            self.assertLess(commands.index("M106 S255"), commands.index("G1 X90 Y70 F600"))
+            self.assertLess(commands.index("M106 S255"), commands.index("G1 X70 Y100 E90 F600"))
 
     def test_capture_generates_two_transfers_and_updates_expected_state(self) -> None:
         with TemporaryDirectory() as directory:
@@ -199,7 +199,7 @@ class ServiceTests(unittest.TestCase):
             self.assertEqual(service.store.load().revision, 0)
             self.assertTrue(journal_path.exists())
             self.assertEqual(service.journal.load()["status"], "failed_or_unknown")
-            self.assertEqual(fake.best_effort_programs, [("M107",)])
+            self.assertEqual(fake.best_effort_programs, [("M107", "M302 P0", "M211 S1")])
 
             reconciled = service.reconcile_mark_applied()
             self.assertEqual(reconciled.revision, 1)
@@ -219,7 +219,7 @@ class ServiceTests(unittest.TestCase):
                 service.execute(move)
             self.assertFalse(journal_path.exists())
 
-    def test_motor_test_homes_runs_fixed_program_and_does_not_change_board_state(self) -> None:
+    def test_motor_test_runs_without_homing_and_does_not_change_board_state(self) -> None:
         with TemporaryDirectory() as directory:
             temp = Path(directory)
             state_path, journal_path, audit_path = self.paths(temp)
@@ -229,11 +229,21 @@ class ServiceTests(unittest.TestCase):
                 test_config(), state_path, journal_path, audit_path, link_factory=lambda settings: fake
             )
             program = service.motor_test()
-            self.assertEqual(fake.programs[0], ("M107",))
-            self.assertEqual(fake.programs[1], ("M107", "G28 X Y", "M400"))
-            self.assertEqual(fake.programs[2], program)
-            self.assertIn("G1 X150 F1000", program)
-            self.assertIn("G1 Y100 F1000", program)
+            self.assertEqual(fake.programs, [program])
+            self.assertIn("M82", program)
+            self.assertIn("M302 P1", program)
+            self.assertIn("M92 X80 Y80 E80", program)
+            self.assertIn("M203 X20 Y20 E20", program)
+            self.assertIn("M201 X200 Y200 E200", program)
+            self.assertIn("M205 X3 Y3 E3", program)
+            self.assertIn("G92 X0 Y170 E0", program)
+            self.assertFalse(any(command.startswith("G28") for command in program))
+            self.assertFalse(any(" Z" in command for command in program))
+            self.assertIn("G1 E5 F600", program)
+            self.assertIn("G1 X5 Y165 F849", program)
+            self.assertIn("G1 E0 F600", program)
+            self.assertIn("G1 X0 Y170 F849", program)
+            self.assertEqual(program[-3:], ("M302 P0", "M211 S1", "M84"))
             self.assertEqual(program[-1], "M84")
             self.assertEqual(service.store.load().revision, 0)
             self.assertFalse(journal_path.exists())

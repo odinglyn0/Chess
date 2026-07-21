@@ -2,7 +2,7 @@
 
 This module joins the two workflows:
 
-* manual X/Y checks that send direct Marlin coordinates; and
+* manual inner E plus coupled outer X/Y checks that send direct Marlin coordinates; and
 * validated JSON chess moves handled by :class:`GantryService`.
 
 Both workflows share one serial connection, so two processes never compete for
@@ -25,7 +25,8 @@ from .service import GantryService, MotionPlan
 
 
 _POSITION_RE = re.compile(
-    r"\bX:\s*(-?\d+(?:\.\d+)?)\s+Y:\s*(-?\d+(?:\.\d+)?)",
+    r"\bX:\s*(-?\d+(?:\.\d+)?)\s+Y:\s*(-?\d+(?:\.\d+)?)"
+    r"(?:\s+Z:\s*-?\d+(?:\.\d+)?)?\s+E:\s*(-?\d+(?:\.\d+)?)",
     re.IGNORECASE,
 )
 
@@ -147,7 +148,7 @@ class GantryController:
         for line in responses:
             match = _POSITION_RE.search(line)
             if match:
-                self._position = MachinePoint(float(match.group(1)), float(match.group(2)))
+                self._position = MachinePoint(float(match.group(3)), float(match.group(1)))
                 return self._position
         return None
 
@@ -202,17 +203,33 @@ class GantryController:
 
         with self._operation_lock:
             if not self._homed:
-                raise ConfigurationError("home X and Y before commanding an absolute coordinate")
+                raise ConfigurationError("initialize the coupled outer X/Y and inner E coordinates before moving")
             link = self._require_link()
-            link.send_program(
-                (
-                    "G21",
-                    "G90",
-                    *self.config.magnet.off_commands,
-                    f"G1 X{x_mm:.3f} Y{y_mm:.3f} F{feed_mm_min:.0f}",
-                    "M400",
-                )
+            mirrored_y_mm = (
+                self.config.workspace.min_y_mm + self.config.workspace.max_y_mm - y_mm
             )
+            try:
+                link.send_program(
+                    (
+                        "G21",
+                        "G90",
+                        "M82",
+                        "M302 P1",
+                        "M92 X80 Y80 E80",
+                        "M203 X20 Y20 E20",
+                        "M201 X200 Y200 E200",
+                        "M205 X3 Y3 E3",
+                        "M211 S0",
+                        *self.config.magnet.off_commands,
+                        f"G1 X{y_mm:.3f} Y{mirrored_y_mm:.3f} E{x_mm:.3f} F{feed_mm_min:.0f}",
+                        "M400",
+                        "M302 P0",
+                        "M211 S1",
+                    )
+                )
+            except Exception:
+                link.best_effort((*self.config.magnet.off_commands, "M302 P0", "M211 S1"))
+                raise
             self._position = point
             try:
                 result = link.send_command("M114", timeout_s=10.0)
@@ -251,7 +268,7 @@ class GantryController:
             link = self._require_link()
             if not self.config.safety.home_before_execute and not self._homed:
                 raise ConfigurationError(
-                    "home X/Y first, or enable safety.home_before_execute"
+                    "initialize the coupled outer X/Y and inner E coordinates first, or enable safety.home_before_execute"
                 )
             plan = self.service.execute_with_link(move, link)
             if self.config.safety.home_before_execute:

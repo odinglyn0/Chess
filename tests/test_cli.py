@@ -72,6 +72,27 @@ class RunCommandTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("G21", buffer.getvalue())
 
+    def test_motor_test_without_confirmation_is_gcode_only(self) -> None:
+        buffer = StringIO()
+        with contextlib.redirect_stdout(buffer):
+            code = run(self.args("motor-test"))
+        self.assertEqual(code, 0)
+        output = buffer.getvalue()
+        self.assertIn("DRY RUN ONLY", output)
+        self.assertIn("G92 X0 Y170 E0", output)
+        self.assertNotIn("G28", output)
+        self.assertIn("M82", output)
+        self.assertIn("M302 P1", output)
+        self.assertIn("M92 X80 Y80 E80", output)
+        self.assertIn("M203 X20 Y20 E20", output)
+        self.assertIn("M201 X200 Y200 E200", output)
+        self.assertIn("M205 X3 Y3 E3", output)
+        self.assertIn("G1 E5 F600", output)
+        self.assertIn("G1 X5 Y165 F849", output)
+        self.assertIn("G1 E0 F600", output)
+        self.assertIn("G1 X0 Y170 F849", output)
+        self.assertIn("M302 P0", output)
+
 
 if __name__ == "__main__":
     unittest.main()

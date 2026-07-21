@@ -1,6 +1,6 @@
 # Chess Gantry
 
-Chess Gantry is a Python 3.9+ motion-control framework for a Raspberry Pi connected over USB serial to an X/Y gantry running Marlin. It accepts a chess move as JSON, validates it against persistent physical board state, converts board squares to machine coordinates, plans a collision-aware path, generates G-code, and can execute that G-code on the controller.
+Chess Gantry is a Python 3.9+ motion-control framework for a Raspberry Pi connected over USB serial to a Marlin gantry. Physical X and Y receive identical targets to drive the outer gantry; physical E moves the inner carriage independently. The framework accepts a chess move as JSON, validates it against persistent physical board state, plans a collision-aware path, generates G-code, and can execute it on the controller.
 
 The package manages physical consistency, not chess legality. A game engine, Lichess, or another upstream system must decide whether a move is legal before passing it to the gantry.
 
@@ -236,8 +236,8 @@ Both `chess-gantry` and `python -m chess_gantry` invoke the CLI.
 | `ports` | List serial devices with likely printer controllers ranked first. |
 | `diagnose` | Verify Marlin and query endstops and position without movement. |
 | `web` | Start the browser controller. |
-| `home --confirm-motion` | Turn the magnet off and run configured X/Y homing commands. |
-| `motor-test --confirm-motion` | Home, run a fixed guarded X/Y test path, and disable motors. |
+| `home --confirm-motion` | Run the configured coordinate-initialization commands; the shipped configuration performs no homing. |
+| `motor-test` | Print the fixed coupled-axis test G-code without opening serial. Add `--confirm-motion` to run it. |
 | `stop` | Send the configured emergency-stop command. |
 | `reconcile` | Inspect or resolve a pending transaction after checking the physical board. |
 
@@ -348,21 +348,63 @@ Useful options include `--once`, `--interval SECONDS`, `--reset-session`, and th
 
 The external service under `services/lichess_stream` is currently recorded as a Git submodule that points back to this repository at a pin that is not available from the current public `main` history. Therefore `git submodule update --init --recursive` and `./scripts/start_lichess_stream.sh` may fail. Public `lichess-pgn` and `lichess-follow` do not depend on that service. Repair the submodule pin and service layout before relying on `lichess-watch` or the Docker Compose configuration.
 
+## Outer X/Y and inner E
+
+The two outer-gantry motors use the controller's physical X and Y ports, but their mechanical installation requires opposite shaft directions. Physical X receives the outer coordinate directly; physical Y receives `170 - outer`. The independent inner coordinate is emitted on E. For logical inner `90` and outer `70`:
+
+```gcode
+G1 X70 Y100 E90 F600
+```
+
+The application continues to use logical `(x, y)` board coordinates internally. At the G-code boundary, logical X maps to physical E, while logical Y maps to physical X directly and physical Y inversely. X and Y always satisfy `X + Y = 170` with the current workspace.
+
+The software now accounts for the mechanically mirrored motor directions. Do not also invert one motor in firmware without rechecking the direction test, or the correction will be applied twice.
+
+Marlin normally treats E as a filament extruder. Gantry programs therefore use `M82` for absolute E positioning and `M302 P1` to permit cold E movement. They restore cold-extrusion protection with `M302 P0` after movement. Do not use this setup with filament loaded or a hotend expecting normal extrusion behavior.
+
+The motor test never issues `G28` and never calls the homing workflow. Its positioning command is `G92 X0 Y0 E0`, which declares the current manually positioned location to be zero without moving a motor.
+
 ## Hardware commands
 
-Home X and Y:
+With the complete gantry physically placed at a safe, squared starting position, initialize its current coordinates without movement:
 
 ```bash
 chess-gantry --config config.json home --confirm-motion
 ```
 
-Run the fixed motor test in simulation first:
+First print and inspect the exact sample G-code. This does not open the serial port:
+
+```bash
+chess-gantry --config config.json motor-test
+```
+
+The sample path is:
+
+```text
+inner E: 0 -> 5 -> 0
+outer X/Y: 0/350 -> 5/345 -> 0/350
+```
+
+You can also pass the program through the in-memory Marlin transport without real hardware:
 
 ```bash
 chess-gantry --config config.json motor-test --confirm-motion --demo
 ```
 
-The test path is `(0,0) -> (150,0) -> (150,100) -> (0,0)` at `F1000`, followed by `M84`. Real execution requires calibration and a workspace containing every test point:
+The 5 mm diagnostic uses the proven faster profile: inner E uses `F600` (10 mm/s), while mirrored outer X/Y use `F849` so each motor moves at about 10 mm/s. Live travel and drag feeds are 1200 and 600 mm/min, with axis limits of 20 mm/s, acceleration of 200 mm/s², and jerk of 3 mm/s. The test returns each group separately, restores cold-extrusion protection, and ends with `M84`.
+
+Before moving, the test applies matching calibration with a fast outer profile and a controlled inner profile:
+
+```gcode
+M82
+M302 P1
+M92 X80 Y80 E80
+M203 X20 Y20 E20
+M201 X200 Y200 E200
+M205 X3 Y3 E3
+```
+
+These set absolute E positioning, permit cold E movement, and configure X, Y, and E equally at the verified 50 mm/s maximum with matching acceleration. They are session settings and do not require EEPROM persistence.
 
 ```bash
 chess-gantry --config config.json motor-test --confirm-motion

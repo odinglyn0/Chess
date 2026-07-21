@@ -221,7 +221,7 @@ class GantryService:
         try:
             link.send_program(plan.program.commands)
         except Exception:
-            link.best_effort(self.config.magnet.off_commands)
+            link.best_effort((*self.config.magnet.off_commands, "M302 P0", "M211 S1"))
             raise
 
     def _complete_transaction(self, plan: MotionPlan) -> MotionPlan:
@@ -283,12 +283,14 @@ class GantryService:
             self.home_with_link(link)
 
     def motor_test_program(self) -> Tuple[str, ...]:
-        """Return the fixed, synchronized 150 mm by 100 mm motor test program."""
+        """Return the no-homing test for coupled outer X/Y and independent inner E."""
 
+        mirror_origin = self.config.workspace.min_y_mm + self.config.workspace.max_y_mm
+        mirror_target = mirror_origin - 5.0
         points = (
             MachinePoint(0.0, 0.0),
-            MachinePoint(150.0, 0.0),
-            MachinePoint(150.0, 100.0),
+            MachinePoint(5.0, 0.0),
+            MachinePoint(5.0, 5.0),
             MachinePoint(0.0, 0.0),
         )
         for point in points:
@@ -296,23 +298,37 @@ class GantryService:
                 raise ConfigurationError(
                     f"motor-test point X{point.x:g} Y{point.y:g} is outside the configured workspace"
                 )
-        return (
+        program = (
             "G21",
             "G90",
+            "M82",
+            "M302 P1",
             *self.config.magnet.off_commands,
-            "G0 X0 Y0",
+            "M92 X80 Y80 E80",
+            "M203 X20 Y20 E20",
+            "M201 X200 Y200 E200",
+            "M205 X3 Y3 E3",
+            "M211 S0",
+            f"G92 X0 Y{mirror_origin:g} E0",
             "M400",
-            "G1 X150 F1000",
+            "G1 E5 F600",
             "M400",
-            "G1 Y100 F1000",
+            f"G1 X5 Y{mirror_target:g} F849",
             "M400",
-            "G1 X0 Y0 F1000",
+            "G1 E0 F600",
             "M400",
+            f"G1 X0 Y{mirror_origin:g} F849",
+            "M400",
+            "M302 P0",
+            "M211 S1",
             "M84",
         )
+        if any(command.strip().upper().startswith("G28") for command in program):
+            raise ConfigurationError("motor-test must never issue a homing command")
+        return program
 
     def motor_test(self) -> Tuple[str, ...]:
-        """Home and run the fixed motor-only test after calibration is approved."""
+        """Run the fixed motor-only test without issuing any homing command."""
 
         self._require_execution_unlocked()
         program = self.motor_test_program()
@@ -320,11 +336,10 @@ class GantryService:
         with link:
             if self.config.safety.preflight_commands:
                 link.send_program(self.config.safety.preflight_commands)
-            self.home_with_link(link)
             try:
                 link.send_program(program)
             except Exception:
-                link.best_effort(self.config.magnet.off_commands)
+                link.best_effort((*self.config.magnet.off_commands, "M302 P0", "M211 S1"))
                 raise
         self.audit.append({"status": "motor_test_completed", "commands": list(program)})
         return program

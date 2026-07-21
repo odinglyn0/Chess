@@ -45,6 +45,12 @@ class GCodeGenerator:
         if milliseconds > 0:
             yield f"G4 P{milliseconds}"
 
+    def _outer_axes(self, position: float) -> Tuple[float, float]:
+        """Map one logical outer position to mechanically mirrored X/Y motors."""
+
+        mirrored = self.config.workspace.min_y_mm + self.config.workspace.max_y_mm - position
+        return position, mirrored
+
     def generate(self, transfers: Sequence[PieceTransfer]) -> GCodeProgram:
         if not transfers:
             raise ValueError("at least one piece transfer is required")
@@ -53,19 +59,28 @@ class GCodeGenerator:
             "; chess-gantry generated program",
             "G21 ; millimetres",
             "G90 ; absolute positioning",
+            "M82 ; absolute E positioning for the second outer-gantry motor",
+            "M302 P1 ; allow cold E-axis gantry movement",
+            "M92 X80 Y80 E80 ; matching motor calibration",
+            "M203 X20 Y20 E20 ; proven X/Y/E feed rates",
+            "M201 X200 Y200 E200 ; matching acceleration limits",
+            "M205 X3 Y3 E3 ; matching jerk limits",
+            "M211 S0 ; measured 350 mm gantry exceeds stale firmware limits",
             "; force magnet off before travel",
             *self.config.magnet.off_commands,
             "M400",
         ]
 
         for index, transfer in enumerate(transfers, start=1):
+            start_x, start_y = self._outer_axes(transfer.start.y)
             lines.extend(
                 [
                     "",
                     f"; transfer {index}: {transfer.purpose} piece {transfer.piece_id}",
                     (
-                        f"G0 X{_format_number(transfer.start.x)} "
-                        f"Y{_format_number(transfer.start.y)} "
+                        f"G0 X{_format_number(start_x)} "
+                        f"Y{_format_number(start_y)} "
+                        f"E{_format_number(transfer.start.x)} "
                         f"F{_format_number(self.config.motion.travel_feed_mm_min)}"
                     ),
                     "M400 ; arrive before energising magnet",
@@ -74,8 +89,10 @@ class GCodeGenerator:
                 ]
             )
             for waypoint in transfer.path[1:]:
+                outer_x, outer_y = self._outer_axes(waypoint.y)
                 lines.append(
-                    f"G1 X{_format_number(waypoint.x)} Y{_format_number(waypoint.y)} "
+                    f"G1 X{_format_number(outer_x)} Y{_format_number(outer_y)} "
+                    f"E{_format_number(waypoint.x)} "
                     f"F{_format_number(self.config.motion.drag_feed_mm_min)}"
                 )
             lines.extend(
@@ -89,18 +106,29 @@ class GCodeGenerator:
         if self.config.motion.park_after_move:
             park = self.config.motion.park_position
             assert park is not None
+            park_x, park_y = self._outer_axes(park.y)
             lines.extend(
                 [
                     "",
                     "; park with magnet off",
                     *self.config.magnet.off_commands,
                     (
-                        f"G0 X{_format_number(park.x)} Y{_format_number(park.y)} "
+                        f"G0 X{_format_number(park_x)} Y{_format_number(park_y)} "
+                        f"E{_format_number(park.x)} "
                         f"F{_format_number(self.config.motion.travel_feed_mm_min)}"
                     ),
                     "M400",
                 ]
             )
 
-        lines.extend(["", "; final fail-safe magnet off", *self.config.magnet.off_commands, "M400"])
+        lines.extend(
+            [
+                "",
+                "; final fail-safe magnet off and restore cold-extrusion protection",
+                *self.config.magnet.off_commands,
+                "M400",
+                "M302 P0",
+                "M211 S1",
+            ]
+        )
         return GCodeProgram(lines=tuple(lines))

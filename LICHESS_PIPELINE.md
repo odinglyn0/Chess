@@ -116,16 +116,21 @@ until the physical piece sizes, magnet clearance, and critical path are measured
 
 ## Fixed motor test
 
-Before a chess move, test the Ender motion with a fixed, guarded 150 mm by 100 mm rectangle.
+Before a chess move, test the mechanism with a fixed, guarded 50 mm movement on each mechanical group.
 It homes first, forces the magnet off, waits for every motion to finish, then
 disables stepper motors using `M84`. It does not touch board state or create a
 pending chess transaction.
 
-First run the serial-free simulation:
+First print and inspect the serial-free outer X/Y and inner E G-code:
 
 ```bash
-.venv/bin/chess-gantry --config config.json motor-test --confirm-motion --demo
+.venv/bin/chess-gantry --config config.json motor-test
 ```
+
+Every outer-axis move uses mirrored X/Y targets whose sum is 170, such as
+`G1 X75 Y95 F4242`. Inner movement uses E independently, such as
+`G1 E75 F3000`. An optional in-memory transport check is available with
+`motor-test --confirm-motion --demo` and still opens no serial port.
 
 After checking endstops, workspace clearance, serial diagnostics, and the
 physical travel limits, send the same fixed program to Marlin:
@@ -134,9 +139,15 @@ physical travel limits, send the same fixed program to Marlin:
 .venv/bin/chess-gantry --config config.json motor-test --confirm-motion
 ```
 
-The command prints the exact transmitted G-code after every Marlin command has
-acknowledged. It requires `safety.calibrated: true` and rejects a workspace that
-does not include the path `(0,0) -> (150,0) -> (150,100) -> (0,0)`.
+The real command prints the exact transmitted G-code after every Marlin command
+has acknowledged. It requires `safety.calibrated: true` and rejects a workspace
+that does not include 75 mm of inner E travel and 75 mm of mirrored outer X/Y
+travel in both directions.
+
+With the gantry manually placed and squared at a safe starting position, the
+motor test uses `M82`, `M302 P1`, and `G92 X0 Y0 E0` to define the E motor as
+the absolute second outer axis. It issues no `G28`, restores cold-extrusion
+protection with `M302 P0`, and does not call the homing workflow.
 
 ## Supported upstream events
 

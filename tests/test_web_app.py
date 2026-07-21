@@ -77,12 +77,13 @@ class WebAppTests(unittest.TestCase):
             "ny": 3,
         }
         _, plan = self.request("/api/plan", {"move": move})
-        self.assertIn("G1 X90 Y70", plan["gcode"])
+        self.assertIn("G1 X70 Y100 E90", plan["gcode"])
         _, board_before = self.request("/api/board")
         self.assertEqual(board_before["board_state"]["revision"], 0)
 
         _, connected = self.request("/api/connect", {})
         self.assertTrue(connected["status"]["connected"])
+        self.request("/api/home", {"confirm_motion": True})
         _, executed = self.request(
             "/api/execute",
             {"move": move, "confirm_motion": True},

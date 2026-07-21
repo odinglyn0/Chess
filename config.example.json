@@ -188,11 +188,11 @@
     ]
   },
   "safety": {
-    "calibrated": false,
-    "home_before_execute": true,
+    "calibrated": true,
+    "home_before_execute": false,
     "home_commands": [
       "M107",
-      "G28 X Y",
+      "G92 X0 Y0 Z0",
       "M400"
     ],
     "preflight_commands": [

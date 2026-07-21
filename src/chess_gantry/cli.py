@@ -131,13 +131,20 @@ def _parser() -> ArgumentParser:
         help="allow a non-loopback bind; local-only is safer and is the default",
     )
 
-    home = commands.add_parser("home", help="turn magnet off and home X/Y using configured commands")
+    home = commands.add_parser(
+        "home", help="initialize coupled outer X/Y and independent inner E coordinates without homing"
+    )
     home.add_argument("--confirm-motion", action="store_true", help="required before physical motion")
 
     motor_test = commands.add_parser(
-        "motor-test", help="home then run a fixed 150 mm by 100 mm Marlin motor test and disable motors"
+        "motor-test",
+        help="print outer X/Y plus inner E sample G-code; add --confirm-motion to send it to Marlin",
     )
-    motor_test.add_argument("--confirm-motion", action="store_true", help="required before physical motion")
+    motor_test.add_argument(
+        "--confirm-motion",
+        action="store_true",
+        help="home and send the displayed test program to physical hardware",
+    )
     motor_test.add_argument("--demo", action="store_true", help="simulate Marlin instead of opening the serial port")
 
     commands.add_parser("stop", help="send the configured Marlin emergency-stop command immediately")
@@ -428,21 +435,23 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
             return 0
 
         if args.command == "motor-test":
+            program = service.motor_test_program()
             if not args.confirm_motion:
-                parser.error("motor-test requires --confirm-motion")
+                print("; DRY RUN ONLY: no serial port was opened")
+                print("; outer X and Y are coupled; inner E moves independently")
+                print("\n".join(program))
+                return 0
             if args.demo:
                 from .serial_link import DemoMarlinSerial
 
-                program = service.motor_test_program()
                 link = DemoMarlinSerial(config.serial)
                 with link:
                     link.send_program(config.safety.preflight_commands)
-                    service.home_with_link(link)
                     link.send_program(program)
                 print("; DEMO ONLY: no serial port was opened")
             else:
                 program = service.motor_test()
-            print("; fixed motor test sent successfully")
+            print("; fixed outer X/Y and inner E motor test sent successfully")
             print("\n".join(program))
             return 0
 

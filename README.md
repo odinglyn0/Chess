@@ -362,7 +362,7 @@ The software now accounts for the mechanically mirrored motor directions. Do not
 
 Marlin normally treats E as a filament extruder. Gantry programs therefore use `M82` for absolute E positioning and `M302 P1` to permit cold E movement. They restore cold-extrusion protection with `M302 P0` after movement. Do not use this setup with filament loaded or a hotend expecting normal extrusion behavior.
 
-The motor test never issues `G28` and never calls the homing workflow. Its positioning command is `G92 X0 Y0 E0`, which declares the current manually positioned location to be zero without moving a motor.
+The motor test never issues `G28` and never calls the homing workflow. Its positioning command is `G92 X0 Y350 E0`, which declares the current manually positioned origin without moving a motor.
 
 ## Hardware commands
 
@@ -381,8 +381,8 @@ chess-gantry --config config.json motor-test
 The sample path is:
 
 ```text
-inner E: 0 -> 5 -> 0
-outer X/Y: 0/350 -> 5/345 -> 0/350
+inner E: 0 -> 300 -> 0
+outer X/Y: 0/350 -> 300/50 -> 0/350
 ```
 
 You can also pass the program through the in-memory Marlin transport without real hardware:
@@ -391,7 +391,7 @@ You can also pass the program through the in-memory Marlin transport without rea
 chess-gantry --config config.json motor-test --confirm-motion --demo
 ```
 
-The 5 mm diagnostic uses the proven faster profile: inner E uses `F600` (10 mm/s), while mirrored outer X/Y use `F849` so each motor moves at about 10 mm/s. Live travel and drag feeds are 1200 and 600 mm/min, with axis limits of 20 mm/s, acceleration of 200 mm/s², and jerk of 3 mm/s. The test returns each group separately, restores cold-extrusion protection, and ends with `M84`.
+The full-range test moves approximately 30 cm in each mechanical direction. Inner E uses `F3000` at 50 mm/s. Mirrored outer X/Y use `F16971`, which gives each motor approximately 200 mm/s after Marlin applies diagonal vector speed. The test returns each group separately, restores cold-extrusion protection, and ends with `M84`.
 
 Before moving, the test applies matching calibration with a fast outer profile and a controlled inner profile:
 
@@ -399,12 +399,12 @@ Before moving, the test applies matching calibration with a fast outer profile a
 M82
 M302 P1
 M92 X80 Y80 E80
-M203 X20 Y20 E20
-M201 X200 Y200 E200
-M205 X3 Y3 E3
+M203 X200 Y200 E50
+M201 X500 Y500 E300
+M205 X5 Y5 E5
 ```
 
-These set absolute E positioning, permit cold E movement, and configure X, Y, and E equally at the verified 50 mm/s maximum with matching acceleration. They are session settings and do not require EEPROM persistence.
+These set absolute E positioning, permit cold E movement, configure outer X/Y for 200 mm/s, and limit inner E to 50 mm/s. They are session settings and do not require EEPROM persistence.
 
 ```bash
 chess-gantry --config config.json motor-test --confirm-motion

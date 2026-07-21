@@ -25,13 +25,13 @@
   },
   "workspace": {
     "min_x_mm": 0.0,
-    "max_x_mm": 235.0,
+    "max_x_mm": 350.0,
     "min_y_mm": 0.0,
-    "max_y_mm": 170.0
+    "max_y_mm": 350.0
   },
   "motion": {
     "travel_feed_mm_min": 12000.0,
-    "drag_feed_mm_min": 600.0,
+    "drag_feed_mm_min": 3000.0,
     "magnet_on_dwell_ms": 300,
     "magnet_off_dwell_ms": 300,
     "park_after_move": true,
@@ -188,11 +188,18 @@
     ]
   },
   "safety": {
-    "calibrated": true,
+    "calibrated": false,
     "home_before_execute": false,
     "home_commands": [
       "M107",
-      "G92 X0 Y0 Z0",
+      "M82",
+      "M302 P1",
+      "M92 X80 Y80 E80",
+      "M203 X200 Y200 E50",
+      "M201 X500 Y500 E300",
+      "M205 X5 Y5 E5",
+      "G92 X0 Y350 E0",
+      "M302 P0",
       "M400"
     ],
     "preflight_commands": [

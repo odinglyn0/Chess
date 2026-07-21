@@ -22,6 +22,8 @@ def test_config(*, calibrated: bool = True, capture: bool = True) -> AppConfig:
     raw["safety"]["calibrated"] = calibrated
     raw["safety"]["home_before_execute"] = False
     raw["safety"]["preflight_commands"] = []
+    raw["workspace"]["max_x_mm"] = 350.0
+    raw["workspace"]["max_y_mm"] = 350.0
     return AppConfig.from_mapping(raw)
 
 
@@ -103,7 +105,7 @@ class ServiceTests(unittest.TestCase):
             commands = plan.program.commands
             self.assertIn("M106 S255", commands)
             self.assertIn("M107", commands)
-            self.assertLess(commands.index("M106 S255"), commands.index("G1 X70 Y100 E90 F600"))
+            self.assertLess(commands.index("M106 S255"), commands.index("G1 X70 Y280 E90 F3000"))
 
     def test_capture_generates_two_transfers_and_updates_expected_state(self) -> None:
         with TemporaryDirectory() as directory:
@@ -233,16 +235,16 @@ class ServiceTests(unittest.TestCase):
             self.assertIn("M82", program)
             self.assertIn("M302 P1", program)
             self.assertIn("M92 X80 Y80 E80", program)
-            self.assertIn("M203 X20 Y20 E20", program)
-            self.assertIn("M201 X200 Y200 E200", program)
-            self.assertIn("M205 X3 Y3 E3", program)
-            self.assertIn("G92 X0 Y170 E0", program)
+            self.assertIn("M203 X200 Y200 E50", program)
+            self.assertIn("M201 X500 Y500 E300", program)
+            self.assertIn("M205 X5 Y5 E5", program)
+            self.assertIn("G92 X0 Y350 E0", program)
             self.assertFalse(any(command.startswith("G28") for command in program))
             self.assertFalse(any(" Z" in command for command in program))
-            self.assertIn("G1 E5 F600", program)
-            self.assertIn("G1 X5 Y165 F849", program)
-            self.assertIn("G1 E0 F600", program)
-            self.assertIn("G1 X0 Y170 F849", program)
+            self.assertIn("G1 E300 F3000", program)
+            self.assertIn("G1 X300 Y50 F16971", program)
+            self.assertIn("G1 E0 F3000", program)
+            self.assertIn("G1 X0 Y350 F16971", program)
             self.assertEqual(program[-3:], ("M302 P0", "M211 S1", "M84"))
             self.assertEqual(program[-1], "M84")
             self.assertEqual(service.store.load().revision, 0)

@@ -57,9 +57,9 @@ class ConfigAndGCodeTests(unittest.TestCase):
         on_index = commands.index("M106 S255")
         self.assertIn("M82", commands)
         self.assertIn("M302 P1", commands)
-        self.assertIn("G0 X10 Y160 E10 F3000", commands)
-        first_drag = commands.index("G1 X15 Y155 E20 F600")
-        final_drag = commands.index("G1 X30 Y140 E30 F600")
+        self.assertIn("G0 X10 Y340 E10 F12000", commands)
+        first_drag = commands.index("G1 X15 Y335 E20 F3000")
+        final_drag = commands.index("G1 X30 Y320 E30 F3000")
         off_after_drag = next(index for index in range(final_drag + 1, len(commands)) if commands[index] == "M107")
         self.assertEqual(commands[on_index - 1], "M400")
         self.assertLess(on_index, first_drag)
@@ -70,7 +70,7 @@ class ConfigAndGCodeTests(unittest.TestCase):
             if command.startswith(("G0 ", "G1 ")) and " Y" in command:
                 x_word = next(word for word in command.split() if word.startswith("X"))
                 y_word = next(word for word in command.split() if word.startswith("Y"))
-                self.assertAlmostEqual(float(x_word[1:]) + float(y_word[1:]), 170.0)
+                self.assertAlmostEqual(float(x_word[1:]) + float(y_word[1:]), 350.0)
 
 
 if __name__ == "__main__":

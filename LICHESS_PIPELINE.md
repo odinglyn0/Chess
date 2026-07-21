@@ -141,11 +141,11 @@ physical travel limits, send the same fixed program to Marlin:
 
 The real command prints the exact transmitted G-code after every Marlin command
 has acknowledged. It requires `safety.calibrated: true` and rejects a workspace
-that does not include 75 mm of inner E travel and 75 mm of mirrored outer X/Y
+that does not include 300 mm of inner E travel and 300 mm of mirrored outer X/Y
 travel in both directions.
 
 With the gantry manually placed and squared at a safe starting position, the
-motor test uses `M82`, `M302 P1`, and `G92 X0 Y0 E0` to define the E motor as
+motor test uses `M82`, `M302 P1`, and `G92 X0 Y350 E0` to define the E motor as
 the absolute second outer axis. It issues no `G28`, restores cold-extrusion
 protection with `M302 P0`, and does not call the homing workflow.
 

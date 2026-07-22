@@ -49,7 +49,6 @@
       "M107"
     ]
   },
-
   "planner": {
     "kind": "astar",
     "grid_step_mm": 5.0,

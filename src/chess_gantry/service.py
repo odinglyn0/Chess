@@ -2,10 +2,27 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+)
 
 from .config import AppConfig
-from .errors import ConfigurationError, PendingTransactionError, PlanningError, StateError, ValidationError
+from .errors import (
+    ConfigurationError,
+    PendingTransactionError,
+    PlanningError,
+    StateError,
+    ValidationError,
+)
 from .gcode import GCodeGenerator, GCodeProgram
 from .kinematics import grid_to_machine, validate_board_inside_workspace
 from .models import BoardState, MachinePoint, MoveDelta, PieceState, PieceTransfer
@@ -250,7 +267,9 @@ class GantryService:
     def execute_with_link(self, move: MoveDelta, link: Any) -> MotionPlan:
         self._require_execution_unlocked()
         if not getattr(link, "connected", False):
-            raise ConfigurationError("cannot execute: the supplied Marlin link is not connected")
+            raise ConfigurationError(
+                "cannot execute: the supplied Marlin link is not connected"
+            )
         with self.store.locked():
             plan = self._prepare_transaction(move)
             try:
@@ -262,7 +281,9 @@ class GantryService:
 
     def home_with_link(self, link: Any) -> None:
         if not getattr(link, "connected", False):
-            raise ConfigurationError("cannot home: the supplied Marlin link is not connected")
+            raise ConfigurationError(
+                "cannot home: the supplied Marlin link is not connected"
+            )
         link.send_program(self.config.magnet.off_commands)
         link.send_program(self.config.safety.home_commands)
 
@@ -324,14 +345,18 @@ class GantryService:
             try:
                 link.send_program(program)
             except Exception:
-                link.best_effort((*self.config.magnet.off_commands, "M302 P0", "M211 S1"))
+                link.best_effort(
+                    (*self.config.magnet.off_commands, "M302 P0", "M211 S1")
+                )
                 raise
         self.audit.append({"status": "motor_test_completed", "commands": list(program)})
         return program
 
     def emergency_stop_with_link(self, link: Any) -> None:
         if not getattr(link, "connected", False):
-            raise ConfigurationError("cannot stop: the supplied Marlin link is not connected")
+            raise ConfigurationError(
+                "cannot stop: the supplied Marlin link is not connected"
+            )
         link.emergency_stop(self.config.safety.emergency_stop_command)
 
     def emergency_stop(self) -> None:
@@ -349,7 +374,9 @@ class GantryService:
             base_revision = int(document["base_revision"])
             next_raw = document["next_state"]
         except (KeyError, TypeError, ValueError) as exc:
-            raise ValidationError("pending journal is missing valid revision/state data") from exc
+            raise ValidationError(
+                "pending journal is missing valid revision/state data"
+            ) from exc
         next_state = BoardState.from_mapping(
             next_raw,
             self.config.board.width,

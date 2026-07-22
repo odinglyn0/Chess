@@ -34,7 +34,9 @@ class GridPosition:
     y: int
 
     @classmethod
-    def validated(cls, x: Any, y: Any, width: int, height: int, prefix: str = "position") -> "GridPosition":
+    def validated(
+        cls, x: Any, y: Any, width: int, height: int, prefix: str = "position"
+    ) -> "GridPosition":
         xi = _strict_int(x, f"{prefix}.x")
         yi = _strict_int(y, f"{prefix}.y")
         if not 0 <= xi < width:
@@ -65,7 +67,9 @@ class MoveDelta:
     capture: Optional[CaptureSpec] = None
 
     @classmethod
-    def from_mapping(cls, raw: Mapping[str, Any], width: int = 8, height: int = 8) -> "MoveDelta":
+    def from_mapping(
+        cls, raw: Mapping[str, Any], width: int = 8, height: int = 8
+    ) -> "MoveDelta":
         if not isinstance(raw, Mapping):
             raise ValidationError("move JSON must be an object")
 
@@ -76,7 +80,8 @@ class MoveDelta:
             unknown_root = set(payload) - {"position", "event_id"}
             if unknown_root:
                 raise ValidationError(
-                    "nested move JSON has unknown top-level field(s): " + ", ".join(sorted(unknown_root))
+                    "nested move JSON has unknown top-level field(s): "
+                    + ", ".join(sorted(unknown_root))
                 )
             nested_payload = dict(nested)
             if "event_id" in payload and "event_id" not in nested_payload:
@@ -86,27 +91,45 @@ class MoveDelta:
         allowed = {"position", "id", "px", "py", "nx", "ny", "event_id", "capture"}
         unknown = set(payload) - allowed
         if unknown:
-            raise ValidationError("unknown move field(s): " + ", ".join(sorted(unknown)))
+            raise ValidationError(
+                "unknown move field(s): " + ", ".join(sorted(unknown))
+            )
 
-        position_id = payload.get("position") if isinstance(payload.get("position"), str) else None
+        position_id = (
+            payload.get("position")
+            if isinstance(payload.get("position"), str)
+            else None
+        )
         explicit_id = payload.get("id")
         if position_id is None and explicit_id is None:
-            raise ValidationError("move JSON needs a piece id in 'position' (original format) or 'id'")
-        if position_id is not None and explicit_id is not None and position_id != explicit_id:
+            raise ValidationError(
+                "move JSON needs a piece id in 'position' (original format) or 'id'"
+            )
+        if (
+            position_id is not None
+            and explicit_id is not None
+            and position_id != explicit_id
+        ):
             raise ValidationError("'position' and 'id' disagree")
-        piece_id = _valid_identifier(explicit_id if explicit_id is not None else position_id, "piece id")
+        piece_id = _valid_identifier(
+            explicit_id if explicit_id is not None else position_id, "piece id"
+        )
 
         missing = [name for name in ("px", "py", "nx", "ny") if name not in payload]
         if missing:
             raise ValidationError("missing move field(s): " + ", ".join(missing))
 
-        previous = GridPosition.validated(payload["px"], payload["py"], width, height, "previous")
+        previous = GridPosition.validated(
+            payload["px"], payload["py"], width, height, "previous"
+        )
         new = GridPosition.validated(payload["nx"], payload["ny"], width, height, "new")
         if previous == new:
             raise ValidationError("previous and new positions are identical")
 
         event_value = payload.get("event_id")
-        event_id = None if event_value is None else _valid_identifier(event_value, "event_id")
+        event_id = (
+            None if event_value is None else _valid_identifier(event_value, "event_id")
+        )
 
         capture_raw = payload.get("capture")
         capture = None
@@ -115,10 +138,17 @@ class MoveDelta:
                 raise ValidationError("capture must be an object with id, x, and y")
             capture_unknown = set(capture_raw) - {"id", "x", "y"}
             if capture_unknown:
-                raise ValidationError("capture has unknown field(s): " + ", ".join(sorted(capture_unknown)))
-            missing_capture = [name for name in ("id", "x", "y") if name not in capture_raw]
+                raise ValidationError(
+                    "capture has unknown field(s): "
+                    + ", ".join(sorted(capture_unknown))
+                )
+            missing_capture = [
+                name for name in ("id", "x", "y") if name not in capture_raw
+            ]
             if missing_capture:
-                raise ValidationError("capture is missing field(s): " + ", ".join(missing_capture))
+                raise ValidationError(
+                    "capture is missing field(s): " + ", ".join(missing_capture)
+                )
             captured_id = _valid_identifier(capture_raw["id"], "capture.id")
             if captured_id == piece_id:
                 raise ValidationError("a piece cannot capture itself")
@@ -126,10 +156,18 @@ class MoveDelta:
                 capture_raw["x"], capture_raw["y"], width, height, "capture"
             )
             if captured_position == previous:
-                raise ValidationError("capture position cannot be the moving piece's source square")
+                raise ValidationError(
+                    "capture position cannot be the moving piece's source square"
+                )
             capture = CaptureSpec(piece_id=captured_id, position=captured_position)
 
-        return cls(piece_id=piece_id, previous=previous, new=new, event_id=event_id, capture=capture)
+        return cls(
+            piece_id=piece_id,
+            previous=previous,
+            new=new,
+            event_id=event_id,
+            capture=capture,
+        )
 
     def to_dict(self) -> Dict[str, Any]:
         result: Dict[str, Any] = {
@@ -169,11 +207,15 @@ class PieceState:
         allowed = {"status", "x", "y", "capture_slot", "metadata"}
         unknown = set(raw) - allowed
         if unknown:
-            raise ValidationError(f"piece {pid!r} has unknown field(s): {', '.join(sorted(unknown))}")
+            raise ValidationError(
+                f"piece {pid!r} has unknown field(s): {', '.join(sorted(unknown))}"
+            )
 
         status = raw.get("status", _STATUS_BOARD)
         if status not in _ALLOWED_STATUSES:
-            raise ValidationError(f"piece {pid!r} status must be one of {sorted(_ALLOWED_STATUSES)}")
+            raise ValidationError(
+                f"piece {pid!r} status must be one of {sorted(_ALLOWED_STATUSES)}"
+            )
 
         metadata = raw.get("metadata", {})
         if not isinstance(metadata, Mapping):
@@ -183,16 +225,24 @@ class PieceState:
         if status == _STATUS_BOARD:
             if "x" not in raw or "y" not in raw:
                 raise ValidationError(f"piece {pid!r} on the board needs x and y")
-            pos = GridPosition.validated(raw["x"], raw["y"], width, height, f"piece {pid}")
+            pos = GridPosition.validated(
+                raw["x"], raw["y"], width, height, f"piece {pid}"
+            )
             if raw.get("capture_slot") is not None:
-                raise ValidationError(f"piece {pid!r} on the board cannot have capture_slot")
-            return cls(piece_id=pid, status=status, x=pos.x, y=pos.y, metadata=metadata_copy)
+                raise ValidationError(
+                    f"piece {pid!r} on the board cannot have capture_slot"
+                )
+            return cls(
+                piece_id=pid, status=status, x=pos.x, y=pos.y, metadata=metadata_copy
+            )
 
         slot = _strict_int(raw.get("capture_slot"), f"piece {pid}.capture_slot")
         if slot < 0:
             raise ValidationError(f"piece {pid!r} capture_slot must be non-negative")
         if raw.get("x") is not None or raw.get("y") is not None:
-            raise ValidationError(f"captured piece {pid!r} must use null/omitted x and y")
+            raise ValidationError(
+                f"captured piece {pid!r} must use null/omitted x and y"
+            )
         return cls(
             piece_id=pid,
             status=status,
@@ -226,24 +276,32 @@ class BoardState:
     processed_events: Tuple[str, ...] = ()
 
     @classmethod
-    def from_mapping(cls, raw: Mapping[str, Any], width: int = 8, height: int = 8) -> "BoardState":
+    def from_mapping(
+        cls, raw: Mapping[str, Any], width: int = 8, height: int = 8
+    ) -> "BoardState":
         if not isinstance(raw, Mapping):
             raise ValidationError("board state must be a JSON object")
         allowed = {"schema_version", "revision", "pieces", "processed_events"}
         unknown = set(raw) - allowed
         if unknown:
-            raise ValidationError("board state has unknown field(s): " + ", ".join(sorted(unknown)))
+            raise ValidationError(
+                "board state has unknown field(s): " + ", ".join(sorted(unknown))
+            )
 
         schema_version = _strict_int(raw.get("schema_version", 1), "schema_version")
         if schema_version != 1:
-            raise ValidationError(f"unsupported board state schema_version {schema_version}; expected 1")
+            raise ValidationError(
+                f"unsupported board state schema_version {schema_version}; expected 1"
+            )
         revision = _strict_int(raw.get("revision", 0), "revision")
         if revision < 0:
             raise ValidationError("revision must be non-negative")
 
         pieces_raw = raw.get("pieces")
         if not isinstance(pieces_raw, Mapping):
-            raise ValidationError("board state 'pieces' must be an object keyed by piece id")
+            raise ValidationError(
+                "board state 'pieces' must be an object keyed by piece id"
+            )
         pieces: Dict[str, PieceState] = {}
         occupied: Dict[GridPosition, str] = {}
         capture_slots: Dict[int, str] = {}
@@ -272,7 +330,9 @@ class BoardState:
         events_raw = raw.get("processed_events", [])
         if not isinstance(events_raw, list):
             raise ValidationError("processed_events must be an array")
-        events = tuple(_valid_identifier(item, "processed event id") for item in events_raw)
+        events = tuple(
+            _valid_identifier(item, "processed event id") for item in events_raw
+        )
         if len(events) != len(set(events)):
             raise ValidationError("processed_events contains duplicates")
 
@@ -287,7 +347,10 @@ class BoardState:
         return {
             "schema_version": self.schema_version,
             "revision": self.revision,
-            "pieces": {piece_id: self.pieces[piece_id].to_dict() for piece_id in sorted(self.pieces)},
+            "pieces": {
+                piece_id: self.pieces[piece_id].to_dict()
+                for piece_id in sorted(self.pieces)
+            },
             "processed_events": list(self.processed_events),
         }
 
@@ -298,7 +361,9 @@ class BoardState:
         return None
 
     def board_pieces(self) -> Iterable[PieceState]:
-        return (piece for piece in self.pieces.values() if piece.status == _STATUS_BOARD)
+        return (
+            piece for piece in self.pieces.values() if piece.status == _STATUS_BOARD
+        )
 
     def used_capture_slots(self) -> Dict[int, str]:
         return {
@@ -346,13 +411,19 @@ class BoardState:
                 "off-destination capture requires an empty destination square; use a normal destination capture instead"
             )
         if move.capture.position == move.new and destination_occupant != captured:
-            raise StateError("explicit destination capture does not match destination occupant")
+            raise StateError(
+                "explicit destination capture does not match destination occupant"
+            )
         return captured
 
-    def applied(self, move: MoveDelta, capture_slot: Optional[int], max_events: int = 512) -> "BoardState":
+    def applied(
+        self, move: MoveDelta, capture_slot: Optional[int], max_events: int = 512
+    ) -> "BoardState":
         captured = self.validate_move(move)
         if captured is not None and capture_slot is None:
-            raise StateError("the move captures a piece, but no capture slot was assigned")
+            raise StateError(
+                "the move captures a piece, but no capture slot was assigned"
+            )
         if captured is None and capture_slot is not None:
             raise StateError("capture slot was assigned for a non-capture move")
 

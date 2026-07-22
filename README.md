@@ -808,3 +808,182 @@ The software already accounts for the mechanically mirrored motor directions. Do
 Marlin conventionally regards E as a filament extruder. Gantry programs therefore assert `M82` for absolute E positioning and `M302 P1` to permit cold E movement, subsequently restoring cold-extrusion protection with `M302 P0`. Do not deploy this configuration with filament loaded or with a hotend anticipating conventional extrusion behavior, unless you are conducting an unsanctioned experiment in polymer archaeology.
 
 The motor test never issues `G28` and never invokes the homing workflow. Its positioning command is `G92 X0 Y350 E0`, which merely declares the current, manually-positioned origin without commanding any motor to move.
+
+## 19. Hardware Incantations
+
+With the complete gantry physically situated at a safe, squared starting posture, initialize its current coordinate belief without commanding movement:
+
+```bash
+chess-gantry --config config.json home --confirm-motion
+```
+
+First print and scrutinize the exact sample G-code. This does not open the serial port and harms nothing:
+
+```bash
+chess-gantry --config config.json motor-test
+```
+
+The sample trajectory is:
+
+```text
+inner E:     0 -> 200 -> 0
+outer X/Y:   0/350 -> 200/150 -> 0/350
+```
+
+You may also route the program through the in-memory Marlin transport with no real hardware whatsoever:
+
+```bash
+chess-gantry --config config.json motor-test --confirm-motion --demo
+```
+
+The test traverses 20 cm along each mechanical direction. Inner E employs `F3000` at 50 mm/s. The mirrored outer X/Y pair employs `F16971`, which — after Marlin applies diagonal vector-speed decomposition — yields approximately 200 mm/s per motor. The test returns each group independently, restores cold-extrusion protection, and terminates with `M84`.
+
+Prior to motion, the test applies matched calibration comprising a fast outer profile and a controlled inner profile:
+
+```gcode
+M82
+M302 P1
+M92 X80 Y80 E80
+M203 X200 Y200 E50
+M201 X500 Y500 E300
+M205 X5 Y5 E5
+```
+
+These assert absolute E positioning, permit cold E movement, configure outer X/Y for 200 mm/s, and constrain inner E to 50 mm/s. They are ephemeral session settings and demand no EEPROM persistence.
+
+```bash
+chess-gantry --config config.json motor-test --confirm-motion
+```
+
+Transmit the configured emergency stop:
+
+```bash
+chess-gantry --config config.json stop
+```
+
+The standalone command must open the serial port and may therefore be unable to seize a port already held hostage by another process. The browser controller, by contrast, dispatches stop over its pre-established connection.
+
+## 20. Disaster Recovery and Journal Reconciliation Rites
+
+Prior to physical execution, the program inscribes `data/pending_move.json`. A command error, timeout, crash, or power loss leaves this journal resident, actively barricading any subsequent move.
+
+Inspect the pending transaction:
+
+```bash
+chess-gantry --config config.json reconcile
+```
+
+After inspecting and, where necessary, manually restoring the physical board, either commit the journal's expected state:
+
+```bash
+chess-gantry --config config.json reconcile \
+  --mark-applied --confirm-physical-state
+```
+
+Or retain the current stored state and discard the journal:
+
+```bash
+chess-gantry --config config.json reconcile \
+  --discard --confirm-physical-state
+```
+
+Never reconcile until stored state and physical reality are provably known to correspond to one of those two outcomes. Reconciliation performed in ignorance is not reconciliation; it is merely the confident recording of a lie.
+
+## 21. Python Integration Surface Area
+
+```python
+import json
+from pathlib import Path
+
+from chess_gantry import AppConfig, GantryService, MoveDelta
+
+config = AppConfig.load("config.json")
+raw_move = json.loads(Path("incoming_move.json").read_text())
+move = MoveDelta.from_mapping(raw_move, config.board.width, config.board.height)
+
+service = GantryService(
+    config,
+    state_path="data/board_state.json",
+    journal_path="data/pending_move.json",
+    audit_path="data/audit.jsonl",
+)
+
+plan = service.plan(move)
+print(plan.program.text())
+
+```
+
+Update an external game matrix only after `execute` returns successfully, or rebuild it wholesale from the committed board state. The mere generation of G-code is not, and never has been, evidence that the physical move actually transpired.
+
+## 22. Testing, Verification, and the Pursuit of Green
+
+Install dependencies, then execute the full compile-and-unit-test gauntlet:
+
+```bash
+./scripts/check.sh
+```
+
+Equivalent invocations for the manually inclined:
+
+```bash
+PYTHONPATH=src python -m compileall -q src tests examples
+PYTHONPATH=src python -m unittest discover -s tests -v
+```
+
+The extant suite comprises 55 tests spanning validation, planning, serial behavior, state transactions, browser APIs, UCI transmutation, and Lichess adapters. A green run is a moment of fleeting serenity. Cherish it.
+
+## 23. Project Topology
+
+```text
+Chess/
+|-- config.example.json
+|-- docker-compose.lichess.yml
+|-- examples/
+|-- schemas/
+|-- scripts/
+|-- services/lichess_stream/   # external service submodule; see the Section 17 lament
+|-- src/chess_gantry/
+|   |-- cli.py
+|   |-- config.py
+|   |-- controller.py
+|   |-- gcode.py
+|   |-- kinematics.py
+|   |-- lichess_adapter.py
+|   |-- lichess_follow.py
+|   |-- lichess_pgn.py
+|   |-- lichess_watch.py
+|   |-- models.py
+|   |-- path_planning.py
+|   |-- persistence.py
+|   |-- serial_link.py
+|   |-- service.py
+|   |-- uci_adapter.py
+|   `-- web_app.py
+`-- tests/
+```
+
+## 24. Limitations, Caveats, and Admissions
+
+- Chess legality is intentionally, philosophically, and permanently delegated to the upstream game engine. We regret nothing.
+- A two-axis drag mechanism cannot resolve routes physically obstructed by tightly packed pieces; smaller pieces, wider inter-square spacing, an outside-board corridor, or a dedicated lift axis may be required to escape gridlock.
+- Castling demands two physical transfers and is not accepted as a single UCI or Lichess adapter move.
+- Promotion demands an external physical replacement process and is rejected by both the UCI and Lichess adapters.
+- Planner geometry and USB acknowledgements are categorically incapable of substituting for physical sensing and supervised calibration. They are models. The board is territory.
+
+## 25. Frequently Unasked Questions
+
+**Q: Does this know if my move is legal?**
+No. It has achieved a state of profound legal agnosticism. This is by design.
+
+**Q: Why is the README this long?**
+Someone requested it. The code, mercifully, remains concise.
+
+**Q: What is `X + Y = 170`?**
+A sacred invariant. See Section 18. Do not question it.
+
+**Q: Can I drive the electromagnet from GPIO?**
+No. Read Section 6 again. Then read it a third time.
+
+## 26. Colophon
+
+This document was composed with an intentionally maximal ratio of syllables to actionable information. Any accidental clarity is an artifact of the underlying software actually working, for which no apology is offered. The genuine, load-bearing operational details are all present and correct; they are merely wearing an elaborate costume.

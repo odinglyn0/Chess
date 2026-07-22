@@ -103,11 +103,23 @@ Runtime files such as `config.json`, board state, journals, audit logs, generate
 
 ## Quick start
 
-Activate the environment before using the CLI:
+All commands below are run from the repository root. Activate the environment
+before using the CLI:
 
 ```bash
 source .venv/bin/activate
 ```
+
+The main program is the `chess-gantry` CLI. The module form is equivalent and
+can be useful when the console script is not on `PATH`:
+
+```bash
+chess-gantry --help
+python -m chess_gantry --help
+```
+
+Get the options for a specific command by placing `--help` after it, for
+example `chess-gantry plan --help`.
 
 Plan a move without opening the serial port or changing board state:
 
@@ -115,6 +127,17 @@ Plan a move without opening the serial port or changing board state:
 chess-gantry --config config.json --state data/board_state.json \
   plan examples/move_e2_e4.json
 ```
+
+For the same dry run with all standard state, journal, and audit paths filled
+in automatically, use the convenience script:
+
+```bash
+./scripts/run_move.sh
+./scripts/run_move.sh examples/move_capture_demo.json
+```
+
+The first command uses `examples/move_e2_e4.json`. Both commands only print the
+planned G-code; they do not open a serial port or modify board state.
 
 Launch the browser controller with simulated hardware:
 
@@ -142,6 +165,15 @@ chess-gantry \
   execute examples/move_e2_e4.json \
   --confirm-motion
 ```
+
+The convenience-script equivalent is:
+
+```bash
+./scripts/run_move.sh examples/move_e2_e4.json --confirm-motion
+```
+
+Real motion remains locked unless `safety.calibrated` is `true` in
+`config.json`. Review the safety and calibration sections before enabling it.
 
 Global options such as `--config`, `--state`, `--journal`, and `--audit` should be placed before the subcommand.
 
@@ -475,7 +507,8 @@ Update an external game matrix only after `execute` returns successfully, or reb
 
 ## Testing
 
-Install dependencies, then run the full compile and unit-test check:
+After completing the installation steps, run the full compile and unit-test
+check from the repository root:
 
 ```bash
 ./scripts/check.sh
@@ -487,6 +520,23 @@ Equivalent commands:
 PYTHONPATH=src python -m compileall -q src tests examples
 PYTHONPATH=src python -m unittest discover -s tests -v
 ```
+
+The project uses Python's built-in `unittest` runner; `pytest` is not required.
+To run one test module:
+
+```bash
+PYTHONPATH=src python -m unittest tests.test_controller -v
+```
+
+To run one class or test method, provide its full dotted name:
+
+```bash
+PYTHONPATH=src python -m unittest \
+  tests.test_controller.ControllerTests.test_method_name -v
+```
+
+Replace `ControllerTests.test_method_name` with the class and method shown in
+the selected test file.
 
 The current suite contains 55 tests covering validation, planning, serial behavior, state transactions, browser APIs, UCI conversion, and Lichess adapters.
 

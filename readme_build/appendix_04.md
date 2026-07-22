@@ -95,3 +95,107 @@ serves three purposes, each of which we now enumerate with excessive formality:
 - **Purpose the Third — The Preservation of the Invariant.** The Sacred Invariant lives in
   the metric-to-machine transform. Isolating that transform in its own frame boundary is
   what permits us to state, prove, and worship the invariant in peace.
+
+### D.2 Notation and Conventions
+
+We adopt the following notation, and we ask the reader to memorise it, because we will use
+it relentlessly and without further introduction.
+
+- Lowercase `(x, y)` denotes a point in the Logical Frame `L`.
+- The pair `(u, v)` denotes a point in the Metric Frame `M`, where by convention `u` is the
+  **outer** metric coordinate and `v` is the **inner** metric coordinate. The words "outer"
+  and "inner" are terms of art and are defined precisely in Section D.3.
+- The triple `(X, Y, E)` denotes a point in the Machine Frame `P`.
+- The symbol `S` denotes the **Sacred Sum**, whose canonical value is `170`. Thus the Sacred
+  Invariant is written `X + Y = S`, and `S = 170` unless a heretic has edited the config.
+- The symbol `p` denotes the calibrated **pitch** of the board in millimetres per logical
+  unit, i.e. the centre-to-centre distance between adjacent squares.
+- The symbol `o` denotes the **origin offset vector** in millimetres, mapping logical origin
+  to metric origin.
+- The operator `⊕` denotes the mirroring reflection about the half-sum `S/2 = 85`.
+
+We further adopt the convention that all G-code is expressed in absolute positioning mode
+(`G90`), that all feed rates are in millimetres per minute as Marlin demands, and that the
+magnet state is toggled by digital output commands whose exact pin assignment is, mercifully,
+outside the scope of this appendix and confined to Appendix B.
+
+### D.2.1 A Digression on the Word "Sacred"
+
+The word "Sacred," as applied to the invariant `X + Y = 170`, is not chosen for mere
+rhetorical flourish, although we will not pretend the flourish is unwelcome. It is chosen
+because the invariant possesses the two defining properties of the sacred as understood by
+the systems theologian: it is **inviolable** (any command that violates it produces physical
+motion that departs the calibrated envelope) and it is **generative** (from it, the entire
+mirrored-axis behaviour of the gantry may be derived without further postulate). We shall
+return to both properties, repeatedly, in the manner of a liturgy.
+
+### D.3 The Meaning of Outer and Inner
+
+Consider the physical gantry. It possesses two orthogonal linear axes. One of these axes —
+the one whose lead screw is longer, whose carriage is heavier, and whose motor sings at a
+lower pitch — we designate the **outer** axis. The other, nested within the travel of the
+first, we designate the **inner** axis. The nomenclature reflects the mechanical nesting: the
+inner axis rides upon the outer.
+
+Now, the metric coordinate `u` is the displacement, in millimetres, along the direction that
+the outer axis physically traverses. The metric coordinate `v` is the displacement along the
+inner axis direction. This is a purely physical, ruler-verifiable definition. It says nothing
+yet about which Marlin axis letter (`X`, `Y`, or `E`) commands which physical motion. That
+correspondence is the entire subject of the metric-to-machine transform, and it is where the
+Sacred Invariant makes its home.
+
+### D.3.1 The Load-Bearing Sentence
+
+Here is the single most important sentence in this appendix, set apart so that it may be
+found by the desperate at 3 a.m.:
+
+> **Physical `X` receives the outer coordinate; physical `Y` receives `170` minus the outer
+> coordinate; and the logical `x` (file index, converted to metric) is what is dispatched to
+> the `E` axis.**
+
+Everything else in this treatise is commentary on that sentence. Read it again. We will now
+spend approximately one thousand three hundred lines on the commentary.
+
+### D.4 The Metric-to-Machine Transform, Stated Plainly
+
+Let `(u, v)` be a point in the Metric Frame, where `u` is the outer coordinate. The
+metric-to-machine transform `T : M → P` is defined by:
+
+```
+X = u
+Y = 170 - u
+E = v
+```
+
+We pause to note the audacity of this definition. The inner coordinate `v` does not
+influence `X` or `Y` at all; it is routed wholesale to the `E` axis. The outer coordinate
+`u` alone determines both `X` and `Y`, and it determines them in perfect opposition: as `X`
+rises, `Y` falls, and their sum is pinned, eternally, at `170`.
+
+### D.4.1 Immediate Consequence
+
+From the definition it is immediate that:
+
+```
+X + Y = u + (170 - u) = 170
+```
+
+and the Sacred Invariant is not so much proven as _revealed_. It falls out of the definition
+like a coin from a torn pocket. Nevertheless, because this appendix has standards to betray,
+we shall prove it again, formally, in Section D.5, and then prove several consequences of it
+that are far less obvious and far more useful.
+
+### D.4.2 Why `E` and Not a Third Cartesian Letter
+
+A reasonable person, encountering the routing of the inner coordinate to the `E` axis, might
+ask: why not use a genuine third Cartesian axis? The answer is grounded in the pragmatic
+reality of consumer 3D-printer motion controllers, which is the substrate upon which the
+Chess Gantry is, with great thrift, constructed.
+
+Marlin firmware exposes the `E` axis as a fully commandable stepper with position, feed rate,
+and acceleration semantics essentially identical to `X` and `Y`, differing only in that it is
+conventionally associated with filament extrusion. By commandeering `E` for the inner axis,
+the Chess Gantry obtains a third independently controllable motor without recompiling the
+firmware to enable a genuine `Z`-plus-`W` multi-axis configuration, and without paying the
+homing and endstop ceremony that the `Z` axis demands. `E` is, in a sense, the axis that asks
+no questions. We route the inner coordinate to it precisely because it asks no questions.

@@ -12,7 +12,11 @@ data/
 *.gcode
 *.lock
 
-# Python is handled by ruff, not prettier
+# Editor / agent tooling (not project source)
+.kiro/
+.husky/_/
+
+# Python is handled by Black, not Prettier
 *.py
 
 # Lock files

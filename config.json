@@ -15,7 +15,6 @@
     "verify_marlin": true,
     "handshake_timeout_s": 5.0
   },
-
   "board": {
     "width": 8,
     "height": 8,

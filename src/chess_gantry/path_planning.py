@@ -16,7 +16,9 @@ def _distance(a: MachinePoint, b: MachinePoint) -> float:
     return hypot(a.x - b.x, a.y - b.y)
 
 
-def _point_segment_distance(point: MachinePoint, start: MachinePoint, end: MachinePoint) -> float:
+def _point_segment_distance(
+    point: MachinePoint, start: MachinePoint, end: MachinePoint
+) -> float:
     dx = end.x - start.x
     dy = end.y - start.y
     length_sq = dx * dx + dy * dy
@@ -36,12 +38,17 @@ def segment_is_clear(
 ) -> bool:
     if keepout_mm <= 0:
         return True
-    return all(_point_segment_distance(obstacle, start, end) + _EPSILON >= keepout_mm for obstacle in obstacles)
+    return all(
+        _point_segment_distance(obstacle, start, end) + _EPSILON >= keepout_mm
+        for obstacle in obstacles
+    )
 
 
 def _assert_in_workspace(point: MachinePoint, workspace: Workspace, name: str) -> None:
     if not workspace.contains(point):
-        raise PlanningError(f"{name} ({point.x:.3f}, {point.y:.3f}) is outside the configured workspace")
+        raise PlanningError(
+            f"{name} ({point.x:.3f}, {point.y:.3f}) is outside the configured workspace"
+        )
 
 
 def direct_path(
@@ -57,10 +64,14 @@ def direct_path(
     return (start, goal)
 
 
-def _axis_values(minimum: float, maximum: float, step: float, extras: Sequence[float]) -> List[float]:
+def _axis_values(
+    minimum: float, maximum: float, step: float, extras: Sequence[float]
+) -> List[float]:
     count = int(ceil((maximum - minimum) / step))
     values = [min(maximum, minimum + index * step) for index in range(count + 1)]
-    values.extend(value for value in extras if minimum - _EPSILON <= value <= maximum + _EPSILON)
+    values.extend(
+        value for value in extras if minimum - _EPSILON <= value <= maximum + _EPSILON
+    )
     values.extend((minimum, maximum))
     # Rounded keys remove floating-point near-duplicates without changing output materially.
     unique: Dict[float, float] = {}
@@ -107,11 +118,16 @@ def astar_path(
     filtered = tuple(
         obstacle
         for obstacle in obstacles
-        if _distance(obstacle, start) > _EPSILON and _distance(obstacle, goal) > _EPSILON
+        if _distance(obstacle, start) > _EPSILON
+        and _distance(obstacle, goal) > _EPSILON
     )
 
-    xs = _axis_values(workspace.min_x_mm, workspace.max_x_mm, settings.grid_step_mm, (start.x, goal.x))
-    ys = _axis_values(workspace.min_y_mm, workspace.max_y_mm, settings.grid_step_mm, (start.y, goal.y))
+    xs = _axis_values(
+        workspace.min_x_mm, workspace.max_x_mm, settings.grid_step_mm, (start.x, goal.x)
+    )
+    ys = _axis_values(
+        workspace.min_y_mm, workspace.max_y_mm, settings.grid_step_mm, (start.y, goal.y)
+    )
     node_count = len(xs) * len(ys)
     if node_count > settings.max_expanded_nodes * 4:
         raise PlanningError(
@@ -134,7 +150,8 @@ def astar_path(
         if node not in free_cache:
             candidate = point(node)
             free_cache[node] = all(
-                _distance(candidate, obstacle) + _EPSILON >= settings.obstacle_keepout_mm
+                _distance(candidate, obstacle) + _EPSILON
+                >= settings.obstacle_keepout_mm
                 for obstacle in filtered
             )
         return free_cache[node]
@@ -156,7 +173,9 @@ def astar_path(
                 if not is_free((ix + dx, iy)) or not is_free((ix, iy + dy)):
                     continue
             target = point(nxt)
-            if not segment_is_clear(current, target, filtered, settings.obstacle_keepout_mm):
+            if not segment_is_clear(
+                current, target, filtered, settings.obstacle_keepout_mm
+            ):
                 continue
             yield nxt, _distance(current, target)
 

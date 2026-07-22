@@ -44,7 +44,9 @@ class GCodeGenerator:
             yield f"G4 P{milliseconds}"
 
     def _outer_axes(self, position: float) -> Tuple[float, float]:
-        mirrored = self.config.workspace.min_y_mm + self.config.workspace.max_y_mm - position
+        mirrored = (
+            self.config.workspace.min_y_mm + self.config.workspace.max_y_mm - position
+        )
         return position, mirrored
 
     def generate(self, transfers: Sequence[PieceTransfer]) -> GCodeProgram:

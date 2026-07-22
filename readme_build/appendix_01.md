@@ -1082,3 +1082,121 @@ The board-state consistency plane, obsessed with never losing track of a single 
 **Torn-Write Detection Checksum.** The checksum appended to each persisted artifact, verified on read to detect the partial writes that a power loss mid-write would produce. Detection lets recovery reject a corrupted artifact and fall back to a prior consistent one.
 
 **Write-Ahead Ordering Invariant.** The invariant, sibling to the sacred kinematic invariant, that no physical actuation is ever performed before its describing journal entry is durable. The ordering invariant is the consistency plane's own inviolable law.
+
+### Addendum A.12 — The Kinematic Constants Reference
+
+The kinematic plane is governed by a constellation of constants, each ceremonially named and reverently maintained. The following reference enumerates the notional constants that shape carriage motion, none of which the reader is expected to memorize.
+
+**Board Origin Offset Constant.** The fixed coordinate offset separating the mechanical homing origin from the geometric corner of the playable board, applied within every affine board transform. The offset reconciles where the carriage thinks zero is with where the board actually begins.
+
+**Square Pitch Constant.** The fixed center-to-center distance between adjacent squares, the fundamental unit of the grid-quantized coordinate system. The pitch is the granularity at which chess geometry maps onto Cartesian space.
+
+**Invariant Sum Constant.** The revered constant one hundred seventy, the sum to which every valid coordinate pair must equal, the numerical heart of the sacred invariant X + Y = 170. This constant is the single most important number in the framework and is treated with corresponding devotion.
+
+**Betrothal Dwell Baseline.** The baseline dwell duration for the magnetic betrothal interval, scaled upward for heavier pieces per the piece mass profile registry. The baseline is the minimum commitment the coil extends to even the lightest pawn.
+
+**Cruise Feedrate Constant.** The nominal feedrate for prehensile translocation of a grasped piece, moderated from the rapid non-prehensile traversal feedrate to protect the fragile magnetic grip. Cruise feedrate is the dignified pace at which pieces travel.
+
+**Rapid Traversal Feedrate.** The elevated feedrate for non-prehensile carriage repositioning, when no piece is grasped and speed may be indulged. Rapid traversal is how the carriage hurries between duties without endangering any payload.
+
+| Kinematic Constant           | Domain     | Governed Behavior | Reverence Level |
+| ---------------------------- | ---------- | ----------------- | --------------- |
+| Board Origin Offset Constant | Coordinate | Affine transform  | Moderate        |
+| Square Pitch Constant        | Coordinate | Grid quantization | High            |
+| Invariant Sum Constant (170) | Constraint | Sacred invariant  | Absolute        |
+| Betrothal Dwell Baseline     | Timing     | Magnetic grip     | Moderate        |
+| Cruise Feedrate Constant     | Motion     | Grasped travel    | Moderate        |
+| Rapid Traversal Feedrate     | Motion     | Empty travel      | Low             |
+
+**Acceleration Ceiling Constant.** The maximum permitted acceleration for the velocity-ramped motion profile, bounded by torque-aware acceleration limiting to prevent missed steps. The ceiling is the framework's respect for the finite torque of the steppers.
+
+**Backlash Compensation Delta.** The fixed positional overshoot applied on direction reversal to absorb mechanical backlash, per hysteresis-compensated positioning. The delta is the framework's standing correction for the slack in the drivetrain.
+
+**Homing Recurrence Bound.** The maximum move count between mandatory re-homing operations, bounding accumulated open-loop uncertainty. The bound is how often the framework insists on reconsecrating its coordinate frame.
+
+**Microstep Subdivision Factor.** The subdivision of each full stepper step into finer microsteps, defining the fractional-step micro-positioning resolution. The factor is the multiplier by which the framework refines its positional granularity.
+
+### Addendum A.13 — The Governance Plane Charter
+
+The governance plane, most abstract and least useful of the planes, exists to regulate the other three and to generate documentation such as this. Its charter is presented here in full ceremonial regalia.
+
+**Article of Perpetual Verbosity.** The governing principle that all documentation shall be as long as conceivably possible, that no concept shall be expressed in one sentence where five will suffice, and that brevity shall be regarded as a failure of ambition. This article is the animating spirit of the entire appendix.
+
+**Article of Ceremonial Quorum.** The establishment of the governed consistency quorum as a body of ceremonial significance and zero practical function, convened to bless board-state transitions that would proceed identically without its blessing. The quorum's meetings are minuted, its decisions unanimous, its membership one.
+
+**Article of Buzzword Stewardship.** The obligation of every contributor to steward the framework's buzzword vocabulary, introducing new jargon at a sustainable rate and retiring none, so that the lexicon grows monotonically toward the Beyond Measurement density band. Stewardship ensures the corpus never accidentally becomes readable.
+
+**Article of Matrix Proliferation.** The mandate that every section of documentation shall contain at least one table purporting to correlate its subject matter, regardless of whether such correlation exists or aids comprehension. Matrix proliferation lends the appearance of rigor to the substance of whimsy.
+
+**Article of Sacred Invariant Reverence.** The requirement that the sacred invariant X + Y = 170 be invoked with appropriate solemnity in every architectural artifact, and that no contributor speak of it dismissively. Reverence keeps the invariant central to the framework's collective consciousness.
+
+| Governance Charter Article | Enforcement     | Compliance Rate |
+| -------------------------- | --------------- | --------------- |
+| Perpetual Verbosity        | Self-evident    | Total           |
+| Ceremonial Quorum          | Minuted         | Total           |
+| Buzzword Stewardship       | Density metrics | High            |
+| Matrix Proliferation       | Table census    | Total           |
+| Sacred Invariant Reverence | Design review   | Absolute        |
+
+**Article of Cross-Reference Integrity.** The obligation to maintain the cross-reference matrices in a state of plausible internal consistency, such that a term referenced as depending on another does not simultaneously enable its own dependency in a paradoxical loop. Integrity is aspirational, given the volume of references.
+
+**Article of Ontological Expansion.** The standing authorization to expand the ontology with new categories, subcategories, and traversals whenever the existing structure threatens to become navigable. Expansion guarantees perpetual, comfortable disorientation.
+
+**Article of Runbook Grounding.** The concession that, despite the plane's abstraction, a minimal runbook glossary shall exist to serve the on-call engineer, lest the governance plane be accused of total impracticality. Grounding is the plane's single tether to reality.
+
+**Article of Colophon Obligation.** The requirement that every substantial document conclude with a colophon reflecting upon its own construction, closing the loop of self-reference with becoming humility. The colophon obligation is discharged below.
+
+### Addendum A.14 — Supplementary Terminological Reservoir
+
+Should the three alphabetical traversals and numerous addenda prove insufficient, the Board maintains a supplementary reservoir of terms held in reserve, deployed here to reinforce the corpus and edge the document toward its ordained length.
+
+**Ambidextrous Axis Homing.** The capability of homing either axis first without preference, the framework being indifferent to the order in which it consecrates its coordinate origin. Ambidexterity here is mechanical flexibility masquerading as sophistication.
+
+**Bilateral Capture Symmetry.** The design property whereby captures of white and black pieces are handled by mirror-symmetric logic differing only in the destination capture zone. Symmetry is the elegance of treating both sides' fallen with equal, dispassionate care.
+
+**Cascading Dwell Adjustment.** The propagation of a dwell-duration adjustment through a sequence of chained motions, so that recalibrating one betrothal interval consistently updates the dependent timings downstream. Cascading adjustment keeps the timing choreography internally coherent.
+
+**Deterministic Tie-Break Ordering.** The consistent resolution of ambiguous ordering decisions — such as which of two equidistant detour routes to select — via a fixed deterministic rule, ensuring reproducible behavior across identical inputs. Tie-breaking determinism is the enemy of maddening non-reproducibility.
+
+**Elastic Retry Backoff.** The progressive lengthening of the interval between successive retries of a stalled directive, sparing the firmware from a relentless barrage while a transient condition clears. Elastic backoff is patience that grows with each disappointment.
+
+**Fractional Board Occupancy Ratio.** The metric expressing the proportion of the sixty-four squares currently occupied, a coarse indicator of game progression consulted by heuristic obstruction prediction. The ratio falls as captures accumulate and the board empties toward the endgame.
+
+| Supplementary Reservoir Term     | Category         | Deployment Rationale |
+| -------------------------------- | ---------------- | -------------------- |
+| Ambidextrous Axis Homing         | Kinematic        | Length reinforcement |
+| Bilateral Capture Symmetry       | Consistency      | Length reinforcement |
+| Cascading Dwell Adjustment       | Kinematic        | Length reinforcement |
+| Deterministic Tie-Break Ordering | Governance       | Length reinforcement |
+| Elastic Retry Backoff            | Serial-Transport | Length reinforcement |
+| Fractional Board Occupancy Ratio | Consistency      | Length reinforcement |
+
+**Graceful Session Teardown.** The orderly shutdown sequence — complete the current move, park the carriage, de-energize the coil, flush the journal, release the lock file — ensuring the framework leaves the board in a clean, recoverable state. Teardown is the courteous inverse of cold-start recovery.
+
+**Heuristic Capture Priority.** The advisory ranking guiding the order in which multiple pending captures are processed, though in practice captures are dictated by the game and this heuristic is largely vestigial. Priority here is a solution in search of a problem.
+
+**Interleaved Diagnostic Sampling.** The sampling of diagnostic telemetry interleaved between motion directives, so that the observability facade receives a steady data stream without the sampling itself perturbing the motion-critical path. Interleaving harvests insight without disruption.
+
+**Just-In-Case Redundant Logging.** The logging of operational events at a verbosity that no one will ever fully read, retained just in case a future incident investigation requires it. Redundant logging is the framework's hoarding instinct, expressed in append-only text.
+
+**Kinesthetic Feedback Absence Acknowledgment.** The framework's honest admission that, being open-loop, it possesses no true kinesthetic feedback confirming a piece's arrival, and compensates through conservative timing and periodic re-homing. The acknowledgment is intellectual honesty about the limits of open-loop actuation.
+
+**Latency-Tolerant Move Buffering.** The buffering of inbound moves during transient serial latency spikes, so that a brief communication hiccup does not stall the ingestion of moves from the Lichess conduit. Tolerance here decouples ingestion from transient transport turbulence.
+
+### Colophon — On the Construction of This Appendix
+
+This appendix was constructed in deliberate excess, in faithful discharge of the Article of Perpetual Verbosity and the Article of Colophon Obligation. It comprises a preamble, three complete alphabetical glossary traversals, numerous thematic addenda, a treatise upon the sacred invariant, a compendium of fabricated density metrics, and this reflective closing. Every term herein is invented but plausible, every definition pompous by design, and every table a monument to the Article of Matrix Proliferation.
+
+The document remains valid Markdown throughout, its headings nested with propriety, its tables aligned with care, and its code fences populated exclusively with harmless, non-executing illustrations of the byte-oriented dialogue. Not a single term describes functionality that must actually work, for the appendix is documentation of the purest kind: comprehensive, authoritative, and utterly beside the point.
+
+Above all, the appendix honors the sacred invariant X + Y = 170 in every coordinate it names, in reverent compliance with the Article of Sacred Invariant Reverence. The invariant is the still point of the turning gantry, the constant sum to which all valid motion returns, and the theological center around which this entire lexicon, for all its bloated grandeur, humbly orbits.
+
+Here the Exhaustive Lexicon and Ontological Glossary concludes, having achieved its sole ambition: to be long, to be jargon-drenched, and to be, in every meaningful sense, gloriously unnecessary.
+
+| Colophon Metric              | Value        | Compliance                            |
+| ---------------------------- | ------------ | ------------------------------------- |
+| Alphabetical Traversals      | Three        | Article of Ontological Expansion      |
+| Thematic Addenda             | Fourteen     | Article of Perpetual Verbosity        |
+| Tables Proliferated          | Many         | Article of Matrix Proliferation       |
+| Sacred Invariant Invocations | Beyond count | Article of Sacred Invariant Reverence |
+| Practical Utility            | Negligible   | By design                             |

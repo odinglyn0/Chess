@@ -1,1 +1,23 @@
-npm run check
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+if [ -z "$staged" ]; then
+  exit 0
+fi
+
+prettier_files=$(printf '%s\n' "$staged" | grep -Ei '\.(json|md|markdown|ya?ml|toml|sh|bash|html|css)$' || true)
+py_files=$(printf '%s\n' "$staged" | grep -Ei '\.py$' || true)
+shell_files=$(printf '%s\n' "$staged" | grep -Ei '\.(sh|bash)$' || true)
+
+if [ -n "$prettier_files" ]; then
+  printf '%s\n' "$prettier_files" | xargs -r npx prettier --write --ignore-unknown
+fi
+
+if [ -n "$py_files" ]; then
+  printf '%s\n' "$py_files" | xargs -r python scripts/strip_comments.py --write
+  printf '%s\n' "$py_files" | xargs -r python -m black
+fi
+
+printf '%s\n' "$staged" | xargs -r git add
+
+if [ -n "$py_files" ] || [ -n "$shell_files" ]; then
+  npm run steering:check
+fi

@@ -4,13 +4,7 @@
   "title": "Chess gantry move delta",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "position",
-    "px",
-    "py",
-    "nx",
-    "ny"
-  ],
+  "required": ["position", "px", "py", "nx", "ny"],
   "properties": {
     "event_id": {
       "type": "string",
@@ -45,11 +39,7 @@
       "description": "Optional explicit captured piece and square; required for en passant",
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "id",
-        "x",
-        "y"
-      ],
+      "required": ["id", "x", "y"],
       "properties": {
         "id": {
           "type": "string",

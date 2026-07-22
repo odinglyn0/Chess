@@ -10,7 +10,7 @@ if [[ ! -f "$SERVICE_DIR/pyproject.toml" ]]; then
   exit 1
 fi
 
-if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+if command -v docker > /dev/null 2>&1 && docker compose version > /dev/null 2>&1; then
   exec docker compose -f "$ROOT/docker-compose.lichess.yml" up --build
 fi
 

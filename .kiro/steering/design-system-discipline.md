@@ -9,7 +9,9 @@ The visual rules are defined once — spacing scale, typography, colors, radii, 
 Required:
 
 ```tsx
-<Button variant="primary" size="md">Save changes</Button>
+<Button variant="primary" size="md">
+  Save changes
+</Button>
 ```
 
 FORBIDDEN:

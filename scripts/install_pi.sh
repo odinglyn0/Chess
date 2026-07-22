@@ -15,7 +15,7 @@ if [[ ! -e data/board_state.json ]]; then
   cp examples/board_state.standard.json data/board_state.json
 fi
 
-cat <<'EOF'
+cat << 'EOF'
 Installed.
 Next:
   source .venv/bin/activate

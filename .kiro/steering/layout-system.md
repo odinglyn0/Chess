@@ -18,9 +18,7 @@ The established page shape in this workspace (match it):
 export default function Page() {
   return (
     <main className="page-shell flex flex-1 flex-col justify-center py-24">
-      <h1 className="font-heading text-3xl font-semibold tracking-tight text-foreground">
-        Title
-      </h1>
+      <h1 className="font-heading text-3xl font-semibold tracking-tight text-foreground">Title</h1>
     </main>
   );
 }

@@ -6,12 +6,12 @@
   "additionalProperties": false,
   "required": ["schema_version", "revision", "pieces", "processed_events"],
   "properties": {
-    "schema_version": {"const": 1},
-    "revision": {"type": "integer", "minimum": 0},
+    "schema_version": { "const": 1 },
+    "revision": { "type": "integer", "minimum": 0 },
     "processed_events": {
       "type": "array",
       "uniqueItems": true,
-      "items": {"type": "string", "pattern": "^[A-Za-z0-9_.:-]{1,80}$"}
+      "items": { "type": "string", "pattern": "^[A-Za-z0-9_.:-]{1,80}$" }
     },
     "pieces": {
       "type": "object",
@@ -22,10 +22,10 @@
             "additionalProperties": false,
             "required": ["status", "x", "y"],
             "properties": {
-              "status": {"const": "board"},
-              "x": {"type": "integer", "minimum": 0, "maximum": 7},
-              "y": {"type": "integer", "minimum": 0, "maximum": 7},
-              "metadata": {"type": "object"}
+              "status": { "const": "board" },
+              "x": { "type": "integer", "minimum": 0, "maximum": 7 },
+              "y": { "type": "integer", "minimum": 0, "maximum": 7 },
+              "metadata": { "type": "object" }
             }
           },
           {
@@ -33,11 +33,11 @@
             "additionalProperties": false,
             "required": ["status", "x", "y", "capture_slot"],
             "properties": {
-              "status": {"const": "captured"},
-              "x": {"type": "null"},
-              "y": {"type": "null"},
-              "capture_slot": {"type": "integer", "minimum": 0},
-              "metadata": {"type": "object"}
+              "status": { "const": "captured" },
+              "x": { "type": "null" },
+              "y": { "type": "null" },
+              "capture_slot": { "type": "integer", "minimum": 0 },
+              "metadata": { "type": "object" }
             }
           }
         ]

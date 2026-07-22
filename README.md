@@ -220,26 +220,26 @@ Add `--overwrite` to `init-state` only when intentionally replacing an existing 
 
 Both `chess-gantry` and `python -m chess_gantry` invoke the CLI.
 
-| Command | Purpose |
-| --- | --- |
-| `plan MOVE` | Validate and print G-code without hardware or state mutation. Supports `--output` and `--summary-json`. |
-| `validate MOVE` | Validate the move, state transition, and planned path without printing G-code. |
-| `execute MOVE --confirm-motion` | Execute on Marlin and commit state only after success. |
-| `run MOVE` | Dry-run by default; add `--confirm-motion` to execute. |
-| `init-state SOURCE` | Validate and install initial board state; `--overwrite` permits replacement. |
-| `show-state` | Print persistent board state. |
-| `uci-to-json UCI` | Convert a four-character move such as `e2e4`; supports `--event-id`, `--en-passant`, and `--output`. |
-| `lichess-event EVENT` | Convert one saved stream event and plan it; supports move and G-code output paths. |
-| `lichess-watch GAME_ID` | Consume WebSocket move events; dry-run by default or execute with explicit confirmation. |
-| `lichess-pgn GAME_ID` | Fetch and dry-run all currently recorded moves in a public game. |
-| `lichess-follow GAME_ID` | Poll public PGN and generate files for new moves, optionally executing them. |
-| `ports` | List serial devices with likely printer controllers ranked first. |
-| `diagnose` | Verify Marlin and query endstops and position without movement. |
-| `web` | Start the browser controller. |
-| `home --confirm-motion` | Run the configured coordinate-initialization commands; the shipped configuration performs no homing. |
-| `motor-test` | Print the fixed coupled-axis test G-code without opening serial. Add `--confirm-motion` to run it. |
-| `stop` | Send the configured emergency-stop command. |
-| `reconcile` | Inspect or resolve a pending transaction after checking the physical board. |
+| Command                         | Purpose                                                                                                 |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `plan MOVE`                     | Validate and print G-code without hardware or state mutation. Supports `--output` and `--summary-json`. |
+| `validate MOVE`                 | Validate the move, state transition, and planned path without printing G-code.                          |
+| `execute MOVE --confirm-motion` | Execute on Marlin and commit state only after success.                                                  |
+| `run MOVE`                      | Dry-run by default; add `--confirm-motion` to execute.                                                  |
+| `init-state SOURCE`             | Validate and install initial board state; `--overwrite` permits replacement.                            |
+| `show-state`                    | Print persistent board state.                                                                           |
+| `uci-to-json UCI`               | Convert a four-character move such as `e2e4`; supports `--event-id`, `--en-passant`, and `--output`.    |
+| `lichess-event EVENT`           | Convert one saved stream event and plan it; supports move and G-code output paths.                      |
+| `lichess-watch GAME_ID`         | Consume WebSocket move events; dry-run by default or execute with explicit confirmation.                |
+| `lichess-pgn GAME_ID`           | Fetch and dry-run all currently recorded moves in a public game.                                        |
+| `lichess-follow GAME_ID`        | Poll public PGN and generate files for new moves, optionally executing them.                            |
+| `ports`                         | List serial devices with likely printer controllers ranked first.                                       |
+| `diagnose`                      | Verify Marlin and query endstops and position without movement.                                         |
+| `web`                           | Start the browser controller.                                                                           |
+| `home --confirm-motion`         | Run the configured coordinate-initialization commands; the shipped configuration performs no homing.    |
+| `motor-test`                    | Print the fixed coupled-axis test G-code without opening serial. Add `--confirm-motion` to run it.      |
+| `stop`                          | Send the configured emergency-stop command.                                                             |
+| `reconcile`                     | Inspect or resolve a pending transaction after checking the physical board.                             |
 
 Get complete options for any command with:
 

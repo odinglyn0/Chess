@@ -209,7 +209,7 @@ npx shadcn@latest init --name my-app --preset base-nova --template next --monore
 
 # Initialize existing project.
 npx shadcn@latest init --preset base-nova
-npx shadcn@latest init --defaults  # shortcut: --template=next --preset=nova (base style implied)
+npx shadcn@latest init --defaults # shortcut: --template=next --preset=nova (base style implied)
 
 # Apply a preset to an existing project.
 npx shadcn@latest apply a2r6bw
@@ -240,8 +240,8 @@ npx shadcn@latest add owner/repo/item --dry-run
 npx shadcn@latest search @shadcn -q "sidebar"
 npx shadcn@latest search @tailark -q "stats"
 npx shadcn@latest search owner/repo -q "login"
-npx shadcn@latest search                          # all configured registries
-npx shadcn@latest search @shadcn -q "menu" -t ui  # filter by item type
+npx shadcn@latest search                         # all configured registries
+npx shadcn@latest search @shadcn -q "menu" -t ui # filter by item type
 
 # Get component docs and example URLs.
 npx shadcn@latest docs button dialog select

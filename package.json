@@ -8,8 +8,8 @@
     "format:check": "npm run format:prettier:check && npm run format:python:check",
     "format:prettier": "prettier --write .",
     "format:prettier:check": "prettier --check .",
-    "format:python": "ruff check --fix . && ruff format .",
-    "format:python:check": "ruff format --check . && ruff check .",
+    "format:python": "python -m black .",
+    "format:python:check": "python -m black --check .",
     "prepare": "husky"
   },
   "devDependencies": {

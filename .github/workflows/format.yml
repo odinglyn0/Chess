@@ -33,7 +33,7 @@ jobs:
         run: uv python install 3.11
 
       - name: Prettier (check)
-        run: npx prettier --check .
+        run: node node_modules/prettier/bin/prettier.cjs --check .
 
       - name: Black (check)
         run: uvx black@25.9.0 --check .
@@ -68,7 +68,7 @@ jobs:
         run: uv run --no-project python scripts/strip_comments.py --write src tests examples scripts
 
       - name: Prettier (write)
-        run: npx prettier --write .
+        run: node node_modules/prettier/bin/prettier.cjs --write .
 
       - name: Black (write)
         run: uvx black@25.9.0 .

@@ -216,7 +216,9 @@ class MarlinSerial:
             if callable(flush):
                 flush()
         except Exception as exc:
-            raise SerialProtocolError(f"failed to write command {stripped!r}: {exc}") from exc
+            raise SerialProtocolError(
+                f"failed to write command {stripped!r}: {exc}"
+            ) from exc
 
         deadline = monotonic() + timeout_s
         responses: List[str] = []
@@ -475,7 +477,9 @@ class DemoMarlinSerial:
     def __exit__(self, exc_type: Any, exc: Any, traceback: Any) -> None:
         self.close()
 
-    def send_command(self, command: str, timeout_s: Optional[float] = None) -> CommandResult:
+    def send_command(
+        self, command: str, timeout_s: Optional[float] = None
+    ) -> CommandResult:
         if not self._connected:
             raise SerialProtocolError("serial link is not connected")
         stripped = MarlinSerial._clean_command(command)
@@ -499,7 +503,10 @@ class DemoMarlinSerial:
         elif upper == "M119":
             responses = ("Reporting endstop status", "x_min: open", "y_min: open", "ok")
         elif upper == "M114":
-            responses = (f"X:{self._x:.3f} Y:{self._y:.3f} Z:0.000 E:{self._e:.3f}", "ok")
+            responses = (
+                f"X:{self._x:.3f} Y:{self._y:.3f} Z:0.000 E:{self._e:.3f}",
+                "ok",
+            )
         else:
             responses = ("ok",)
         return CommandResult(stripped, responses)

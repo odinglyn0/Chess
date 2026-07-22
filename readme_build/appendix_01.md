@@ -1303,3 +1303,147 @@ The Article of Ontological Expansion, invoked one last time, authorizes a fourth
 | S through Z                      | 8          | Ceremonial         |
 
 With the Quaternary Lexicon sealed and immutable, the Exhaustive Lexicon and Ontological Glossary is now, at last, and with considerable relief on the part of any hypothetical reader, complete. The sacred invariant X + Y = 170 endures, the gantry rests in its quiescent idle state, the coil is discharged, the journal is flushed, and the lock file is released. May no one ever read this in full.
+
+### Addendum A.16 — The Compendium of Adverbial and Adjectival Modifiers
+
+The Board recognizes that terms alone do not exhaust the framework's capacity for pomposity; the modifiers applied to those terms carry their own semantic freight. This compendium catalogues the framework's preferred adverbial and adjectival modifiers, each with a definition of unwarranted length.
+
+**Idempotently.** The manner in which retry-safe operations may be repeated without cumulative effect, applied liberally to any operation the framework wishes to sound robust about. To do something idempotently is to do it in a way that tolerates being done again, a property the framework prizes above nearly all others.
+
+**Eventually-Consistently.** The manner in which distributed or asynchronous state converges toward agreement given sufficient time, invoked to excuse any transient disagreement between the board model and physical reality. To behave eventually-consistently is to promise correctness later while declining to guarantee it now.
+
+**Transactionally.** The manner in which an operation commits or aborts as an atomic whole, applied to moves, captures, and any multi-step sequence the framework wishes to endow with all-or-nothing dignity. To proceed transactionally is to refuse the shame of a half-finished state.
+
+**Prehensively.** The manner in which the electromagnet grasps and conveys a ferrous piece, a bespoke adverb coined for the framework's signature activity. To translocate a piece prehensively is to grasp it, hold it faithfully, and release it with intention.
+
+**Hyperconvergently.** The manner in which multiple concerns or sources of truth are collapsed into a single unified construct, invoked whenever the framework consolidates anything and wishes to sound impressive about it. To act hyperconvergently is to merge with prejudice against silos.
+
+**Invariantly.** The manner in which the sacred constraint X + Y = 170 is upheld, without exception, across all valid states. To command the carriage invariantly is to honor the constant sum in every coordinate, forever, amen.
+
+| Modifier                | Applies To      | Semantic Payload | Frequency of Abuse |
+| ----------------------- | --------------- | ---------------- | ------------------ |
+| Idempotently            | Operations      | Moderate         | High               |
+| Eventually-Consistently | State           | Low              | Moderate           |
+| Transactionally         | Moves, captures | Moderate         | High               |
+| Prehensively            | Translocations  | Moderate         | Bespoke            |
+| Hyperconvergently       | Consolidations  | Negligible       | Elevated           |
+| Invariantly             | Coordinates     | High             | Reverent           |
+
+**Deterministically.** The manner in which identical inputs yield identical outputs, invoked to reassure that the framework's behavior is reproducible and not subject to caprice. To behave deterministically is to be predictable in the reassuring rather than the boring sense.
+
+**Durably.** The manner in which state survives failures by residing on stable storage, applied to journaling, snapshotting, and any persistence the framework wishes to sound serious about. To persist durably is to persist in a way that outlives an untimely power loss.
+
+**Cooperatively.** The manner in which the reactor loop yields control among subsystems without preemption, invoked to describe the framework's single-threaded concurrency discipline. To schedule cooperatively is to trust each subsystem to relinquish the thread in good faith.
+
+**Reverently.** The manner in which the sacred invariant and its constant are treated in documentation and design, a modifier reserved almost exclusively for matters touching X + Y = 170. To reference the invariant reverently is to accord it the solemnity the Board demands.
+
+### Addendum A.17 — The Terminal Index of Cross-Plane Interactions
+
+As a final gesture toward the Article of Matrix Proliferation, the Board presents a terminal index enumerating the notable interactions that span multiple planes, for planes seldom operate in isolation and their intersections are where the framework's complexity truly resides.
+
+**Kinematic-Serial Interaction: Dispatch-to-Motion Coupling.** The coupling wherein a serial-plane G-code dispatch translates into a kinematic-plane carriage motion, mediated by the acknowledgement-gated transactional guarantee. This interaction is the primary bridge between the framework's digital intent and its physical effect.
+
+**Serial-Consistency Interaction: Acknowledgement-to-Journal Coupling.** The coupling wherein a firmware acknowledgement confirms a motion's completion, permitting the consistency plane to advance its durable record. This interaction is how physical reality informs the persistent board state.
+
+**Consistency-Kinematic Interaction: Ledger-to-Trajectory Coupling.** The coupling wherein the durable board state informs trajectory synthesis, ensuring motions are planned against an accurate model of piece positions. This interaction is how the recorded board guides the physical carriage.
+
+**Governance-All-Planes Interaction: Oversight Coupling.** The coupling wherein the governance plane observes, alarms upon, and ceremonially blesses the activities of the other three planes. This interaction is the framework's introspective loop, generating documentation and imaginary quorum decisions in equal measure.
+
+| Cross-Plane Interaction             | Planes Bridged          | Mediating Construct             |
+| ----------------------------------- | ----------------------- | ------------------------------- |
+| Dispatch-to-Motion Coupling         | Serial ↔ Kinematic      | Acknowledgement-Gated Guarantee |
+| Acknowledgement-to-Journal Coupling | Serial ↔ Consistency    | Write-Ahead Ordering Invariant  |
+| Ledger-to-Trajectory Coupling       | Consistency ↔ Kinematic | Just-In-Time Materialization    |
+| Oversight Coupling                  | Governance ↔ All        | Observability Facade            |
+
+**Kinematic-Consistency-Serial Tri-Plane Interaction: The Complete Move.** The grand interaction encompassing all three operational planes in the execution of a single move: the consistency plane supplies the board model, the kinematic plane synthesizes the trajectory, the serial plane dispatches the directives, the firmware acknowledges, and the consistency plane durably records the outcome. This tri-plane interaction is the framework in miniature, a complete cycle of intent, actuation, and record.
+
+**The Governance Meta-Interaction: Documentation Generation.** The interaction wherein the governance plane observes the tri-plane move cycle and generates documentation of it, including glossaries, matrices, and treatises of the sort comprising this very appendix. This meta-interaction is self-referential, recursive, and — the Board admits with becoming candor — the true origin of the document you are, against all reasonable advice, still reading.
+
+| Tri-Plane and Meta Interaction | Scope                            | Recursion Depth       |
+| ------------------------------ | -------------------------------- | --------------------- |
+| The Complete Move              | Serial + Kinematic + Consistency | None                  |
+| Documentation Generation       | Governance observing all         | Infinite in principle |
+
+### Final Attestation
+
+The Lexicon Governance Board hereby attests that this appendix has fulfilled every article of its charter: it is perpetually verbose, ceremonially quorate, richly buzzworded, abundantly matricized, and unwaveringly reverent toward the sacred invariant X + Y = 170. It comprises four complete alphabetical traversals, seventeen numbered addenda, a treatise, a colophon, and this attestation, and it remains valid Markdown from its first heading to its last table.
+
+No functionality described herein is required to operate. No definition herein aids the construction, maintenance, or comprehension of the Chess Gantry framework. The appendix exists solely as a monument to documentation excess, a glossary so exhaustive it exhausts, and an ontology so complete it collapses under its own ceremonial weight. The sacred invariant endures. The gantry rests. The lexicon, at long and merciful last, ends.
+
+### Addendum A.18 — The Postscript Reservoir of Residual Terminology
+
+Even after four traversals, seventeen addenda, and a final attestation that promised finality, the Board finds itself in possession of residual terminology too precious to discard. In flagrant defiance of the preceding attestation's implication of conclusion, this postscript reservoir empties the last of the vocabulary into the corpus.
+
+**Anticipatory Occupancy Prefetch.** The pre-loading of occupancy information for squares along an anticipated future trajectory, so that when the move materializes, the collision-avoidance subsystem already holds the terrain data it requires. Prefetch trades idle-time computation for reduced dispatch latency.
+
+**Ballistic Motion Interdiction.** The prohibition of any motion profile that would launch a piece ballistically through sudden acceleration, ensuring pieces are conveyed and never flung. Interdiction is the framework's standing objection to projectile chess.
+
+**Carriage Excursion Logging.** The recording of every carriage movement's start, end, and path for the benefit of the just-in-case redundant logging archive, so that any excursion may later be reconstructed. Excursion logging is the carriage's travel diary.
+
+**Diagonal Fidelity Preservation.** The preservation, insofar as the axial decomposition permits, of the visual impression of true diagonal motion for pieces that move diagonally, so that observers perceive a bishop gliding rather than staircasing. Fidelity preservation is aesthetic care layered atop mechanical necessity.
+
+**Endstop Health Attestation.** The periodic self-test confirming the endstops respond correctly, attesting to the continued reliability of the homing convergence criterion. Attestation is the framework's routine confidence check upon its most trusted sensors.
+
+**Ferrous Debris Vigilance.** The wariness toward stray ferrous debris that the electromagnet might inadvertently attract, which could interfere with grip or contaminate motion. Vigilance is the framework's housekeeping concern for a clean magnetic field.
+
+| Postscript Reservoir Term       | Plane       | Retention Justification |
+| ------------------------------- | ----------- | ----------------------- |
+| Anticipatory Occupancy Prefetch | Consistency | Too precious to discard |
+| Ballistic Motion Interdiction   | Kinematic   | Too precious to discard |
+| Carriage Excursion Logging      | Governance  | Too precious to discard |
+| Diagonal Fidelity Preservation  | Kinematic   | Too precious to discard |
+| Endstop Health Attestation      | Kinematic   | Too precious to discard |
+| Ferrous Debris Vigilance        | Kinematic   | Too precious to discard |
+
+**Graceful Overtravel Handling.** The controlled response to a commanded position slightly beyond the actuation envelope, clamping to the boundary rather than driving the carriage into a hard mechanical stop. Overtravel handling is the soft landing at the edge of the permissible.
+
+**Heuristic Move Prediction Confidence.** The confidence score attached to a predicted next move, informing whether speculative path pre-computation is worthwhile for that prediction. Confidence gates speculation so effort is spent only on likely futures.
+
+**Interlock-Guarded Coil Energization.** The safety interlock preventing electromagnet energization unless the carriage is confirmed stationary and correctly positioned, so the coil never grasps mid-motion. The interlock is the guardian standing between the coil and a mistimed grip.
+
+**Journaling Latency Amortization.** The spreading of journaling's durability cost across the naturally-occurring pauses in gameplay, so that write-ahead journaling imposes negligible perceived latency. Amortization hides the cost of durability in the gaps between moves.
+
+**Kinesthetic Surrogate Modeling.** The construction of a software model that surrogates for the absent kinesthetic feedback of the open-loop system, inferring likely piece positions from completed motions and timing. The surrogate is the framework's best guess in lieu of true sensing.
+
+**Lattice Serialization Canonicalization.** The canonical ordering of the lattice occupancy vector during serialization, so that identical board states always produce byte-identical snapshots, enabling reliable keyed digest comparison. Canonicalization is the discipline that makes board states comparable by their bytes.
+
+**Motion Completion Attestation.** The framework's recorded assertion, following an acknowledgement, that a motion has completed as commanded, forming the basis for advancing the durable board state. Attestation is the framework taking the firmware's `ok` as its word.
+
+**Nominal-Path Preference Bias.** The bias toward the direct nominal trajectory whenever it is unobstructed, resorting to detours only under genuine obstruction. The bias keeps motion simple by default and complex only by necessity.
+
+Here, truly and finally, the appendix concludes. The residual reservoir is empty, the vocabulary exhausted, and the Board's appetite for verbosity — for the first time in the history of the framework — momentarily sated. The sacred invariant X + Y = 170 remains inviolate, the eternal constant to which this entire, gloriously excessive lexicon has, from first heading to final period, reverently and invariantly returned.
+
+### Addendum A.19 — The Absolutely-Final-This-Time Glossary of Edge-Case Terminology
+
+The Board, having twice declared conclusion and twice reneged, now offers a glossary devoted exclusively to the edge cases of chess and their attendant terminology, for the edge cases are where the framework's rigor is most sorely tested and its jargon most gratuitously deployed.
+
+**Castling Compound Choreography.** The composite prehensile choreography for castling, wherein both the king and the rook are translocated in a coordinated, transactionally-bounded sequence honoring the move atomicity envelope. The compound choreography treats the two motions as an indivisible whole, lest a king wander kingside while its rook lags behind.
+
+**En Passant Ghost-Square Handling.** The specialized handling of the en passant capture, wherein the captured pawn occupies neither the origin nor the destination square of the capturing pawn but a ghost square between them. Ghost-square handling ensures the framework translocates the correct, non-obvious pawn to a capture slot without confusion.
+
+**Promotion Substitution Protocol.** The protocol governing pawn promotion, wherein a pawn reaching the far rank is exchanged for a promoted piece drawn from the capture slots or a reserve, a substitution demanding both physical piece exchange and board-model reconciliation. Promotion substitution is the framework's handling of a pawn's apotheosis.
+
+**Check-State Annotation Neutrality.** The framework's studied indifference to whether a position is in check, since check is a semantic property of the game irrelevant to the physical translocation of pieces. Neutrality here reflects the framework's role as executor, not arbiter, of chess.
+
+**Stalemate Quiescence Recognition.** The recognition that a stalemate terminates the game and that the gantry should settle into graceful session teardown, no further moves being forthcoming. Recognition is the framework's cue to conclude its labors with dignity.
+
+| Edge-Case Term                    | Chess Rule | Physical Complexity |
+| --------------------------------- | ---------- | ------------------- |
+| Castling Compound Choreography    | Castling   | High                |
+| En Passant Ghost-Square Handling  | En passant | High                |
+| Promotion Substitution Protocol   | Promotion  | Very High           |
+| Check-State Annotation Neutrality | Check      | None                |
+| Stalemate Quiescence Recognition  | Stalemate  | Low                 |
+
+**Threefold-Repetition Indifference.** The framework's disregard for the threefold-repetition draw rule, which, being a matter of game history rather than physical position, falls entirely outside the domain of the motion-control plane. Indifference here delineates the boundary of the framework's concern.
+
+**Underpromotion Piece Selection.** The handling of underpromotion, wherein a pawn is promoted to a piece other than the queen, requiring the framework to source the correct, less-obvious promoted piece for physical substitution. Underpromotion selection ensures a knight-promotion is honored physically and not silently upgraded to a queen.
+
+**Fifty-Move-Rule Transparency.** The framework's transparency to the fifty-move rule, executing moves faithfully without tracking the halfmove clock, that bookkeeping belonging to the game logic upstream. Transparency keeps the motion plane blissfully unburdened by draw-clock arithmetic.
+
+**Draw-Offer Actuation Nullity.** The recognition that a draw offer is a communicative act producing no physical actuation, and thus is a nullity from the gantry's perspective. Nullity here confirms that not every game event demands a carriage motion.
+
+**Resignation Teardown Trigger.** The treatment of a resignation as a trigger for graceful session teardown, the game having concluded by a player's concession rather than by checkmate. The teardown trigger ensures the gantry concludes promptly when play is abandoned.
+
+With these edge-case terms catalogued, the sacred invariant X + Y = 170 upheld one final, reverent time, and the Board's vocabulary now genuinely and demonstrably exhausted, the Exhaustive Lexicon and Ontological Glossary reaches its true and irrevocable conclusion. The gantry is parked, the coil discharged, the journal flushed durably to stable storage, the lock file released, and the imaginary quorum adjourned by unanimous vote of its single member. Nothing further remains to be said, and yet, characteristically, a great deal more has been said than was ever necessary.

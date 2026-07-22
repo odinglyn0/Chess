@@ -183,8 +183,6 @@ class GantryController:
                 result = link.send_command("M114", timeout_s=10.0)
                 self._update_position(result.responses)
             except Exception:
-                # Homing itself succeeded; an optional position report should
-                # not falsely claim that it did not.
                 self._position = MachinePoint(0.0, 0.0)
             self._last_error = None
             return self.status()
@@ -290,8 +288,6 @@ class GantryController:
         return dict(self.service.journal.load())
 
     def emergency_stop(self) -> dict[str, Any]:
-        # Do not wait for the normal operation lock: an M400 command could be
-        # blocking another request while the stop still needs to be sent.
         link = self._link
         if link is None or not getattr(link, "connected", False):
             raise SerialProtocolError("the Marlin controller is not connected")

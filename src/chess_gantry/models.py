@@ -14,7 +14,6 @@ _ALLOWED_STATUSES = {_STATUS_BOARD, _STATUS_CAPTURED}
 
 
 def _strict_int(value: Any, name: str) -> int:
-    # bool is a subclass of int, but accepting true/false as coordinates is a bug.
     if isinstance(value, bool) or not isinstance(value, int):
         raise ValidationError(f"{name} must be an integer, got {value!r}")
     return value
@@ -73,7 +72,6 @@ class MoveDelta:
         if not isinstance(raw, Mapping):
             raise ValidationError("move JSON must be an object")
 
-        # Accept either the original flat shape or a nested position object.
         payload: Dict[str, Any] = dict(raw)
         nested = payload.get("position")
         if isinstance(nested, Mapping):

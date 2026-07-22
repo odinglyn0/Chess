@@ -104,7 +104,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             raise ValidationError("move must be a JSON object")
         return value
 
-    def do_GET(self) -> None:  # noqa: N802
+    def do_GET(self) -> None:
         if self.path == "/" or self.path.startswith("/?"):
             body = HTML.encode("utf-8")
             self.send_response(HTTPStatus.OK)
@@ -138,7 +138,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             return
         self._send_json({"ok": False, "error": "not found"}, HTTPStatus.NOT_FOUND)
 
-    def do_POST(self) -> None:  # noqa: N802
+    def do_POST(self) -> None:
         try:
             payload = self._read_json()
             if self.path == "/api/connect":

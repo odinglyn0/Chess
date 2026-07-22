@@ -26,7 +26,7 @@ def pgn_moves(game_id: str, pgn_text: str, state: BoardState) -> Iterator[MoveDe
     try:
         import chess
         import chess.pgn
-    except ImportError as exc:  # pragma: no cover - installation error path.
+    except ImportError as exc:
         raise ConfigurationError(
             "python-chess is not installed; run 'python -m pip install -e .'"
         ) from exc
@@ -86,7 +86,6 @@ def pgn_moves(game_id: str, pgn_text: str, state: BoardState) -> Iterator[MoveDe
                 "y": capture_position.y,
             }
         result = MoveDelta.from_mapping(payload)
-        # Keep a parallel physical state so subsequent PGN plies resolve piece IDs correctly.
         capture_slot = None
         if result.capture is not None:
             used_slots = set(simulated.used_capture_slots())

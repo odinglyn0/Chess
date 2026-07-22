@@ -19,7 +19,7 @@ async def watch_game(
 ) -> None:
     try:
         from websockets.asyncio.client import connect
-    except ImportError as exc:  # pragma: no cover - installation error path.
+    except ImportError as exc:
         raise ConfigurationError(
             "websockets is not installed; run 'python -m pip install -e .'"
         ) from exc

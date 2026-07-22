@@ -82,7 +82,7 @@ def discover_serial_ports(
 ) -> Tuple[PortInfo, ...]:
     if port_provider is None:
         try:
-            from serial.tools import list_ports  # type: ignore
+            from serial.tools import list_ports
         except ImportError as exc:
             raise SerialProtocolError("pyserial is not installed") from exc
         port_provider = list_ports.comports
@@ -157,7 +157,7 @@ class MarlinSerial:
         if self._serial_factory is not None:
             return self._serial_factory
         try:
-            import serial  # type: ignore
+            import serial
         except ImportError as exc:
             raise SerialProtocolError(
                 "pyserial is not installed; run 'python -m pip install -e .'"
@@ -232,8 +232,6 @@ class MarlinSerial:
             if not raw:
                 continue
             if isinstance(raw, bytes):
-                # Printer resets and bad baud probes can produce non-UTF-8 bytes.
-                # Replacement keeps diagnostics visible without crashing.
                 line = raw.decode("utf-8", errors="replace").strip()
             else:
                 line = str(raw).strip()
@@ -259,8 +257,6 @@ class MarlinSerial:
                     "Marlin requested a numbered-line resend, which this USB transport does not use: "
                     + line
                 )
-            # echo:, busy:, wait, temperatures, startup text and replacement
-            # characters are informational until ok/error arrives.
 
         detail = " | ".join(responses[-8:]) if responses else "no response"
         raise SerialProtocolError(
@@ -308,9 +304,6 @@ class MarlinSerial:
                                     timeout_s=self.settings.handshake_timeout_s,
                                 )
                             except SerialProtocolError:
-                                # Some USB bridges leave one partial byte after a
-                                # controller reset. Drain once and retry the
-                                # read-only identity query on the same baud.
                                 if callable(reset):
                                     reset()
                                 sleep(0.1)
@@ -415,8 +408,6 @@ class MarlinSerial:
                     return
 
     def emergency_stop(self, command: str = "M112") -> None:
-        # Deliberately bypass the normal command lock. A different thread could
-        # be blocked in M400 and an emergency stop must still be writable.
         serial_object = self._require_connected()
         try:
             payload = (self._clean_command(command) + "\n").encode("ascii")

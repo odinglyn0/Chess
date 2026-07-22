@@ -11,10 +11,10 @@ import tempfile
 from .errors import PendingTransactionError, StateError, ValidationError
 from .models import BoardState
 
-try:  # Linux/Fedora/Raspberry Pi path.
-    import fcntl  # type: ignore
-except ImportError:  # pragma: no cover - fallback for non-POSIX development hosts.
-    fcntl = None  # type: ignore
+try:
+    import fcntl
+except ImportError:
+    fcntl = None
 
 
 def utc_now() -> str:
@@ -98,7 +98,6 @@ class BoardStore:
         return BoardState.from_mapping(read_json(self.path), self.width, self.height)
 
     def save(self, state: BoardState) -> None:
-        # Round-trip validation catches accidental invalid in-memory state before disk replacement.
         validated = BoardState.from_mapping(state.to_dict(), self.width, self.height)
         atomic_write_json(self.path, validated.to_dict())
 

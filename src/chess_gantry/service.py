@@ -385,7 +385,7 @@ class GantryService:
         with self.store.locked():
             current = self.store.load()
             if current.to_dict() == next_state.to_dict():
-                pass  # State was saved before a crash that left the journal behind.
+                pass
             elif current.revision == base_revision:
                 self.store.save(next_state)
             else:

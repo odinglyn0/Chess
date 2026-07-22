@@ -73,7 +73,6 @@ def _axis_values(
         value for value in extras if minimum - _EPSILON <= value <= maximum + _EPSILON
     )
     values.extend((minimum, maximum))
-    # Rounded keys remove floating-point near-duplicates without changing output materially.
     unique: Dict[float, float] = {}
     for value in values:
         key = round(value, 9)
@@ -113,8 +112,6 @@ def astar_path(
     if start == goal:
         raise PlanningError("path start and goal are identical")
 
-    # Ignore obstacle points that exactly match an endpoint. The caller normally
-    # excludes those pieces already, but this makes the planner defensive.
     filtered = tuple(
         obstacle
         for obstacle in obstacles
@@ -169,7 +166,6 @@ def astar_path(
             if not is_free(nxt):
                 continue
             if dx and dy:
-                # Do not squeeze diagonally through a blocked corner.
                 if not is_free((ix + dx, iy)) or not is_free((ix, iy + dy)):
                     continue
             target = point(nxt)

@@ -60,11 +60,12 @@
     "simplify_path": true,
     "max_expanded_nodes": 100000
   },
-  
+
   "capture": {
     "enabled": false,
     "slots": []
   },
+  
   "safety": {
     "calibrated": true,
     "home_before_execute": false,

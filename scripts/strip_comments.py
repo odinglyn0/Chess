@@ -205,7 +205,9 @@ def main(argv: List[str]) -> int:
     for file in skipped:
         print(f"skipped (would not parse after cleaning): {file.as_posix()}")
     if check and offenders:
-        print("Python comments and docstrings are not allowed (no-stubs steering rule):")
+        print(
+            "Python comments and docstrings are not allowed (no-stubs steering rule):"
+        )
         for file, comments, docstrings in offenders:
             if comments:
                 listed = ", ".join(str(line) for line in comments)

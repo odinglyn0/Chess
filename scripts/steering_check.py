@@ -61,7 +61,9 @@ def check_unimplemented(root: Path) -> List[str]:
         source = file.read_text(encoding="utf-8")
         for number, line in enumerate(source.splitlines(), start=1):
             if UNIMPLEMENTED_PATTERN.search(line):
-                problems.append(f"{file.as_posix()}: NotImplementedError on line {number}")
+                problems.append(
+                    f"{file.as_posix()}: NotImplementedError on line {number}"
+                )
     return problems
 
 
@@ -107,7 +109,9 @@ def main(argv: List[str]) -> int:
         else:
             print(f"PASS {label}")
     if failed:
-        print("\nSteering evaluation failed. See .kiro/steering for the governing rules.")
+        print(
+            "\nSteering evaluation failed. See .kiro/steering for the governing rules."
+        )
         return 1
     print("\nSteering evaluation passed.")
     return 0

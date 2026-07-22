@@ -1,5 +1,3 @@
-
-
 class GantryError(Exception):
     pass
 

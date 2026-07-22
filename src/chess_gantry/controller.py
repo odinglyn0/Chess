@@ -1,3 +1,14 @@
+"""Shared controller used by the local browser interface.
+
+This module joins the two workflows:
+
+* manual X/Y checks that send direct Marlin coordinates; and
+* validated JSON chess moves handled by :class:`GantryService`.
+
+Both workflows share one serial connection, so two processes never compete for
+exclusive ownership of the Ender controller's USB port.
+"""
+
 from __future__ import annotations
 
 from dataclasses import replace
@@ -14,13 +25,14 @@ from .service import GantryService, MotionPlan
 
 
 _POSITION_RE = re.compile(
-    r"\bX:\s*(-?\d+(?:\.\d+)?)\s+Y:\s*(-?\d+(?:\.\d+)?)"
-    r"(?:\s+Z:\s*-?\d+(?:\.\d+)?)?\s+E:\s*(-?\d+(?:\.\d+)?)",
+    r"\bX:\s*(-?\d+(?:\.\d+)?)\s+Y:\s*(-?\d+(?:\.\d+)?)",
     re.IGNORECASE,
 )
 
 
 class GantryController:
+    """Stateful, thread-safe façade for web and interactive control."""
+
     def __init__(
         self,
         config: AppConfig,
@@ -74,6 +86,8 @@ class GantryController:
                 "max_x": self.config.workspace.max_x_mm,
                 "min_y": self.config.workspace.min_y_mm,
                 "max_y": self.config.workspace.max_y_mm,
+        
+
             },
             "max_manual_feed_mm_min": self.config.motion.travel_feed_mm_min,
             "calibrated": self.config.safety.calibrated,
@@ -135,7 +149,7 @@ class GantryController:
         for line in responses:
             match = _POSITION_RE.search(line)
             if match:
-                self._position = MachinePoint(float(match.group(3)), float(match.group(1)))
+                self._position = MachinePoint(float(match.group(1)), float(match.group(2)))
                 return self._position
         return None
 
@@ -190,33 +204,17 @@ class GantryController:
 
         with self._operation_lock:
             if not self._homed:
-                raise ConfigurationError("initialize the coupled outer X/Y and inner E coordinates before moving")
+                raise ConfigurationError("home X and Y before commanding an absolute coordinate")
             link = self._require_link()
-            mirrored_y_mm = (
-                self.config.workspace.min_y_mm + self.config.workspace.max_y_mm - y_mm
-            )
-            try:
-                link.send_program(
-                    (
-                        "G21",
-                        "G90",
-                        "M82",
-                        "M302 P1",
-                        "M92 X80 Y80 E80",
-                        "M203 X200 Y200 E50",
-                        "M201 X500 Y500 E300",
-                        "M205 X5 Y5 E5",
-                        "M211 S0",
-                        *self.config.magnet.off_commands,
-                        f"G1 X{y_mm:.3f} Y{mirrored_y_mm:.3f} E{x_mm:.3f} F{feed_mm_min:.0f}",
-                        "M400",
-                        "M302 P0",
-                        "M211 S1",
-                    )
+            link.send_program(
+                (
+                    "G21",
+                    "G90",
+                    *self.config.magnet.off_commands,
+                    f"G1 X{x_mm:.3f} Y{y_mm:.3f} Z{y_mm:.3f} F{feed_mm_min:.0f}",
+                    "M400",
                 )
-            except Exception:
-                link.best_effort((*self.config.magnet.off_commands, "M302 P0", "M211 S1"))
-                raise
+            )
             self._position = point
             try:
                 result = link.send_command("M114", timeout_s=10.0)
@@ -255,7 +253,7 @@ class GantryController:
             link = self._require_link()
             if not self.config.safety.home_before_execute and not self._homed:
                 raise ConfigurationError(
-                    "initialize the coupled outer X/Y and inner E coordinates first, or enable safety.home_before_execute"
+                    "home X/Y first, or enable safety.home_before_execute"
                 )
             plan = self.service.execute_with_link(move, link)
             if self.config.safety.home_before_execute:

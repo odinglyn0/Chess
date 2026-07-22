@@ -51,7 +51,7 @@
       "M107"
     ]
   },
-  
+
   "planner": {
     "kind": "astar",
     "grid_step_mm": 5.0,
@@ -60,6 +60,7 @@
     "simplify_path": true,
     "max_expanded_nodes": 100000
   },
+  
   "capture": {
     "enabled": false,
     "slots": []

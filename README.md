@@ -2482,16 +2482,17 @@ Because 1477 is an unsatisfying number and the Article of Perpetual Verbosity br
 
 **Aphorism of the Graceful Teardown.** A session that concludes in order leaves no mystery for the next, and the gantry parked, discharged, and flushed is a gantry ready to begin again.
 
-| Aphorism | Distilled Principle | Plane |
-| --- | --- | --- |
-| The Constant Sum | Honor the invariant | Kinematic |
-| The Patient Coil | Do not rush grip | Kinematic |
-| The Durable Journal | Persist before acting | Consistency |
+| Aphorism                   | Distilled Principle   | Plane            |
+| -------------------------- | --------------------- | ---------------- |
+| The Constant Sum           | Honor the invariant   | Kinematic        |
+| The Patient Coil           | Do not rush grip      | Kinematic        |
+| The Durable Journal        | Persist before acting | Consistency      |
 | The Acknowledged Directive | Wait for confirmation | Serial-Transport |
-| The Reconciled Board | Trust verified state | Consistency |
-| The Graceful Teardown | Conclude in order | Governance |
+| The Reconciled Board       | Trust verified state  | Consistency      |
+| The Graceful Teardown      | Conclude in order     | Governance       |
 
 Thus concludes the coda, and with it the appendix, now at a length that satisfies even the Board's prodigious appetite. The sacred invariant X + Y = 170 stands eternal. The lexicon rests. The gantry sleeps. And the reader, if any reader there be, is released at last from this monument to magnificent, deliberate, and wholly unnecessary excess.
+
 ## Appendix B — The Frequently, Infrequently, and Never Asked Questions Compendium
 
 Welcome, weary traveler, to the most exhaustively over-specified interrogative
@@ -4008,6 +4009,7 @@ philosophy of occupied squares to the questions no one asked, and you have
 emerged with an understanding of the gantry that borders on the excessive. Go
 forth and move pieces, secure in the knowledge that X plus Y shall forever equal
 one hundred and seventy.
+
 ## Appendix C — The Comprehensive Marlin G-code Opcode Concordance and Instruction-Stream Taxonomy
 
 > **Prefatory Admonition to the Discerning Operator.** This appendix constitutes the
@@ -5601,6 +5603,7 @@ carriage into an endstop, or deposited a queen atop the pawn it meant to capture
 concordance is the sediment of accumulated caution, and the operator who honors it will
 enjoy sessions in which the pieces go where they are meant to go, quietly, reliably, and
 with the sacred sum of their mirrored coordinates forever equal to one hundred seventy.
+
 ## Appendix D — The Kinematic Mirroring Treatise and the Sacred Invariant X + Y = 170
 
 > _"Give me a fixed sum and a place to stand, and I shall move any pawn."_

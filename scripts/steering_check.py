@@ -1,11 +1,3 @@
-"""Evaluate the repository against the machine-checkable Kiro steering rules.
-
-Enforces the subset of ``.kiro/steering`` that can be verified deterministically:
-the no-stubs rule (no Python comments, no stub markers, no unimplemented
-functions) and the code-formatting expectation that Python parses cleanly.
-Formatter conformance itself is enforced by the dedicated format workflow.
-"""
-
 from __future__ import annotations
 
 import re
@@ -13,7 +5,7 @@ import sys
 from pathlib import Path
 from typing import List, Tuple
 
-from strip_comments import collect_comments, iter_python_files
+from strip_comments import collect_comments, collect_docstrings, iter_python_files
 
 MARKERS = ["TO" + "DO", "FIX" + "ME", "XX" + "X", "HA" + "CK"]
 MARKER_PATTERN = re.compile(r"\b(" + "|".join(MARKERS) + r")\b")
@@ -52,15 +44,24 @@ def check_python_comments(root: Path) -> List[str]:
     return problems
 
 
+def check_python_docstrings(root: Path) -> List[str]:
+    problems: List[str] = []
+    for file in iter_python_files([str(root)]):
+        source = file.read_text(encoding="utf-8")
+        rows = collect_docstrings(source)
+        if rows:
+            listed = ", ".join(str(row) for row in rows)
+            problems.append(f"{file.as_posix()}: docstring on line(s) {listed}")
+    return problems
+
+
 def check_unimplemented(root: Path) -> List[str]:
     problems: List[str] = []
     for file in iter_python_files([str(root)]):
         source = file.read_text(encoding="utf-8")
         for number, line in enumerate(source.splitlines(), start=1):
             if UNIMPLEMENTED_PATTERN.search(line):
-                problems.append(
-                    f"{file.as_posix()}: NotImplementedError on line {number}"
-                )
+                problems.append(f"{file.as_posix()}: NotImplementedError on line {number}")
     return problems
 
 
@@ -87,6 +88,7 @@ def check_stub_markers(root: Path) -> List[str]:
 def run(root: Path) -> List[Tuple[str, List[str]]]:
     return [
         ("no Python comments (no-stubs)", check_python_comments(root)),
+        ("no Python docstrings (no-stubs)", check_python_docstrings(root)),
         ("no stub markers (no-stubs)", check_stub_markers(root)),
         ("no unimplemented functions (no-stubs)", check_unimplemented(root)),
     ]
@@ -105,9 +107,7 @@ def main(argv: List[str]) -> int:
         else:
             print(f"PASS {label}")
     if failed:
-        print(
-            "\nSteering evaluation failed. See .kiro/steering for the governing rules."
-        )
+        print("\nSteering evaluation failed. See .kiro/steering for the governing rules.")
         return 1
     print("\nSteering evaluation passed.")
     return 0

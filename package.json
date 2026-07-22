@@ -8,8 +8,10 @@
     "format:check": "npm run format:prettier:check && npm run format:python:check",
     "format:prettier": "prettier --write .",
     "format:prettier:check": "prettier --check .",
-    "format:python": "python -m black .",
-    "format:python:check": "python -m black --check .",
+    "format:python": "python scripts/strip_comments.py --write src tests examples scripts && python -m black .",
+    "format:python:check": "python -m black --check . && python scripts/strip_comments.py --check src tests examples scripts",
+    "steering:check": "python scripts/steering_check.py .",
+    "check": "npm run format:check && npm run steering:check",
     "prepare": "husky"
   },
   "devDependencies": {

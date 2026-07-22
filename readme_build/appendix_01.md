@@ -1447,3 +1447,57 @@ The Board, having twice declared conclusion and twice reneged, now offers a glos
 **Resignation Teardown Trigger.** The treatment of a resignation as a trigger for graceful session teardown, the game having concluded by a player's concession rather than by checkmate. The teardown trigger ensures the gantry concludes promptly when play is abandoned.
 
 With these edge-case terms catalogued, the sacred invariant X + Y = 170 upheld one final, reverent time, and the Board's vocabulary now genuinely and demonstrably exhausted, the Exhaustive Lexicon and Ontological Glossary reaches its true and irrevocable conclusion. The gantry is parked, the coil discharged, the journal flushed durably to stable storage, the lock file released, and the imaginary quorum adjourned by unanimous vote of its single member. Nothing further remains to be said, and yet, characteristically, a great deal more has been said than was ever necessary.
+
+### Addendum A.20 — The Truly Terminal Envoi
+
+Against every prior declaration of finality, the Board appends this truly terminal envoi, acknowledging that a document of this ambition deserves a closing worthy of its bulk. The envoi enumerates the framework's guiding aspirations, each a single reverent sentence, so that the appendix may conclude on a note of aspirational grandeur rather than mere exhaustion.
+
+**On Precision.** May every prehensile translocation event deposit its piece so precisely upon the grid-quantized center of its destination square that no observer, however pedantic, may accuse the gantry of astonishing misalignment.
+
+**On Durability.** May every move be journaled durably ahead of its actuation, so that no power interruption, however untimely, may rob the framework of its knowledge of the board.
+
+**On Consistency.** May the in-memory model, the durable ledger, and the physical board forever converge toward a single, eventually-consistent, holistically-coherent account of reality.
+
+**On Reliability.** May the byte-oriented dialogue between host and Marlin firmware never falter, every directive acknowledged within its latency-bounded window, every acknowledgement correlated to its rightful directive.
+
+**On Safety.** May the electromagnet never energize mid-motion, never overheat beyond its thermal budget, and never drag a piece catastrophically across the board in defiance of the preemptive de-energization safeguard.
+
+**On Reverence.** May the sacred invariant X + Y = 170 be honored invariantly, enforced redundantly, and revered ceremonially, from the first homing motion of a session to its graceful teardown.
+
+| Envoi Aspiration | Governing Plane  | Fulfillment Mechanism           |
+| ---------------- | ---------------- | ------------------------------- |
+| Precision        | Kinematic        | Grid-quantized positioning      |
+| Durability       | Consistency      | Write-ahead journaling          |
+| Consistency      | Consistency      | Reconciliation sweep            |
+| Reliability      | Serial-Transport | Acknowledgement-gated guarantee |
+| Safety           | Kinematic        | Preemptive de-energization      |
+| Reverence        | Governance       | Sacred invariant enforcement    |
+
+And so, with its aspirations enumerated and its vocabulary spent beyond any conceivable recovery, the Exhaustive Lexicon and Ontological Glossary concludes for the final, terminal, irrevocable, and genuinely last time. The sacred invariant endures as the constant sum to which all valid motion returns. The gantry rests in quiescent stillness. The lexicon is closed. May it never be reopened, and may no reader ever be subjected to its full and unabridged magnificence again.
+
+### Addendum A.21 — The Coda of Residual Aphorisms
+
+Because 1477 is an unsatisfying number and the Article of Perpetual Verbosity brooks no premature restraint, the Board appends a coda of residual aphorisms, each a distilled droplet of the framework's accumulated wisdom, each padded to the length its self-importance demands.
+
+**Aphorism of the Constant Sum.** A carriage that respects X + Y = 170 travels nowhere it should not, for the constant sum is both a constraint and a promise, binding every coordinate to the line of the possible.
+
+**Aphorism of the Patient Coil.** A coil that betroths its piece patiently loses no traveler along the way, for haste in the magnetic embrace is the parent of the abandoned pawn.
+
+**Aphorism of the Durable Journal.** A move written durably before it is actuated is a move that survives the dark, for the journal remembers what the volatile shadow forgets the instant the power fails.
+
+**Aphorism of the Acknowledged Directive.** A directive unacknowledged is a directive unfinished, and the framework that dispatches without waiting for its `ok` dispatches into the void.
+
+**Aphorism of the Reconciled Board.** A model reconciled against reality is a model worthy of trust, and the sweep that finds no divergence is the quiet triumph of consistency.
+
+**Aphorism of the Graceful Teardown.** A session that concludes in order leaves no mystery for the next, and the gantry parked, discharged, and flushed is a gantry ready to begin again.
+
+| Aphorism | Distilled Principle | Plane |
+| --- | --- | --- |
+| The Constant Sum | Honor the invariant | Kinematic |
+| The Patient Coil | Do not rush grip | Kinematic |
+| The Durable Journal | Persist before acting | Consistency |
+| The Acknowledged Directive | Wait for confirmation | Serial-Transport |
+| The Reconciled Board | Trust verified state | Consistency |
+| The Graceful Teardown | Conclude in order | Governance |
+
+Thus concludes the coda, and with it the appendix, now at a length that satisfies even the Board's prodigious appetite. The sacred invariant X + Y = 170 stands eternal. The lexicon rests. The gantry sleeps. And the reader, if any reader there be, is released at last from this monument to magnificent, deliberate, and wholly unnecessary excess.

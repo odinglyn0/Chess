@@ -20,15 +20,23 @@ class FollowSession:
     emitted_event_ids: frozenset[str]
 
     @classmethod
-    def load_or_create(cls, path: Path, game_id: str, state: BoardState, reset: bool) -> "FollowSession":
+    def load_or_create(
+        cls, path: Path, game_id: str, state: BoardState, reset: bool
+    ) -> "FollowSession":
         if path.exists() and not reset:
             raw = read_json(path)
             if raw.get("game_id") != game_id:
-                raise ConfigurationError(f"session {path} belongs to another game; use --reset-session")
+                raise ConfigurationError(
+                    f"session {path} belongs to another game; use --reset-session"
+                )
             base = BoardState.from_mapping(raw.get("base_state", {}))
             emitted = raw.get("emitted_event_ids", [])
-            if not isinstance(emitted, list) or not all(isinstance(item, str) for item in emitted):
-                raise ValidationError("Lichess follow session has invalid emitted_event_ids")
+            if not isinstance(emitted, list) or not all(
+                isinstance(item, str) for item in emitted
+            ):
+                raise ValidationError(
+                    "Lichess follow session has invalid emitted_event_ids"
+                )
             return cls(game_id, base, frozenset(emitted))
         return cls(game_id, state, frozenset())
 
@@ -66,9 +74,13 @@ def follow_game(
     if interval_s <= 0:
         raise ConfigurationError("poll interval must be positive")
     if service.journal.exists():
-        raise ConfigurationError(f"pending transaction exists at {service.journal.path}; reconcile it first")
+        raise ConfigurationError(
+            f"pending transaction exists at {service.journal.path}; reconcile it first"
+        )
     output_dir.mkdir(parents=True, exist_ok=True)
-    session = FollowSession.load_or_create(session_path, game_id, service.store.load(), reset_session)
+    session = FollowSession.load_or_create(
+        session_path, game_id, service.store.load(), reset_session
+    )
     session.save(session_path)
     print(
         f"Following Lichess game {game_id}; {'executing' if execute else 'dry-running'} "
@@ -87,20 +99,32 @@ def follow_game(
                     continue
                 plan = service.execute(move)
                 _write_plan(output_dir, move, plan.program.text())
-                print(f"\n; executed Lichess move {move.event_id}\n{plan.program.text()}", end="")
+                print(
+                    f"\n; executed Lichess move {move.event_id}\n{plan.program.text()}",
+                    end="",
+                )
             else:
                 if already_emitted:
                     continue
                 try:
-                    plan = service.plan(move, _state_before(moves, move, session.base_state, service))
+                    plan = service.plan(
+                        move, _state_before(moves, move, session.base_state, service)
+                    )
                 except PlanningError as exc:
                     raise PlanningError(
                         f"Lichess move {move.event_id} ({move.piece_id}: "
                         f"{move.previous.x},{move.previous.y} -> {move.new.x},{move.new.y}) failed: {exc}"
                     ) from exc
                 _write_plan(output_dir, move, plan.program.text())
-                print(f"\n; dry-run Lichess move {move.event_id}\n{plan.program.text()}", end="")
-            session = FollowSession(session.game_id, session.base_state, session.emitted_event_ids | {move.event_id})
+                print(
+                    f"\n; dry-run Lichess move {move.event_id}\n{plan.program.text()}",
+                    end="",
+                )
+            session = FollowSession(
+                session.game_id,
+                session.base_state,
+                session.emitted_event_ids | {move.event_id},
+            )
             session.save(session_path)
         if once:
             return
@@ -108,7 +132,10 @@ def follow_game(
 
 
 def _state_before(
-    moves: Iterable[MoveDelta], target: MoveDelta, base: BoardState, service: GantryService
+    moves: Iterable[MoveDelta],
+    target: MoveDelta,
+    base: BoardState,
+    service: GantryService,
 ) -> BoardState:
     state = base
     for move in moves:
@@ -116,4 +143,6 @@ def _state_before(
             return state
         plan = service.plan(move, state)
         state = plan.next_state
-    raise ValidationError(f"Lichess move {target.event_id} is missing from its PGN sequence")
+    raise ValidationError(
+        f"Lichess move {target.event_id} is missing from its PGN sequence"
+    )

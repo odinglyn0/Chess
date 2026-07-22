@@ -24,7 +24,7 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [dependency-groups]
-dev = ["black>=25.9,<26", "prettier"]
+dev = ["black>=25.9,<26"]
 
 [tool.black]
 target-version = ["py39"]

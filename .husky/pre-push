@@ -1,1 +1,6 @@
-npm run check
+set -e
+
+node node_modules/prettier/bin/prettier.cjs --check .
+python -m black --check .
+python scripts/strip_comments.py --check src tests examples scripts
+python scripts/steering_check.py .

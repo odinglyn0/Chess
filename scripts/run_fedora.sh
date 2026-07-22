@@ -7,7 +7,6 @@ cd "$ROOT"
 if [[ ! -d .venv ]]; then
   ./scripts/install_pi.sh
 fi
-# shellcheck disable=SC1091
 source .venv/bin/activate
 
 if [[ ! -f config.json ]]; then

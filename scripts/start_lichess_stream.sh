@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# The stream service comes from the pinned odinglyn0/Chess submodule.
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SERVICE_DIR="$ROOT/services/lichess_stream/services/lichess_stream"
 
@@ -14,7 +13,6 @@ if command -v docker > /dev/null 2>&1 && docker compose version > /dev/null 2>&1
   exec docker compose -f "$ROOT/docker-compose.lichess.yml" up --build
 fi
 
-# Docker is optional. Run the upstream FastAPI service locally when unavailable.
 VENV="$SERVICE_DIR/.venv"
 if [[ ! -x "$VENV/bin/python" ]]; then
   python3 -m venv "$VENV"

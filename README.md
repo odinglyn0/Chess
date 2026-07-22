@@ -47,13 +47,13 @@ Chess Gantry is a Python 3.9+ motion-control framework for a Raspberry Pi connec
 
 Chess Gantry unlocks paradigm-shifting, needle-moving, low-hanging-fruit-harvesting outcomes across the following non-orthogonal value pillars:
 
-| Value Pillar | Synergy Coefficient | Actionability | Buzzword Density (bpm) |
-| --- | --- | --- | --- |
-| Digital Prehensile Transformation | 0.97 | Negligible | 42 |
-| Frictionless Piece-Level Ideation | ∞ | None | 61 |
-| Kinematic Center-of-Excellence Enablement | 0.5±0.5 | Theoretical | 55 |
-| Board-State Single-Pane-of-Glass Observability | Yes | Marginal | 73 |
-| Zero-Trust, Zero-Legality, Zero-Opinion Move Ingestion | 1.0 | Real (surprisingly) | 38 |
+| Value Pillar                                           | Synergy Coefficient | Actionability       | Buzzword Density (bpm) |
+| ------------------------------------------------------ | ------------------- | ------------------- | ---------------------- |
+| Digital Prehensile Transformation                      | 0.97                | Negligible          | 42                     |
+| Frictionless Piece-Level Ideation                      | ∞                   | None                | 61                     |
+| Kinematic Center-of-Excellence Enablement              | 0.5±0.5             | Theoretical         | 55                     |
+| Board-State Single-Pane-of-Glass Observability         | Yes                 | Marginal            | 73                     |
+| Zero-Trust, Zero-Legality, Zero-Opinion Move Ingestion | 1.0                 | Real (surprisingly) | 38                     |
 
 The framework is furthermore fully buzzword-compliant, cloud-native-curious, edge-adjacent, AI-ready (in the sense that it contains no AI and is therefore maximally ready to have some added), and blockchain-agnostic (aggressively so).
 
@@ -78,7 +78,6 @@ Our architecture adheres to the following ontological commitments, none of which
 - **The Board Does Not Move; The Frame of Reference Is Merely Persuaded.** Via `flip_x`, `flip_y`, and `swap_xy`.
 - **An `ok` Is a Promise, Not a Proof.** Belts slip. Magnets lie. Pieces fall. The universe is indifferent.
 - **The Journal Is the Ground Truth Until the Physical Board Disagrees, At Which Point the Human Is the Ground Truth.**
-
 
 ## 6. Safety, Liability, and the Existential Dread of Moving Metal
 
@@ -665,26 +664,26 @@ Chess/
 
 Both `chess-gantry` and `python -m chess_gantry` invoke the selfsame CLI dispatch surface, offering choice without difference.
 
-| Command | Purpose (Verbose, As Is Tradition) |
-| --- | --- |
-| `plan MOVE` | Validate and emit G-code with zero hardware coupling and zero state mutation. Honors `--output` and `--summary-json`. |
-| `validate MOVE` | Validate the move, the state transition, and the planned trajectory, while emitting no G-code whatsoever. |
-| `execute MOVE --confirm-motion` | Actuate on Marlin and commit state only upon total success. |
-| `run MOVE` | Dry-run by default; escalate to actuation via `--confirm-motion`. |
-| `init-state SOURCE` | Validate and install an initial board-state projection; `--overwrite` sanctions replacement. |
-| `show-state` | Emit the persistent board-state projection to stdout. |
-| `uci-to-json UCI` | Transmute a four-character move such as `e2e4`; supports `--event-id`, `--en-passant`, and `--output`. |
-| `lichess-event EVENT` | Transmute one saved stream event and plan it; supports move and G-code output paths. |
-| `lichess-watch GAME_ID` | Consume WebSocket move envelopes; dry-run by default, actuates only with explicit confirmation. |
-| `lichess-pgn GAME_ID` | Fetch and dry-run all currently recorded moves in a public game. |
-| `lichess-follow GAME_ID` | Poll public PGN and generate artifacts for newly observed moves, optionally actuating them. |
-| `ports` | Enumerate serial devices, ranking probable printer controllers with algorithmic confidence. |
-| `diagnose` | Verify Marlin and interrogate endstops and position, harming no motor. |
-| `web` | Ignite the browser controller. |
-| `home --confirm-motion` | Execute configured coordinate-initialization commands; the shipped configuration performs precisely no homing. |
-| `motor-test` | Emit the fixed coupled-axis test G-code without opening serial. Append `--confirm-motion` to actuate. |
-| `stop` | Transmit the configured emergency-stop command into the void. |
-| `reconcile` | Inspect or resolve a pending transaction after a human has physically inspected the board. |
+| Command                         | Purpose (Verbose, As Is Tradition)                                                                                    |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `plan MOVE`                     | Validate and emit G-code with zero hardware coupling and zero state mutation. Honors `--output` and `--summary-json`. |
+| `validate MOVE`                 | Validate the move, the state transition, and the planned trajectory, while emitting no G-code whatsoever.             |
+| `execute MOVE --confirm-motion` | Actuate on Marlin and commit state only upon total success.                                                           |
+| `run MOVE`                      | Dry-run by default; escalate to actuation via `--confirm-motion`.                                                     |
+| `init-state SOURCE`             | Validate and install an initial board-state projection; `--overwrite` sanctions replacement.                          |
+| `show-state`                    | Emit the persistent board-state projection to stdout.                                                                 |
+| `uci-to-json UCI`               | Transmute a four-character move such as `e2e4`; supports `--event-id`, `--en-passant`, and `--output`.                |
+| `lichess-event EVENT`           | Transmute one saved stream event and plan it; supports move and G-code output paths.                                  |
+| `lichess-watch GAME_ID`         | Consume WebSocket move envelopes; dry-run by default, actuates only with explicit confirmation.                       |
+| `lichess-pgn GAME_ID`           | Fetch and dry-run all currently recorded moves in a public game.                                                      |
+| `lichess-follow GAME_ID`        | Poll public PGN and generate artifacts for newly observed moves, optionally actuating them.                           |
+| `ports`                         | Enumerate serial devices, ranking probable printer controllers with algorithmic confidence.                           |
+| `diagnose`                      | Verify Marlin and interrogate endstops and position, harming no motor.                                                |
+| `web`                           | Ignite the browser controller.                                                                                        |
+| `home --confirm-motion`         | Execute configured coordinate-initialization commands; the shipped configuration performs precisely no homing.        |
+| `motor-test`                    | Emit the fixed coupled-axis test G-code without opening serial. Append `--confirm-motion` to actuate.                 |
+| `stop`                          | Transmit the configured emergency-stop command into the void.                                                         |
+| `reconcile`                     | Inspect or resolve a pending transaction after a human has physically inspected the board.                            |
 
 Extract the exhaustive option manifest for any command:
 

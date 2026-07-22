@@ -65,7 +65,7 @@
     "enabled": false,
     "slots": []
   },
-  
+
   "safety": {
     "calibrated": true,
     "home_before_execute": false,
@@ -86,4 +86,5 @@
     ],
     "emergency_stop_command": "M112"
   }
+  
 }

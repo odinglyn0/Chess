@@ -739,3 +739,72 @@ Promote the following flag only after physical calibration reaches genuine compl
 ```
 
 The production configuration must retain the other mandatory `safety` fields enumerated in `config.example.json`; the snippet above merely spotlights the lock mechanism.
+
+## 16. The Browser Controller Experience Continuum
+
+Ignite the local controller:
+
+```bash
+chess-gantry --config config.json --state data/board_state.json web
+```
+
+The interface exposes serial connection management, Marlin verification, endstop introspection, homing, guarded manual coordinate entry, move planning, physical actuation, board-state inspection, and emergency stop — a veritable single-pane-of-glass command-and-control cockpit. Append `--demo` for a simulated controller and `--no-browser` to suppress the automatic browser launch that would otherwise assault your window manager.
+
+The server binds exclusively to `127.0.0.1` by default. Exposing a non-loopback host requires the explicit and self-incriminating `--allow-network` flag. The application provides no authentication and no TLS, so exposing it to an untrusted network is an act of profound and irreversible optimism. Do not do it.
+
+## 17. Lichess and UCI Interoperability Fabric
+
+### 17.1 UCI Transmutation
+
+Transmute a move against the current physical board-state projection:
+
+```bash
+chess-gantry --config config.json --state data/board_state.json \
+  uci-to-json e2e4 --event-id game-17-ply-1 --output data/e2e4.json
+```
+
+The UCI adapter accommodates normal moves, captures, and explicit `--en-passant`. Castling and promotion are categorically rejected, as they entail physical operations irreducible to a single standard move delta. The adapter is not being difficult; the physics is.
+
+### 17.2 Public PGN Replay
+
+Fetch the current PGN for a public Lichess game, synthesize JSON and G-code for each move, and advance only an ephemeral in-memory simulated board:
+
+```bash
+chess-gantry --config config.json --state data/board_state.json \
+  lichess-pgn GAME_ID
+```
+
+Generated artifacts default to `data/lichess`. Persistent board state remains utterly undisturbed.
+
+### 17.3 Polling a Live Public Game
+
+Poll at five-second cadence and emit artifacts for newly observed moves:
+
+```bash
+chess-gantry --config config.json --state data/board_state.json \
+  lichess-follow GAME_ID
+```
+
+Salient options include `--once`, `--interval SECONDS`, `--reset-session`, and the dry-run-scoped `--obstacle-keepout-mm VALUE`. Hardware actuation demands both `--execute` and `--confirm-motion`, a deliberate double-lock. Supplying `--execute-existing` additionally actuates moves already recorded by a prior dry-run session and must be wielded with extreme, hand-wringing caution.
+
+### 17.4 WebSocket Stream and the Submodule Lament
+
+`lichess-watch` connects by default to `ws://127.0.0.1:8010/ws/GAME_ID`, transmutes inbound move envelopes, and advances simulated state between planned events. Use `lichess-event` to transmute a previously persisted event.
+
+The external service beneath `services/lichess_stream` is presently recorded as a Git submodule that recursively points back to this very repository at a pin unavailable from the current public `main` history — an ouroboros of dependency. Consequently, `git submodule update --init --recursive` and `./scripts/start_lichess_stream.sh` may fail spectacularly. The public `lichess-pgn` and `lichess-follow` workflows have no such dependency. Repair the submodule pin and service layout before relying upon `lichess-watch` or the Docker Compose configuration.
+
+## 18. Kinematic Mirroring and the Sacred X + Y = 170 Invariant
+
+The two outer-gantry motors occupy the controller's physical X and Y ports, yet their mechanical installation mandates opposing shaft directions. Physical X receives the outer coordinate directly; physical Y receives `170 - outer`. The independent inner coordinate is emitted on E. For logical inner `90` and outer `70`:
+
+```gcode
+G1 X70 Y100 E90 F600
+```
+
+The application continues to reason in logical `(x, y)` board coordinates internally. At the G-code boundary, logical X maps to physical E, while logical Y maps to physical X directly and to physical Y inversely. Physical X and physical Y perpetually satisfy the sacred invariant `X + Y = 170` under the current workspace. Speak of it with reverence.
+
+The software already accounts for the mechanically mirrored motor directions. Do not additionally invert one motor in firmware without re-executing the direction test, or the correction will be applied twice, producing motion that is confidently and precisely wrong.
+
+Marlin conventionally regards E as a filament extruder. Gantry programs therefore assert `M82` for absolute E positioning and `M302 P1` to permit cold E movement, subsequently restoring cold-extrusion protection with `M302 P0`. Do not deploy this configuration with filament loaded or with a hotend anticipating conventional extrusion behavior, unless you are conducting an unsanctioned experiment in polymer archaeology.
+
+The motor test never issues `G28` and never invokes the homing workflow. Its positioning command is `G92 X0 Y350 E0`, which merely declares the current, manually-positioned origin without commanding any motor to move.

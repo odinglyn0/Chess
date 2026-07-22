@@ -19,10 +19,14 @@ def _mapping(value: Any, name: str) -> Mapping[str, Any]:
 def _unknown(raw: Mapping[str, Any], allowed: Iterable[str], name: str) -> None:
     extra = set(raw) - set(allowed)
     if extra:
-        raise ConfigurationError(f"{name} has unknown field(s): {', '.join(sorted(extra))}")
+        raise ConfigurationError(
+            f"{name} has unknown field(s): {', '.join(sorted(extra))}"
+        )
 
 
-def _number(value: Any, name: str, *, positive: bool = False, non_negative: bool = False) -> float:
+def _number(
+    value: Any, name: str, *, positive: bool = False, non_negative: bool = False
+) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ConfigurationError(f"{name} must be a number")
     result = float(value)
@@ -35,7 +39,9 @@ def _number(value: Any, name: str, *, positive: bool = False, non_negative: bool
     return result
 
 
-def _integer(value: Any, name: str, *, positive: bool = False, non_negative: bool = False) -> int:
+def _integer(
+    value: Any, name: str, *, positive: bool = False, non_negative: bool = False
+) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
         raise ConfigurationError(f"{name} must be an integer")
     if positive and value <= 0:
@@ -79,7 +85,9 @@ def _commands(value: Any, name: str, *, allow_empty: bool = False) -> Tuple[str,
         if "\n" in text or "\r" in text:
             raise ConfigurationError(f"{name}[{index}] cannot contain a newline")
         if text.startswith(";"):
-            raise ConfigurationError(f"{name}[{index}] must be a command, not only a comment")
+            raise ConfigurationError(
+                f"{name}[{index}] must be a command, not only a comment"
+            )
         commands.append(text)
     return tuple(commands)
 
@@ -124,16 +132,32 @@ class SerialSettings:
         )
         return cls(
             port=_string(raw.get("port", "auto"), "serial.port"),
-            baudrate=_integer(raw.get("baudrate", 115200), "serial.baudrate", positive=True),
+            baudrate=_integer(
+                raw.get("baudrate", 115200), "serial.baudrate", positive=True
+            ),
             fallback_baudrates=_integer_sequence(
                 raw.get("fallback_baudrates", [115200, 250000]),
                 "serial.fallback_baudrates",
             ),
-            read_timeout_s=_number(raw.get("read_timeout_s", 0.25), "serial.read_timeout_s", positive=True),
-            write_timeout_s=_number(raw.get("write_timeout_s", 2.0), "serial.write_timeout_s", positive=True),
-            command_timeout_s=_number(raw.get("command_timeout_s", 120.0), "serial.command_timeout_s", positive=True),
-            startup_wait_s=_number(raw.get("startup_wait_s", 2.5), "serial.startup_wait_s", non_negative=True),
-            verify_marlin=_boolean(raw.get("verify_marlin", True), "serial.verify_marlin"),
+            read_timeout_s=_number(
+                raw.get("read_timeout_s", 0.25), "serial.read_timeout_s", positive=True
+            ),
+            write_timeout_s=_number(
+                raw.get("write_timeout_s", 2.0), "serial.write_timeout_s", positive=True
+            ),
+            command_timeout_s=_number(
+                raw.get("command_timeout_s", 120.0),
+                "serial.command_timeout_s",
+                positive=True,
+            ),
+            startup_wait_s=_number(
+                raw.get("startup_wait_s", 2.5),
+                "serial.startup_wait_s",
+                non_negative=True,
+            ),
+            verify_marlin=_boolean(
+                raw.get("verify_marlin", True), "serial.verify_marlin"
+            ),
             handshake_timeout_s=_number(
                 raw.get("handshake_timeout_s", 5.0),
                 "serial.handshake_timeout_s",
@@ -157,7 +181,16 @@ class BoardGeometry:
     def from_mapping(cls, raw: Mapping[str, Any]) -> "BoardGeometry":
         _unknown(
             raw,
-            {"width", "height", "square_size_mm", "origin_x_mm", "origin_y_mm", "flip_x", "flip_y", "swap_xy"},
+            {
+                "width",
+                "height",
+                "square_size_mm",
+                "origin_x_mm",
+                "origin_y_mm",
+                "flip_x",
+                "flip_y",
+                "swap_xy",
+            },
             "board",
         )
         width = _integer(raw.get("width", 8), "board.width", positive=True)
@@ -167,7 +200,9 @@ class BoardGeometry:
         return cls(
             width=width,
             height=height,
-            square_size_mm=_number(raw.get("square_size_mm"), "board.square_size_mm", positive=True),
+            square_size_mm=_number(
+                raw.get("square_size_mm"), "board.square_size_mm", positive=True
+            ),
             origin_x_mm=_number(raw.get("origin_x_mm"), "board.origin_x_mm"),
             origin_y_mm=_number(raw.get("origin_y_mm"), "board.origin_y_mm"),
             flip_x=_boolean(raw.get("flip_x", False), "board.flip_x"),
@@ -227,26 +262,44 @@ class MotionSettings:
             },
             "motion",
         )
-        park_after = _boolean(raw.get("park_after_move", True), "motion.park_after_move")
+        park_after = _boolean(
+            raw.get("park_after_move", True), "motion.park_after_move"
+        )
         park_x = raw.get("park_x_mm")
         park_y = raw.get("park_y_mm")
         if park_after and (park_x is None or park_y is None):
-            raise ConfigurationError("motion.park_x_mm and motion.park_y_mm are required when parking is enabled")
+            raise ConfigurationError(
+                "motion.park_x_mm and motion.park_y_mm are required when parking is enabled"
+            )
         if not park_after and (park_x is None) != (park_y is None):
-            raise ConfigurationError("motion park coordinates must be provided together")
+            raise ConfigurationError(
+                "motion park coordinates must be provided together"
+            )
         park = None
         if park_x is not None and park_y is not None:
-            park = MachinePoint(_number(park_x, "motion.park_x_mm"), _number(park_y, "motion.park_y_mm"))
+            park = MachinePoint(
+                _number(park_x, "motion.park_x_mm"), _number(park_y, "motion.park_y_mm")
+            )
         return cls(
             travel_feed_mm_min=_number(
-                raw.get("travel_feed_mm_min", 4000.0), "motion.travel_feed_mm_min", positive=True
+                raw.get("travel_feed_mm_min", 4000.0),
+                "motion.travel_feed_mm_min",
+                positive=True,
             ),
-            drag_feed_mm_min=_number(raw.get("drag_feed_mm_min", 900.0), "motion.drag_feed_mm_min", positive=True),
+            drag_feed_mm_min=_number(
+                raw.get("drag_feed_mm_min", 900.0),
+                "motion.drag_feed_mm_min",
+                positive=True,
+            ),
             magnet_on_dwell_ms=_integer(
-                raw.get("magnet_on_dwell_ms", 250), "motion.magnet_on_dwell_ms", non_negative=True
+                raw.get("magnet_on_dwell_ms", 250),
+                "motion.magnet_on_dwell_ms",
+                non_negative=True,
             ),
             magnet_off_dwell_ms=_integer(
-                raw.get("magnet_off_dwell_ms", 250), "motion.magnet_off_dwell_ms", non_negative=True
+                raw.get("magnet_off_dwell_ms", 250),
+                "motion.magnet_off_dwell_ms",
+                non_negative=True,
             ),
             park_after_move=park_after,
             park_position=park,
@@ -262,8 +315,12 @@ class MagnetSettings:
     def from_mapping(cls, raw: Mapping[str, Any]) -> "MagnetSettings":
         _unknown(raw, {"on_commands", "off_commands"}, "magnet")
         return cls(
-            on_commands=_commands(raw.get("on_commands", ["M106 S255"]), "magnet.on_commands"),
-            off_commands=_commands(raw.get("off_commands", ["M107"]), "magnet.off_commands"),
+            on_commands=_commands(
+                raw.get("on_commands", ["M106 S255"]), "magnet.on_commands"
+            ),
+            off_commands=_commands(
+                raw.get("off_commands", ["M107"]), "magnet.off_commands"
+            ),
         )
 
 
@@ -280,7 +337,14 @@ class PlannerSettings:
     def from_mapping(cls, raw: Mapping[str, Any]) -> "PlannerSettings":
         _unknown(
             raw,
-            {"kind", "grid_step_mm", "obstacle_keepout_mm", "allow_diagonal", "simplify_path", "max_expanded_nodes"},
+            {
+                "kind",
+                "grid_step_mm",
+                "obstacle_keepout_mm",
+                "allow_diagonal",
+                "simplify_path",
+                "max_expanded_nodes",
+            },
             "planner",
         )
         kind = _string(raw.get("kind", "astar"), "planner.kind").lower()
@@ -288,14 +352,24 @@ class PlannerSettings:
             raise ConfigurationError("planner.kind must be 'astar' or 'direct'")
         return cls(
             kind=kind,
-            grid_step_mm=_number(raw.get("grid_step_mm", 5.0), "planner.grid_step_mm", positive=True),
-            obstacle_keepout_mm=_number(
-                raw.get("obstacle_keepout_mm", 18.0), "planner.obstacle_keepout_mm", non_negative=True
+            grid_step_mm=_number(
+                raw.get("grid_step_mm", 5.0), "planner.grid_step_mm", positive=True
             ),
-            allow_diagonal=_boolean(raw.get("allow_diagonal", True), "planner.allow_diagonal"),
-            simplify_path=_boolean(raw.get("simplify_path", True), "planner.simplify_path"),
+            obstacle_keepout_mm=_number(
+                raw.get("obstacle_keepout_mm", 18.0),
+                "planner.obstacle_keepout_mm",
+                non_negative=True,
+            ),
+            allow_diagonal=_boolean(
+                raw.get("allow_diagonal", True), "planner.allow_diagonal"
+            ),
+            simplify_path=_boolean(
+                raw.get("simplify_path", True), "planner.simplify_path"
+            ),
             max_expanded_nodes=_integer(
-                raw.get("max_expanded_nodes", 100000), "planner.max_expanded_nodes", positive=True
+                raw.get("max_expanded_nodes", 100000),
+                "planner.max_expanded_nodes",
+                positive=True,
             ),
         )
 
@@ -323,7 +397,9 @@ class CaptureSettings:
                 )
             )
         if enabled and not slots:
-            raise ConfigurationError("capture.enabled is true, but no capture slots are configured")
+            raise ConfigurationError(
+                "capture.enabled is true, but no capture slots are configured"
+            )
         return cls(enabled=enabled, slots=tuple(slots))
 
 
@@ -339,12 +415,22 @@ class SafetySettings:
     def from_mapping(cls, raw: Mapping[str, Any]) -> "SafetySettings":
         _unknown(
             raw,
-            {"calibrated", "home_before_execute", "home_commands", "preflight_commands", "emergency_stop_command"},
+            {
+                "calibrated",
+                "home_before_execute",
+                "home_commands",
+                "preflight_commands",
+                "emergency_stop_command",
+            },
             "safety",
         )
-        emergency = _string(raw.get("emergency_stop_command", "M112"), "safety.emergency_stop_command")
+        emergency = _string(
+            raw.get("emergency_stop_command", "M112"), "safety.emergency_stop_command"
+        )
         if "\n" in emergency or "\r" in emergency:
-            raise ConfigurationError("safety.emergency_stop_command cannot contain a newline")
+            raise ConfigurationError(
+                "safety.emergency_stop_command cannot contain a newline"
+            )
         return cls(
             calibrated=_boolean(raw.get("calibrated", False), "safety.calibrated"),
             home_before_execute=_boolean(
@@ -369,7 +455,9 @@ class SafetySettings:
                 "safety.home_commands",
             ),
             preflight_commands=_commands(
-                raw.get("preflight_commands", ["M115"]), "safety.preflight_commands", allow_empty=True
+                raw.get("preflight_commands", ["M115"]),
+                "safety.preflight_commands",
+                allow_empty=True,
             ),
             emergency_stop_command=emergency,
         )
@@ -388,16 +476,43 @@ class AppConfig:
 
     @classmethod
     def from_mapping(cls, raw: Mapping[str, Any]) -> "AppConfig":
-        _unknown(raw, {"serial", "board", "workspace", "motion", "magnet", "planner", "capture", "safety"}, "config")
+        _unknown(
+            raw,
+            {
+                "serial",
+                "board",
+                "workspace",
+                "motion",
+                "magnet",
+                "planner",
+                "capture",
+                "safety",
+            },
+            "config",
+        )
         result = cls(
-            serial=SerialSettings.from_mapping(_mapping(raw.get("serial", {}), "serial")),
+            serial=SerialSettings.from_mapping(
+                _mapping(raw.get("serial", {}), "serial")
+            ),
             board=BoardGeometry.from_mapping(_mapping(raw.get("board", {}), "board")),
-            workspace=Workspace.from_mapping(_mapping(raw.get("workspace", {}), "workspace")),
-            motion=MotionSettings.from_mapping(_mapping(raw.get("motion", {}), "motion")),
-            magnet=MagnetSettings.from_mapping(_mapping(raw.get("magnet", {}), "magnet")),
-            planner=PlannerSettings.from_mapping(_mapping(raw.get("planner", {}), "planner")),
-            capture=CaptureSettings.from_mapping(_mapping(raw.get("capture", {}), "capture")),
-            safety=SafetySettings.from_mapping(_mapping(raw.get("safety", {}), "safety")),
+            workspace=Workspace.from_mapping(
+                _mapping(raw.get("workspace", {}), "workspace")
+            ),
+            motion=MotionSettings.from_mapping(
+                _mapping(raw.get("motion", {}), "motion")
+            ),
+            magnet=MagnetSettings.from_mapping(
+                _mapping(raw.get("magnet", {}), "magnet")
+            ),
+            planner=PlannerSettings.from_mapping(
+                _mapping(raw.get("planner", {}), "planner")
+            ),
+            capture=CaptureSettings.from_mapping(
+                _mapping(raw.get("capture", {}), "capture")
+            ),
+            safety=SafetySettings.from_mapping(
+                _mapping(raw.get("safety", {}), "safety")
+            ),
         )
         result._validate_cross_fields()
         return result
@@ -408,7 +523,9 @@ class AppConfig:
         try:
             raw = json.loads(config_path.read_text(encoding="utf-8"))
         except FileNotFoundError as exc:
-            raise ConfigurationError(f"configuration file not found: {config_path}") from exc
+            raise ConfigurationError(
+                f"configuration file not found: {config_path}"
+            ) from exc
         except json.JSONDecodeError as exc:
             raise ConfigurationError(
                 f"invalid JSON in {config_path}: line {exc.lineno}, column {exc.colno}: {exc.msg}"
@@ -416,38 +533,62 @@ class AppConfig:
         return cls.from_mapping(_mapping(raw, "config"))
 
     def _validate_cross_fields(self) -> None:
-        if self.motion.park_position is not None and not self.workspace.contains(self.motion.park_position):
+        if self.motion.park_position is not None and not self.workspace.contains(
+            self.motion.park_position
+        ):
             raise ConfigurationError("motion park position is outside the workspace")
 
         physical_x_count = self.board.height if self.board.swap_xy else self.board.width
         physical_y_count = self.board.width if self.board.swap_xy else self.board.height
         half_square = self.board.square_size_mm / 2.0
         board_min_x = self.board.origin_x_mm - half_square
-        board_max_x = self.board.origin_x_mm + (physical_x_count - 0.5) * self.board.square_size_mm
+        board_max_x = (
+            self.board.origin_x_mm
+            + (physical_x_count - 0.5) * self.board.square_size_mm
+        )
         board_min_y = self.board.origin_y_mm - half_square
-        board_max_y = self.board.origin_y_mm + (physical_y_count - 0.5) * self.board.square_size_mm
+        board_max_y = (
+            self.board.origin_y_mm
+            + (physical_y_count - 0.5) * self.board.square_size_mm
+        )
 
         seen_slots = set()
         for index, slot in enumerate(self.capture.slots):
             if not self.workspace.contains(slot):
-                raise ConfigurationError(f"capture slot {index} is outside the workspace")
+                raise ConfigurationError(
+                    f"capture slot {index} is outside the workspace"
+                )
             key = (round(slot.x, 6), round(slot.y, 6))
             if key in seen_slots:
-                raise ConfigurationError(f"capture slot {index} duplicates another capture slot")
+                raise ConfigurationError(
+                    f"capture slot {index} duplicates another capture slot"
+                )
             seen_slots.add(key)
-            if board_min_x <= slot.x <= board_max_x and board_min_y <= slot.y <= board_max_y:
-                raise ConfigurationError(f"capture slot {index} lies inside the playing-board footprint")
+            if (
+                board_min_x <= slot.x <= board_max_x
+                and board_min_y <= slot.y <= board_max_y
+            ):
+                raise ConfigurationError(
+                    f"capture slot {index} lies inside the playing-board footprint"
+                )
 
         if self.motion.park_position is not None:
-            park_key = (round(self.motion.park_position.x, 6), round(self.motion.park_position.y, 6))
+            park_key = (
+                round(self.motion.park_position.x, 6),
+                round(self.motion.park_position.y, 6),
+            )
             if park_key in seen_slots:
                 raise ConfigurationError("motion park position overlaps a capture slot")
 
         if self.magnet.on_commands == self.magnet.off_commands:
-            raise ConfigurationError("magnet on_commands and off_commands must not be identical")
+            raise ConfigurationError(
+                "magnet on_commands and off_commands must not be identical"
+            )
 
         if self.planner.grid_step_mm > max(
             self.workspace.max_x_mm - self.workspace.min_x_mm,
             self.workspace.max_y_mm - self.workspace.min_y_mm,
         ):
-            raise ConfigurationError("planner.grid_step_mm is larger than the workspace")
+            raise ConfigurationError(
+                "planner.grid_step_mm is larger than the workspace"
+            )

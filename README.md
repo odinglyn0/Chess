@@ -986,3 +986,6 @@ No. Read Section 6 again. Then read it a third time.
 ## 26. Colophon
 
 This document was composed with an intentionally maximal ratio of syllables to actionable information. Any accidental clarity is an artifact of the underlying software actually working, for which no apology is offered. The genuine, load-bearing operational details are all present and correct; they are merely wearing an elaborate costume.
+
+
+Jingle bells, Odin smells.

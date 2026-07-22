@@ -39,9 +39,15 @@ def stream_event_to_move(
         if not isinstance(piece_id, str):
             raise ValidationError("Lichess stream move requires a string piece field")
     else:
-        piece = state.piece_at(GridPosition.validated(source.get("x"), source.get("y"), width, height, "from"))
+        piece = state.piece_at(
+            GridPosition.validated(
+                source.get("x"), source.get("y"), width, height, "from"
+            )
+        )
         if piece is None:
-            raise ValidationError("stored gantry board has no piece at the Lichess move source square")
+            raise ValidationError(
+                "stored gantry board has no piece at the Lichess move source square"
+            )
         piece_id = piece.piece_id
     payload: dict[str, Any] = {
         "event_id": event_id,
@@ -61,10 +67,18 @@ def stream_event_to_move(
                 raise ValidationError("Lichess stream capture requires a piece id")
         else:
             captured_piece = state.piece_at(
-                GridPosition.validated(capture.get("x"), capture.get("y"), width, height, "capture")
+                GridPosition.validated(
+                    capture.get("x"), capture.get("y"), width, height, "capture"
+                )
             )
             if captured_piece is None:
-                raise ValidationError("stored gantry board has no piece at the Lichess capture square")
+                raise ValidationError(
+                    "stored gantry board has no piece at the Lichess capture square"
+                )
             captured_id = captured_piece.piece_id
-        payload["capture"] = {"id": captured_id, "x": capture.get("x"), "y": capture.get("y")}
+        payload["capture"] = {
+            "id": captured_id,
+            "x": capture.get("x"),
+            "y": capture.get("y"),
+        }
     return MoveDelta.from_mapping(payload, width, height)

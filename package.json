@@ -1,0 +1,21 @@
+{
+  "name": "chess-gantry-tooling",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Formatting and git-hook tooling for the chess-gantry project",
+  "scripts": {
+    "format": "npm run format:prettier && npm run format:python",
+    "format:check": "npm run format:prettier:check && npm run format:python:check",
+    "format:prettier": "prettier --write .",
+    "format:prettier:check": "prettier --check .",
+    "format:python": "ruff check --fix . && ruff format .",
+    "format:python:check": "ruff format --check . && ruff check .",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "prettier": "^3.4.2",
+    "prettier-plugin-sh": "^0.14.0",
+    "prettier-plugin-toml": "^2.0.1"
+  }
+}

@@ -15,7 +15,9 @@ from chess_gantry.service import GantryService
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def controller_config(*, calibrated: bool = True, home_before_execute: bool = True) -> AppConfig:
+def controller_config(
+    *, calibrated: bool = True, home_before_execute: bool = True
+) -> AppConfig:
     raw = json.loads((ROOT / "config.example.json").read_text(encoding="utf-8"))
     raw["planner"]["kind"] = "direct"
     raw["capture"]["enabled"] = False
@@ -91,7 +93,9 @@ class ControllerTests(unittest.TestCase):
             completed = controller.execute_move(move, confirm_motion=True)
             self.assertEqual(completed.next_state.revision, 1)
             stored = service.store.load()
-            self.assertEqual(stored.pieces["white_pawn_e"].board_position, GridPosition(4, 3))
+            self.assertEqual(
+                stored.pieces["white_pawn_e"].board_position, GridPosition(4, 3)
+            )
             self.assertFalse(service.journal.exists())
 
     def test_execution_remains_locked_by_config(self) -> None:

@@ -22,7 +22,9 @@ class KinematicsTests(unittest.TestCase):
             swap_xy=True,
         )
         # logical (1, 2) -> flipped indices (6, 2) -> swapped (2, 6)
-        self.assertEqual(grid_to_machine(GridPosition(1, 2), geometry), MachinePoint(50.0, 130.0))
+        self.assertEqual(
+            grid_to_machine(GridPosition(1, 2), geometry), MachinePoint(50.0, 130.0)
+        )
 
 
 class AStarTests(unittest.TestCase):

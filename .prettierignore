@@ -1,0 +1,19 @@
+# Dependencies / build artifacts
+node_modules/
+.venv/
+build/
+dist/
+*.egg-info/
+__pycache__/
+.pytest_cache/
+
+# Runtime / generated data
+data/
+*.gcode
+*.lock
+
+# Python is handled by ruff, not prettier
+*.py
+
+# Lock files
+package-lock.json

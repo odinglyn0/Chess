@@ -76,7 +76,9 @@ class BoardStateTests(unittest.TestCase):
         )
         result = self.state.applied(move, capture_slot=0)
         self.assertEqual(result.revision, 3)
-        self.assertEqual(result.pieces["white_pawn_e"].board_position, GridPosition(3, 4))
+        self.assertEqual(
+            result.pieces["white_pawn_e"].board_position, GridPosition(3, 4)
+        )
         self.assertEqual(result.pieces["black_pawn_d"].status, "captured")
         self.assertEqual(result.pieces["black_pawn_d"].capture_slot, 0)
         self.assertIn("capture-1", result.processed_events)
@@ -101,7 +103,6 @@ class BoardStateTests(unittest.TestCase):
                     "processed_events": [],
                 }
             )
-
 
     def test_explicit_en_passant_capture(self) -> None:
         state = BoardState.from_mapping(
@@ -129,7 +130,9 @@ class BoardStateTests(unittest.TestCase):
         self.assertIsNotNone(captured)
         self.assertEqual(captured.piece_id, "black_pawn_d")
         result = state.applied(move, capture_slot=2)
-        self.assertEqual(result.pieces["white_pawn_e"].board_position, GridPosition(3, 5))
+        self.assertEqual(
+            result.pieces["white_pawn_e"].board_position, GridPosition(3, 5)
+        )
         self.assertEqual(result.pieces["black_pawn_d"].capture_slot, 2)
 
     def test_processed_event_is_rejected(self) -> None:

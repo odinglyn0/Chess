@@ -1,0 +1,25 @@
+{
+  "plugins": ["prettier-plugin-toml", "prettier-plugin-sh"],
+  "printWidth": 100,
+  "tabWidth": 2,
+  "semi": true,
+  "singleQuote": false,
+  "trailingComma": "all",
+  "overrides": [
+    {
+      "files": ["*.sh", "*.bash"],
+      "options": {
+        "keepComments": true,
+        "indent": 2,
+        "binaryNextLine": true,
+        "switchCaseIndent": true
+      }
+    },
+    {
+      "files": ["*.md"],
+      "options": {
+        "proseWrap": "preserve"
+      }
+    }
+  ]
+}

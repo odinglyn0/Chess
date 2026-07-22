@@ -27,7 +27,6 @@ class ConfigAndGCodeTests(unittest.TestCase):
         with self.assertRaisesRegex(ConfigurationError, "outside the workspace"):
             AppConfig.from_mapping(raw)
 
-
     def test_rejects_capture_slot_inside_board(self) -> None:
         raw = self.raw_config()
         raw["capture"]["slots"][0] = [10.0, 10.0]
@@ -51,7 +50,11 @@ class ConfigAndGCodeTests(unittest.TestCase):
             purpose="move",
             start=MachinePoint(10.0, 10.0),
             end=MachinePoint(30.0, 30.0),
-            path=(MachinePoint(10.0, 10.0), MachinePoint(20.0, 15.0), MachinePoint(30.0, 30.0)),
+            path=(
+                MachinePoint(10.0, 10.0),
+                MachinePoint(20.0, 15.0),
+                MachinePoint(30.0, 30.0),
+            ),
         )
         commands = GCodeGenerator(config).generate([transfer]).commands
         on_index = commands.index("M106 S255")
@@ -60,7 +63,11 @@ class ConfigAndGCodeTests(unittest.TestCase):
         self.assertIn("G0 X10 Y340 E10 F12000", commands)
         first_drag = commands.index("G1 X15 Y335 E20 F3000")
         final_drag = commands.index("G1 X30 Y320 E30 F3000")
-        off_after_drag = next(index for index in range(final_drag + 1, len(commands)) if commands[index] == "M107")
+        off_after_drag = next(
+            index
+            for index in range(final_drag + 1, len(commands))
+            if commands[index] == "M107"
+        )
         self.assertEqual(commands[on_index - 1], "M400")
         self.assertLess(on_index, first_drag)
         self.assertEqual(commands[off_after_drag - 1], "M400")

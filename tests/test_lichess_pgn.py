@@ -16,11 +16,20 @@ class LichessPgnTests(unittest.TestCase):
             "white_pawn_d": {"status": "board", "x": 3, "y": 1},
             "black_pawn_d": {"status": "board", "x": 3, "y": 6},
         }
-        return BoardState.from_mapping({"schema_version": 1, "revision": 0, "pieces": pieces, "processed_events": []})
+        return BoardState.from_mapping(
+            {
+                "schema_version": 1,
+                "revision": 0,
+                "pieces": pieces,
+                "processed_events": [],
+            }
+        )
 
     def test_replays_pgn_to_stable_gantry_moves(self) -> None:
         moves = list(pgn_moves("game123", "1. e4 d5 2. exd5 *", self.standard_state()))
-        self.assertEqual([move.event_id for move in moves], ["game123.1", "game123.2", "game123.3"])
+        self.assertEqual(
+            [move.event_id for move in moves], ["game123.1", "game123.2", "game123.3"]
+        )
         self.assertEqual(moves[0].piece_id, "white_pawn_e")
         self.assertEqual(moves[1].piece_id, "black_pawn_d")
         self.assertEqual(moves[2].previous, GridPosition(4, 3))
@@ -30,9 +39,13 @@ class LichessPgnTests(unittest.TestCase):
     def test_follow_session_persists_emitted_events(self) -> None:
         with TemporaryDirectory() as directory:
             path = Path(directory) / "game.session.json"
-            session = FollowSession("game123", self.standard_state(), frozenset({"game123.1"}))
+            session = FollowSession(
+                "game123", self.standard_state(), frozenset({"game123.1"})
+            )
             session.save(path)
-            loaded = FollowSession.load_or_create(path, "game123", self.standard_state(), reset=False)
+            loaded = FollowSession.load_or_create(
+                path, "game123", self.standard_state(), reset=False
+            )
             self.assertEqual(loaded.emitted_event_ids, frozenset({"game123.1"}))
 
 

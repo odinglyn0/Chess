@@ -105,7 +105,9 @@ class ServiceTests(unittest.TestCase):
             commands = plan.program.commands
             self.assertIn("M106 S255", commands)
             self.assertIn("M107", commands)
-            self.assertLess(commands.index("M106 S255"), commands.index("G1 X70 Y280 E90 F3000"))
+            self.assertLess(
+                commands.index("M106 S255"), commands.index("G1 X70 Y280 E90 F3000")
+            )
 
     def test_capture_generates_two_transfers_and_updates_expected_state(self) -> None:
         with TemporaryDirectory() as directory:
@@ -117,11 +119,15 @@ class ServiceTests(unittest.TestCase):
                 {"position": "white_pawn_e", "px": 4, "py": 3, "nx": 3, "ny": 4}
             )
             plan = service.plan(move)
-            self.assertEqual([transfer.purpose for transfer in plan.transfers], ["capture", "move"])
+            self.assertEqual(
+                [transfer.purpose for transfer in plan.transfers], ["capture", "move"]
+            )
             self.assertEqual(plan.captured_piece_id, "black_pawn_d")
             self.assertEqual(plan.next_state.pieces["black_pawn_d"].capture_slot, 0)
-            self.assertEqual(plan.next_state.pieces["white_pawn_e"].board_position, GridPosition(3, 4))
-
+            self.assertEqual(
+                plan.next_state.pieces["white_pawn_e"].board_position,
+                GridPosition(3, 4),
+            )
 
     def test_en_passant_capture_starts_at_explicit_capture_square(self) -> None:
         with TemporaryDirectory() as directory:
@@ -164,7 +170,11 @@ class ServiceTests(unittest.TestCase):
             atomic_write_json(state_path, self.minimal_state().to_dict())
             fake = FakeLink()
             service = GantryService(
-                test_config(), state_path, journal_path, audit_path, link_factory=lambda settings: fake
+                test_config(),
+                state_path,
+                journal_path,
+                audit_path,
+                link_factory=lambda settings: fake,
             )
             move = MoveDelta.from_mapping(
                 {
@@ -179,7 +189,9 @@ class ServiceTests(unittest.TestCase):
             service.execute(move)
             stored = service.store.load()
             self.assertEqual(stored.revision, 1)
-            self.assertEqual(stored.pieces["white_pawn_e"].board_position, GridPosition(4, 3))
+            self.assertEqual(
+                stored.pieces["white_pawn_e"].board_position, GridPosition(4, 3)
+            )
             self.assertIn("event-1", stored.processed_events)
             self.assertFalse(journal_path.exists())
             self.assertEqual(len(fake.programs), 1)
@@ -191,7 +203,11 @@ class ServiceTests(unittest.TestCase):
             atomic_write_json(state_path, self.minimal_state().to_dict())
             fake = FakeLink(fail=True)
             service = GantryService(
-                test_config(), state_path, journal_path, audit_path, link_factory=lambda settings: fake
+                test_config(),
+                state_path,
+                journal_path,
+                audit_path,
+                link_factory=lambda settings: fake,
             )
             move = MoveDelta.from_mapping(
                 {"position": "white_pawn_e", "px": 4, "py": 1, "nx": 4, "ny": 3}
@@ -201,11 +217,16 @@ class ServiceTests(unittest.TestCase):
             self.assertEqual(service.store.load().revision, 0)
             self.assertTrue(journal_path.exists())
             self.assertEqual(service.journal.load()["status"], "failed_or_unknown")
-            self.assertEqual(fake.best_effort_programs, [("M107", "M302 P0", "M211 S1")])
+            self.assertEqual(
+                fake.best_effort_programs, [("M107", "M302 P0", "M211 S1")]
+            )
 
             reconciled = service.reconcile_mark_applied()
             self.assertEqual(reconciled.revision, 1)
-            self.assertEqual(service.store.load().pieces["white_pawn_e"].board_position, GridPosition(4, 3))
+            self.assertEqual(
+                service.store.load().pieces["white_pawn_e"].board_position,
+                GridPosition(4, 3),
+            )
             self.assertFalse(journal_path.exists())
 
     def test_execute_is_locked_until_calibrated(self) -> None:
@@ -213,7 +234,9 @@ class ServiceTests(unittest.TestCase):
             temp = Path(directory)
             state_path, journal_path, audit_path = self.paths(temp)
             atomic_write_json(state_path, self.minimal_state().to_dict())
-            service = GantryService(test_config(calibrated=False), state_path, journal_path, audit_path)
+            service = GantryService(
+                test_config(calibrated=False), state_path, journal_path, audit_path
+            )
             move = MoveDelta.from_mapping(
                 {"position": "white_pawn_e", "px": 4, "py": 1, "nx": 4, "ny": 3}
             )
@@ -221,14 +244,20 @@ class ServiceTests(unittest.TestCase):
                 service.execute(move)
             self.assertFalse(journal_path.exists())
 
-    def test_motor_test_runs_without_homing_and_does_not_change_board_state(self) -> None:
+    def test_motor_test_runs_without_homing_and_does_not_change_board_state(
+        self,
+    ) -> None:
         with TemporaryDirectory() as directory:
             temp = Path(directory)
             state_path, journal_path, audit_path = self.paths(temp)
             atomic_write_json(state_path, self.minimal_state().to_dict())
             fake = FakeLink()
             service = GantryService(
-                test_config(), state_path, journal_path, audit_path, link_factory=lambda settings: fake
+                test_config(),
+                state_path,
+                journal_path,
+                audit_path,
+                link_factory=lambda settings: fake,
             )
             program = service.motor_test()
             self.assertEqual(fake.programs, [program])
@@ -255,7 +284,9 @@ class ServiceTests(unittest.TestCase):
             temp = Path(directory)
             state_path, journal_path, audit_path = self.paths(temp)
             atomic_write_json(state_path, self.minimal_state().to_dict())
-            locked = GantryService(test_config(calibrated=False), state_path, journal_path, audit_path)
+            locked = GantryService(
+                test_config(calibrated=False), state_path, journal_path, audit_path
+            )
             with self.assertRaisesRegex(ConfigurationError, "calibrated is false"):
                 locked.motor_test()
 

@@ -95,7 +95,9 @@ class SerialLinkTests(unittest.TestCase):
 
     def test_timeout(self) -> None:
         fake = FakeSerial([])
-        link = MarlinSerial(self.settings(command_timeout_s=0.005), serial_factory=lambda **kwargs: fake)
+        link = MarlinSerial(
+            self.settings(command_timeout_s=0.005), serial_factory=lambda **kwargs: fake
+        )
         with link, self.assertRaisesRegex(SerialProtocolError, "timeout"):
             link.send_command("M400")
 
@@ -108,7 +110,9 @@ class SerialLinkTests(unittest.TestCase):
                 FakePort("/dev/rfcomm0", "Bluetooth serial"),
             ]
         )
-        self.assertEqual([item.device for item in ports[:2]], ["/dev/ttyACM0", "/dev/ttyUSB0"])
+        self.assertEqual(
+            [item.device for item in ports[:2]], ["/dev/ttyACM0", "/dev/ttyUSB0"]
+        )
         self.assertTrue(ports[0].likely_printer)
         self.assertNotIn("/dev/rfcomm0", [item.device for item in ports])
 

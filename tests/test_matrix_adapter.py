@@ -47,7 +47,9 @@ class MatrixAdapterTests(unittest.TestCase):
         new[0][5] = "white_rook_h"
         deltas = diff_matrices(old, new)
         self.assertEqual(len(deltas), 2)
-        self.assertEqual({d["position"] for d in deltas}, {"white_king_e", "white_rook_h"})
+        self.assertEqual(
+            {d["position"] for d in deltas}, {"white_king_e", "white_rook_h"}
+        )
 
 
 if __name__ == "__main__":

@@ -100,3 +100,81 @@ internal analogue of this table when it decides how aggressively to police the
 acknowledgement latency of a given line, how many retries to permit before escalating to
 the operator, and whether a failure to acknowledge should be treated as a recoverable
 hiccup or a session-ending catastrophe.
+
+### C.2 — The Dwell-Time Reference Table
+
+Dwell — the deliberate insertion of a quiescent interval — is the unsung hero of reliable
+prehensile translocation. When the magnet energizes, its flux does not attain full grasp
+authority instantaneously; when it de-energizes, residual magnetization lingers in the
+piece's ferrous base like the memory of an argument. The Chess Gantry framework budgets
+dwell intervals with the following canonical reference, expressed in milliseconds and
+justified with the appropriate pomp.
+
+| Dwell Class      | Symbol | Nominal (ms) | Tolerance (ms) | Precipitating Event                         | Physical Justification                          |
+| ---------------- | ------ | ------------ | -------------- | ------------------------------------------- | ----------------------------------------------- |
+| Flux-Rise        | Δφ↑    | 180          | ±20            | Immediately after magnet energization       | Coil inductance opposes instantaneous current   |
+| Flux-Settle      | Δφ~    | 120          | ±15            | After grasp confirmed, before traverse      | Domains align; grasp authority stabilizes       |
+| Inertial-Damp    | Δι     | 90           | ±10            | At the terminus of a translocation segment  | Piece momentum bleeds into felt friction        |
+| Flux-Decay       | Δφ↓    | 220          | ±25            | Immediately after magnet de-energization    | Residual magnetization must relax below release |
+| Seat-Verify      | Δσ     | 60           | ±8             | After release, before position report       | Allows the piece to settle onto cell centre     |
+| Corner-Rounding  | Δκ     | 45           | ±6             | At each intermediate waypoint of an L-path  | Prevents junction jerk from dislodging grasp    |
+| Homing-Debounce  | Δη     | 300          | ±30            | After each endstop contact during G28       | Mechanical switch bounce must fully quiesce     |
+| Handshake-Grace  | Δψ     | 500          | ±50            | After link open, before first instruction   | Firmware boot banner must fully drain           |
+
+These dwell classes are not applied uniformly; they are composed. A canonical capture
+sequence, for instance, layers Flux-Rise atop Flux-Settle before the doomed piece is
+lifted, applies Corner-Rounding at each waypoint of the eviction path, and terminates with
+Flux-Decay and Seat-Verify as the captured piece is deposited in the graveyard margin.
+
+### C.3 — The Feed-Rate Profile Table
+
+Feed-rate — the commanded velocity of coordinated motion, expressed via the `F` word in
+millimetres per minute — is the single most consequential tuning parameter in the
+translocation subsystem. Too slow, and a session of correspondence chess threatens to
+outlast the correspondents; too fast, and the grasped piece is flung into an adjacent
+county by the tyranny of inertia. Chess Gantry maintains a stratified profile of
+feed-rates, each associated with a distinct phase of the translocation lifecycle.
+
+| Profile Name       | Feed-rate (mm/min) | Phase of Use                                   | Grasp State  | Rationale                                       |
+| ------------------ | ------------------ | ---------------------------------------------- | ------------ | ----------------------------------------------- |
+| Rapid-Empty        | 9000               | Repositioning above vacated cells (G0)         | Un-grasped   | No piece at risk; maximize traversal throughput |
+| Approach-Cautious  | 3000               | Final descent toward a piece to be grasped     | Un-grasped   | Precision matters more than speed near contact  |
+| Laden-Nominal      | 1800               | Standard translocation of a grasped piece      | Grasped      | The stability-optimal velocity for most pieces  |
+| Laden-Timid        | 900                | Translocation of a tall, top-heavy piece       | Grasped      | Kings and queens have unfavorable inertia       |
+| Eviction-Sweep     | 1200               | Carrying a captured piece to the margin        | Grasped      | Moderate speed; the piece's fate is sealed      |
+| Micro-Nudge        | 400                | Sub-millimetre reseating of a mis-centred piece | Grasped     | Fine correction demands a gentle hand           |
+| Homing-Seek        | 2400               | Fast approach toward the endstop during G28    | Un-grasped   | Coarse datum acquisition                        |
+| Homing-Latch       | 300                | Slow re-approach to precisely trip the endstop | Un-grasped   | Repeatable, low-bounce datum establishment      |
+
+The controller selects a feed-rate profile by inspecting both the grasp state and the
+morphological classification of the piece under translocation. The morphological
+classification is itself a rich subject, encompassing the piece's height, its base
+diameter, its centre-of-mass elevation, and its empirically measured susceptibility to
+toppling — but that classification is the subject of a different appendix and we shall not
+be goaded into reproducing it here.
+
+### C.4 — The Acknowledgement-Latency Budget Table
+
+Every line dispatched into the instruction stream is expected to be acknowledged by the
+firmware within a bounded interval. The serial link subsystem treats a violation of this
+budget as a signal that something has gone wrong — the buffer is full, the firmware is
+wedged, the USB cable has been chewed by a cat — and escalates accordingly. The budgets
+below are stated in milliseconds and are deliberately generous, because the alternative to
+generosity is a session that aborts itself over a transient scheduling hiccup.
+
+| Instruction Class     | Representative Opcodes | Soft Budget (ms) | Hard Budget (ms) | On Soft Breach         | On Hard Breach          |
+| --------------------- | ---------------------- | ---------------- | ---------------- | ---------------------- | ----------------------- |
+| Instantaneous-Config  | G21, G90, M82, M302    | 50               | 250              | Log and continue       | Retry once, then abort  |
+| Telemetry-Query       | M114, M115, M119, M503 | 120              | 600              | Log and continue       | Escalate to operator    |
+| Motion-Planned        | G0, G1                 | 200              | 4000             | Extend and observe     | Presume stall; halt     |
+| Barrier-Synchronize   | M400                   | 300              | 30000            | Extend and observe     | Presume deadlock; halt  |
+| Actuation-Magnet      | M106, M107             | 80               | 400              | Log and continue       | Retry once, then abort  |
+| Calibration-Homing    | G28                    | 2000             | 45000            | Extend and observe     | Presume mechanical jam  |
+| Persistence           | M500, M501             | 150              | 1500             | Log and continue       | Retry once, then warn   |
+| Safety-Halt           | M112                   | 0                | 100              | N/A (immediate)        | Assume worst; power off |
+
+Note the peculiar entry for `M112`, the emergency stop. Its soft budget is zero because
+there is no circumstance under which a leisurely emergency stop is acceptable; the very
+phrase is an oxymoron that would make a lexicographer weep. The controller does not so
+much *wait* for an acknowledgement of `M112` as it *hopes* for one while simultaneously
+preparing to cut power at the mains.

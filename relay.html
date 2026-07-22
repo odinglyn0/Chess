@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Relay — Robotic Chess, Live From the Broadcast</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+:root{
+  --espresso:#181310;
+  --espresso-2:#221b15;
+  --walnut:#2a2119;
+  --walnut-2:#372c21;
+  --bone:#ece2d0;
+  --bone-dim:#c7bca6;
+  --brass:#b9925c;
+  --brass-bright:#dcb47f;
+  --oxblood:#8c3232;
+  --oxblood-bright:#b34a4a;
+  --sage:#9db3a4;
+  --line:rgba(236,226,208,0.12);
+  --line-strong:rgba(236,226,208,0.22);
+  --font-display:'Fraunces', serif;
+  --font-body:'Inter', sans-serif;
+  --font-mono:'JetBrains Mono', monospace;
+}
+
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{
+  margin:0;
+  background:var(--espresso);
+  color:var(--bone);
+  font-family:var(--font-body);
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+img,svg{display:block;max-width:100%;}
+a{color:inherit;text-decoration:none;}
+h1,h2,h3{font-family:var(--font-display);font-weight:600;margin:0;color:var(--bone);}
+p{margin:0;}
+ul,ol{margin:0;padding:0;list-style:none;}
+button{font-family:inherit;cursor:pointer;}
+
+:focus-visible{outline:2px solid var(--brass-bright);outline-offset:3px;}
+
+.wrap{max-width:1180px;margin:0 auto;padding:0 32px;}
+.eyebrow{
+  font-family:var(--font-mono);
+  font-size:12px;
+  letter-spacing:0.14em;
+  text-transform:uppercase;
+  color:var(--sage);
+  display:flex;
+  align-items:center;
+  gap:9px;
+  margin:0 0 18px;
+}
+.dot{
+  width:7px;height:7px;border-radius:50%;
+  background:var(--oxblood-bright);
+  box-shadow:0 0 0 3px rgba(179,74,74,0.22);
+  flex:none;
+  animation:pulse 2s ease-in-out infinite;
+}
+@keyframes pulse{
+  0%,100%{opacity:1;}
+  50%{opacity:0.45;}
+}
+
+.btn{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:14px 24px;
+  border-radius:3px;
+  font-size:14.5px;
+  font-weight:600;
+  letter-spacing:0.01em;
+  border:1px solid transparent;
+  transition:transform 0.25s ease, background 0.25s ease, border-color 0.25s ease;
+}
+.btn-primary{
+  background:var(--brass);
+  color:var(--espresso);
+}
+.btn-primary:hover{background:var(--brass-bright);transform:translateY(-1px);}
+.btn-ghost{
+  border-color:var(--line-strong);
+  color:var(--bone);
+}
+.btn-ghost:hover{border-color:var(--brass);color:var(--brass-bright);}
+
+/* ---------- reveal-on-scroll ---------- */
+.reveal{opacity:0;transform:translateY(18px);transition:opacity 0.7s ease, transform 0.7s ease;}
+.reveal.in-view{opacity:1;transform:translateY(0);}
+
+/* ---------- nav ---------- */
+nav{
+  position:sticky;top:0;z-index:50;
+  background:rgba(24,19,16,0.86);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line);
+}
+.nav-inner{
+  max-width:1180px;margin:0 auto;padding:18px 32px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.logo{
+  font-family:var(--font-display);
+  font-size:21px;font-weight:700;letter-spacing:0.02em;
+  color:var(--bone);
+}
+.logo span{color:var(--brass-bright);}
+.nav-links{display:flex;gap:34px;font-size:14px;color:var(--bone-dim);}
+.nav-links a:hover{color:var(--brass-bright);}
+.nav-right{display:flex;align-items:center;gap:18px;}
+.nav-toggle{
+  display:none;background:none;border:1px solid var(--line-strong);
+  color:var(--bone);width:38px;height:38px;border-radius:3px;
+  font-size:18px;align-items:center;justify-content:center;
+}
+@media (max-width:860px){
+  .nav-links{
+    position:absolute;top:100%;left:0;right:0;
+    flex-direction:column;gap:0;
+    background:var(--espresso-2);
+    border-bottom:1px solid var(--line);
+    max-height:0;overflow:hidden;
+    transition:max-height 0.3s ease;
+  }
+  nav.nav-open .nav-links{max-height:260px;}
+  .nav-links a{padding:16px 32px;border-top:1px solid var(--line);}
+  .nav-toggle{display:flex;}
+  .nav-right .btn{display:none;}
+}
+
+/* ---------- hero ---------- */
+.hero{padding:64px 0 0;overflow:hidden;}
+.hero-grid{
+  max-width:1180px;margin:0 auto;padding:0 32px;
+  display:grid;grid-template-columns:1.05fr 0.95fr;gap:56px;align-items:center;
+}
+.hero-copy h1{
+  font-size:clamp(38px,5vw,60px);
+  line-height:1.05;
+  letter-spacing:-0.01em;
+  margin-bottom:22px;
+}
+.hero-copy h1 em{color:var(--brass-bright);font-style:normal;}
+.lede{
+  font-size:17px;color:var(--bone-dim);max-width:46ch;margin-bottom:32px;
+}
+.hero-ctas{display:flex;flex-wrap:wrap;gap:14px;margin-bottom:44px;}
+.hero-stats{display:flex;gap:36px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:26px;}
+.hero-stats .num{
+  display:block;font-family:var(--font-mono);font-size:22px;color:var(--brass-bright);font-weight:600;
+}
+.hero-stats .label{font-size:12.5px;color:var(--bone-dim);}
+
+/* hero visual: board + rail + readout */
+.hero-visual{position:relative;}
+.rail-frame{
+  background:var(--walnut);
+  border:1px solid var(--line);
+  border-radius:6px;
+  padding:26px 26px 22px;
+  position:relative;
+}
+.readout{
+  font-family:var(--font-mono);font-size:12px;color:var(--sage);
+  letter-spacing:0.06em;margin-bottom:16px;min-height:16px;
+}
+.board{
+  position:relative;
+  display:grid;grid-template-columns:repeat(8,1fr);
+  aspect-ratio:1/1;
+  border:1px solid var(--line-strong);
+  border-radius:2px;
+  overflow:hidden;
+}
+.sq{aspect-ratio:1/1;}
+.sq-light{background:var(--bone);}
+.sq-dark{background:var(--espresso-2);}
+.sq-hit{box-shadow:inset 0 0 0 2px var(--brass-bright);}
+.sq-cap{box-shadow:inset 0 0 0 2px var(--oxblood-bright);}
+.token{
+  position:absolute;top:0;left:0;
+  width:16%;height:16%;
+  border-radius:50%;
+  transition:transform 0.55s cubic-bezier(.4,.1,.2,1), background 0.3s ease;
+  box-shadow:0 2px 6px rgba(0,0,0,0.4);
+  z-index:5;
+}
+.hero-caption{
+  display:flex;justify-content:space-between;
+  font-family:var(--font-mono);font-size:11px;color:var(--bone-dim);
+  margin-top:14px;letter-spacing:0.04em;
+}
+
+/* ---------- ticker ---------- */
+.ticker{
+  margin-top:56px;
+  border-top:1px solid var(--line);
+  border-bottom:1px solid var(--line);
+  background:var(--espresso-2);
+  overflow:hidden;
+  white-space:nowrap;
+  padding:14px 0;
+}
+.ticker-track{
+  display:inline-flex;
+  font-family:var(--font-mono);
+  font-size:13.5px;
+  color:var(--bone-dim);
+  animation:ticker 46s linear infinite;
+}
+.ticker-track span{padding:0 10px;}
+.ticker-track .mv-num{color:var(--brass);}
+@keyframes ticker{
+  from{transform:translateX(0);}
+  to{transform:translateX(-50%);}
+}
+
+/* ---------- generic section ---------- */
+section{padding:100px 0;}
+.section-head{max-width:640px;margin:0 0 56px;}
+.section-head h2{font-size:clamp(28px,3.4vw,38px);margin-bottom:16px;}
+.section-head p{color:var(--bone-dim);font-size:16px;}
+
+/* ---------- how it works ---------- */
+.how{border-top:1px solid var(--line);}
+.how-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:0;
+  border:1px solid var(--line);border-radius:6px;overflow:hidden;
+}
+.step{
+  padding:38px 34px;
+  border-right:1px solid var(--line);
+  position:relative;
+}
+.step:last-child{border-right:none;}
+.step-num{
+  font-family:var(--font-mono);font-size:13px;color:var(--brass);
+  display:block;margin-bottom:22px;letter-spacing:0.06em;
+}
+.step h3{font-size:21px;margin-bottom:12px;}
+.step p{color:var(--bone-dim);font-size:14.5px;}
+@media (max-width:800px){
+  .how-grid{grid-template-columns:1fr;}
+  .step{border-right:none;border-bottom:1px solid var(--line);}
+  .step:last-child{border-bottom:none;}
+}
+
+/* ---------- blueprint ---------- */
+.blueprint{background:var(--espresso-2);border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
+.bp-frame{
+  border:1px dashed var(--line-strong);
+  border-radius:4px;
+  padding:36px;
+  position:relative;
+}
+.bp-frame svg{width:100%;height:auto;}
+.bp-caption{
+  display:flex;justify-content:space-between;align-items:baseline;
+  margin-top:22px;padding-top:18px;border-top:1px solid var(--line);
+  font-family:var(--font-mono);font-size:12px;color:var(--bone-dim);letter-spacing:0.04em;
+}
+.bp-caption strong{color:var(--brass-bright);font-weight:600;}
+
+/* ---------- live demo ---------- */
+.demo-grid{
+  display:grid;grid-template-columns:0.85fr 1.15fr;gap:48px;align-items:start;
+}
+.demo-board-wrap{
+  background:var(--walnut);border:1px solid var(--line);border-radius:6px;padding:24px;
+}
+.demo-feed{
+  background:var(--walnut);border:1px solid var(--line);border-radius:6px;
+  padding:26px 0 0;display:flex;flex-direction:column;height:100%;
+}
+.feed-header{
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;
+  padding:0 26px 18px;border-bottom:1px solid var(--line);
+  font-size:13.5px;color:var(--bone-dim);
+}
+.feed-header .game-name{color:var(--bone);font-weight:600;}
+.badge{
+  font-family:var(--font-mono);font-size:10.5px;letter-spacing:0.08em;
+  background:rgba(140,50,50,0.18);color:var(--oxblood-bright);
+  padding:5px 9px;border-radius:20px;border:1px solid rgba(179,74,74,0.35);
+}
+.move-list{
+  font-family:var(--font-mono);font-size:13.5px;
+  padding:18px 26px;max-height:280px;overflow-y:auto;flex:1;
+}
+.move-list li{
+  display:flex;gap:10px;padding:5px 0;color:var(--bone-dim);
+}
+.move-list li:last-child{color:var(--brass-bright);}
+.move-list .mv-num{color:var(--brass);width:26px;flex:none;}
+.latency-row{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:16px 26px;border-top:1px solid var(--line);
+  font-family:var(--font-mono);font-size:12px;color:var(--sage);letter-spacing:0.06em;
+}
+.latency-row span{color:var(--brass-bright);font-size:15px;}
+@media (max-width:860px){
+  .demo-grid{grid-template-columns:1fr;}
+}
+
+/* ---------- use cases ---------- */
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:6px;overflow:hidden;}
+.card{background:var(--espresso);padding:32px 26px;}
+.card .icon{width:34px;height:34px;margin-bottom:22px;color:var(--brass-bright);}
+.card h3{font-size:17px;margin-bottom:10px;}
+.card p{font-size:13.5px;color:var(--bone-dim);}
+@media (max-width:900px){.cards{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:560px){.cards{grid-template-columns:1fr;}}
+
+/* ---------- specs ---------- */
+.specs{border-top:1px solid var(--line);}
+.spec-table{width:100%;border-collapse:collapse;font-size:14.5px;}
+.spec-table tr{border-bottom:1px solid var(--line);}
+.spec-table tr:last-child{border-bottom:none;}
+.spec-table td{padding:18px 0;}
+.spec-table td:first-child{color:var(--bone-dim);width:44%;}
+.spec-table td:last-child{font-family:var(--font-mono);color:var(--bone);text-align:right;}
+@media (max-width:600px){
+  .spec-table td:first-child{width:auto;}
+}
+
+/* ---------- testimonials ---------- */
+.testimonials{background:var(--espresso-2);border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
+.quotes{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:6px;overflow:hidden;}
+.quote{background:var(--espresso-2);padding:30px 26px;display:flex;flex-direction:column;justify-content:space-between;}
+.quote p{font-family:var(--font-display);font-size:17px;line-height:1.4;color:var(--bone);margin-bottom:22px;}
+.quote .attr{font-size:12.5px;color:var(--bone-dim);font-family:var(--font-mono);}
+@media (max-width:860px){.quotes{grid-template-columns:1fr;}}
+
+/* ---------- pricing ---------- */
+.pricing-card{
+  border:1px solid var(--brass);border-radius:8px;
+  padding:52px;text-align:center;
+  background:radial-gradient(120% 140% at 50% -10%, rgba(185,146,92,0.12), transparent 60%);
+  max-width:560px;margin:0 auto;
+}
+.price{font-family:var(--font-mono);font-size:48px;color:var(--brass-bright);margin:14px 0 6px;}
+.pricing-card .fine{color:var(--bone-dim);font-size:14px;margin-bottom:30px;}
+.pricing-feats{display:flex;flex-direction:column;gap:10px;text-align:left;max-width:340px;margin:0 auto 34px;font-size:14px;color:var(--bone-dim);}
+.pricing-feats li{display:flex;gap:10px;}
+.pricing-feats li::before{content:'—';color:var(--brass);flex:none;}
+
+/* ---------- footer ---------- */
+footer{padding:52px 0 40px;border-top:1px solid var(--line);}
+.footer-top{display:flex;justify-content:space-between;flex-wrap:wrap;gap:24px;margin-bottom:28px;}
+.footer-links{display:flex;gap:28px;font-size:13.5px;color:var(--bone-dim);}
+.footer-links a:hover{color:var(--brass-bright);}
+.disclaimer{font-size:12px;color:var(--bone-dim);opacity:0.7;max-width:640px;line-height:1.6;}
+
+@media (max-width:900px){
+  .hero-grid{grid-template-columns:1fr;}
+  .hero-visual{max-width:420px;}
+}
+
+@media (prefers-reduced-motion: reduce){
+  *{animation-duration:0.001s !important; transition-duration:0.001s !important;}
+}
+</style>
+</head>
+<body>
+
+<nav id="nav">
+  <div class="nav-inner">
+    <div class="logo">RE<span>LAY</span></div>
+    <ul class="nav-links">
+      <li><a href="#how">How it works</a></li>
+      <li><a href="#blueprint">Blueprint</a></li>
+      <li><a href="#demo">Live demo</a></li>
+      <li><a href="#specs">Specs</a></li>
+      <li><a href="#pricing">Pricing</a></li>
+    </ul>
+    <div class="nav-right">
+      <button class="btn btn-primary" onclick="location.hash='#pricing'">Reserve</button>
+      <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">☰</button>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="hero-grid">
+    <div class="hero-copy">
+      <p class="eyebrow"><span class="dot"></span> Live relay — Chess.com &amp; Lichess broadcasts</p>
+      <h1>Every grandmaster move,<br>replayed on <em>your</em> board.</h1>
+      <p class="lede">Relay watches any live broadcast the instant a move is transmitted, then drives a gantry hidden under the board that pulls the correct piece into place with an electromagnet. No arm, no motors in view — the piece just moves.</p>
+      <div class="hero-ctas">
+        <a class="btn btn-primary" href="#pricing">Reserve Relay — $200 deposit</a>
+        <a class="btn btn-ghost" href="#demo">Watch it move ↓</a>
+      </div>
+      <div class="hero-stats">
+        <div><span class="num" id="heroLatency">89ms</span><span class="label">avg. relay latency</span></div>
+        <div><span class="num">±0.2mm</span><span class="label">placement accuracy</span></div>
+        <div><span class="num">2</span><span class="label">supported feeds</span></div>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="rail-frame">
+        <p class="readout" id="heroReadout">LISTENING…</p>
+        <div class="board" id="heroBoard"></div>
+        <div class="hero-caption">
+          <span>MORPHY — OPERA GAME, 1858</span>
+          <span id="heroMoveLabel">1. e4</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ticker" aria-hidden="true">
+    <div class="ticker-track" id="tickerTrack"></div>
+  </div>
+</header>
+
+<section class="how reveal" id="how">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow">Process</p>
+      <h2>From broadcast to board in three moves.</h2>
+      <p>No engine to fight, no app to babysit. Relay sits between the live feed and your board.</p>
+    </div>
+    <div class="how-grid">
+      <div class="step">
+        <span class="step-num">01 — Connect</span>
+        <h3>Point it at a game</h3>
+        <p>Paste a Chess.com or Lichess game link, or hand Relay a tournament broadcast. It joins the feed the way a spectator would — read-only, nothing installed on either platform.</p>
+      </div>
+      <div class="step">
+        <span class="step-num">02 — Read</span>
+        <h3>It reads the move stream</h3>
+        <p>The instant a move is transmitted, Relay parses the notation, resolves the origin and destination squares, and queues the physical motion — usually inside 100 milliseconds.</p>
+      </div>
+      <div class="step">
+        <span class="step-num">03 — Move</span>
+        <h3>The board plays it out</h3>
+        <p>Under the surface, an electromagnet rides an X/Y gantry, lines up beneath the correct piece, and drags it along a collision-checked path to its square. Captured pieces get pulled off the edge into an exit channel, out of play.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="blueprint reveal" id="blueprint">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow">Fig. 01</p>
+      <h2>The drive assembly</h2>
+      <p>Nothing above the board moves. Every motor, rail, and magnet lives underneath it.</p>
+    </div>
+    <div class="bp-frame">
+      <svg viewBox="0 0 900 380" fill="none" xmlns="http://www.w3.org/2000/svg" id="bpSvg">
+        <!-- playing surface, edge-on, with file divisions -->
+        <g stroke="#9db3a4" stroke-width="1.2" opacity="0.9">
+          <line class="draw" x1="140" y1="140" x2="760" y2="140" />
+          <line class="draw" x1="218" y1="140" x2="218" y2="125" />
+          <line class="draw" x1="295" y1="140" x2="295" y2="125" />
+          <line class="draw" x1="373" y1="140" x2="373" y2="125" />
+          <line class="draw" x1="450" y1="140" x2="450" y2="125" />
+          <line class="draw" x1="528" y1="140" x2="528" y2="125" />
+          <line class="draw" x1="605" y1="140" x2="605" y2="125" />
+          <line class="draw" x1="683" y1="140" x2="683" y2="125" />
+        </g>
+        <!-- piece sitting on the surface -->
+        <g stroke="#c7bca6" stroke-width="1.4">
+          <ellipse class="draw" cx="450" cy="140" rx="16" ry="4" />
+          <path class="draw" d="M436 140 L444 106 L456 106 L464 140 Z" />
+          <circle class="draw" cx="450" cy="98" r="9" />
+        </g>
+        <!-- magnetic coupling through the deck -->
+        <line class="draw" x1="450" y1="140" x2="450" y2="207" stroke="#9db3a4" stroke-width="1" stroke-dasharray="3 4" />
+        <!-- deck + housing, cutaway -->
+        <g stroke="#9db3a4" stroke-width="1.2" opacity="0.9">
+          <rect class="draw" x="140" y="140" width="620" height="16" />
+          <rect class="draw" x="140" y="156" width="620" height="134" />
+        </g>
+        <!-- X/Y rail + carriage + motor -->
+        <g stroke="#dcb47f" stroke-width="1.6">
+          <line class="draw" x1="175" y1="225" x2="725" y2="225" />
+          <rect class="draw" x="426" y="209" width="48" height="32" rx="2" />
+          <path class="draw" d="M434 233 A16 16 0 0 0 466 233" />
+          <path class="draw" d="M440 233 A10 10 0 0 0 460 233" />
+          <rect class="draw" x="700" y="203" width="26" height="42" />
+        </g>
+        <!-- drive belt -->
+        <line class="draw" x1="175" y1="248" x2="725" y2="248" stroke="#dcb47f" stroke-width="1" stroke-dasharray="2 4" opacity="0.85" />
+        <!-- capture exit channel -->
+        <g stroke="#8c3232" stroke-width="1.3" opacity="0.9">
+          <path class="draw" d="M760 172 L800 206" />
+          <rect class="draw" x="792" y="206" width="42" height="30" />
+        </g>
+        <!-- leader lines -->
+        <g stroke="#9db3a4" stroke-width="0.8">
+          <line class="draw" x1="255" y1="140" x2="60" y2="58" />
+          <line class="draw" x1="458" y1="112" x2="545" y2="52" />
+          <line class="draw" x1="452" y1="178" x2="690" y2="152" />
+          <line class="draw" x1="432" y1="222" x2="70" y2="312" />
+          <line class="draw" x1="712" y1="225" x2="640" y2="322" />
+          <line class="draw" x1="800" y1="206" x2="800" y2="68" />
+        </g>
+        <g fill="#c7bca6" font-family="JetBrains Mono, monospace" font-size="12">
+          <text x="10" y="52">Playing surface — 64-pt sensor grid</text>
+          <text x="470" y="46">Piece — steel-weighted base</text>
+          <text x="620" y="146">Magnetic coupling, through 6mm deck</text>
+          <text x="10" y="326">X/Y gantry + electromagnet head</text>
+          <text x="540" y="336">Drive belt &amp; motor</text>
+          <text x="722" y="62">Capture exit channel</text>
+        </g>
+      </svg>
+    </div>
+    <div class="bp-caption">
+      <span><strong>Fig. 01</strong> — Relay drive assembly, side section</span>
+      <span>Repeatability: ±0.2mm · Max piece weight: 40g, steel-weighted base</span>
+    </div>
+  </div>
+</section>
+
+<section class="demo reveal" id="demo">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow">Live board</p>
+      <h2>This is what it looks like on your table.</h2>
+      <p>Below is a real board, replaying a real game move-by-move, exactly as Relay would drive it — including the famous mate that ends it.</p>
+    </div>
+    <div class="demo-grid">
+      <div class="demo-board-wrap">
+        <div class="board" id="demoBoard"></div>
+      </div>
+      <div class="demo-feed">
+        <div class="feed-header">
+          <span class="game-name">Morphy vs. Duke &amp; Count — Paris, 1858</span>
+          <span class="badge">REPLAYING</span>
+        </div>
+        <ol class="move-list" id="moveList"></ol>
+        <div class="latency-row">
+          <span>RELAY LATENCY</span>
+          <span id="demoLatency">92ms</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="usecases reveal" id="usecases">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow">Where it lives</p>
+      <h2>Built for anywhere chess is watched.</h2>
+    </div>
+    <div class="cards">
+      <div class="card">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+        <h3>Clubs &amp; academies</h3>
+        <p>Run a live relay board during club night so members watch a championship unfold on real wood, not a laptop screen.</p>
+      </div>
+      <div class="card">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+        <h3>Broadcast studios</h3>
+        <p>Commentators reach for the physical board mid-sentence. Audiences hear the piece glide into place on air — it reads as event, not overlay.</p>
+      </div>
+      <div class="card">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M18 8h1a4 4 0 010 8h-1M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/></svg>
+        <h3>Cafés &amp; lounges</h3>
+        <p>A window table that plays out the World Championship, move by move, all afternoon — no staff required to run it.</p>
+      </div>
+      <div class="card">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 12l9-9 9 9M5 10v10h14V10"/></svg>
+        <h3>Home enthusiasts</h3>
+        <p>Follow a candidate's tournament the way you'd follow it in person — on the board in your own study.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="specs reveal" id="specs">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow">Specification</p>
+      <h2>Relay One</h2>
+    </div>
+    <table class="spec-table">
+      <tr><td>Placement accuracy</td><td>±0.2mm</td></tr>
+      <tr><td>Average relay latency</td><td>89ms, broadcast to board</td></tr>
+      <tr><td>Drive</td><td>X/Y gantry beneath deck, variable-strength electromagnet</td></tr>
+      <tr><td>Board compatibility</td><td>Tournament sets, 2.0″–2.5″ squares</td></tr>
+      <tr><td>Piece compatibility</td><td>Weighted plastic or wood, ≤40g, steel-weighted base</td></tr>
+      <tr><td>Captures</td><td>Pulled off-board into an exit channel</td></tr>
+      <tr><td>Live sources</td><td>Chess.com, Lichess (broadcast &amp; game URL)</td></tr>
+      <tr><td>Connectivity</td><td>Wi-Fi 6</td></tr>
+      <tr><td>Power</td><td>24W typical, USB-C PD</td></tr>
+      <tr><td>Footprint</td><td>460 × 460 × 180mm</td></tr>
+    </table>
+  </div>
+</section>
+
+<section class="testimonials reveal">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow">In the room</p>
+      <h2>What it changes.</h2>
+    </div>
+    <div class="quotes">
+      <div class="quote">
+        <p>"Our members watch the Candidates differently now. They see a move happen, instead of reading that it happened."</p>
+        <span class="attr">Club director, Marseille Chess Society</span>
+      </div>
+      <div class="quote">
+        <p>"We run it beside the commentary desk. The audience audibly reacts when the piece slides on its own — it reads as live."</p>
+        <span class="attr">Broadcast producer, independent chess stream</span>
+      </div>
+      <div class="quote">
+        <p>"It's the closest thing to standing behind the players' chairs, without leaving Vienna."</p>
+        <span class="attr">Owner, Café Zugzwang</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="pricing reveal" id="pricing">
+  <div class="wrap">
+    <div class="pricing-card">
+      <p class="eyebrow" style="justify-content:center;">Relay One</p>
+      <p class="price">$2,400</p>
+      <p class="fine">Reserve today for a $200 deposit. Ships Q1 2027.</p>
+      <ul class="pricing-feats">
+        <li>Full drive assembly, board sensor array, and magnetic piece set</li>
+        <li>Chess.com and Lichess relay included, no subscription</li>
+        <li>Fits any tournament-size board, 2.0″–2.5″ squares</li>
+        <li>Firmware updates for the life of the unit</li>
+      </ul>
+      <button class="btn btn-primary">Reserve Relay</button>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="footer-top">
+      <div class="logo">RE<span>LAY</span></div>
+      <div class="footer-links">
+        <a href="#how">How it works</a>
+        <a href="#specs">Specs</a>
+        <a href="#pricing">Pricing</a>
+      </div>
+    </div>
+    <p class="disclaimer">Relay is an independent hardware product built by Relay Robotics. It reads publicly available live-game data and is not affiliated with, endorsed by, or sponsored by Chess.com or Lichess. Chess.com and Lichess are trademarks of their respective owners.</p>
+  </div>
+</footer>
+
+<script>
+// ---------- data: Morphy's "Opera Game", Paris 1858 ----------
+const MOVES = ["e4","e5","Nf3","d6","d4","Bg4","dxe5","Bxf3","Qxf3","dxe5","Bc4","Nf6","Qb3","Qe7","Nc3","c6","Bg5","b5","Nxb5","cxb5","Bxb5+","Nbd7","O-O-O","Rd8","Rxd7","Rxd7","Rd1","Qe6","Bxd7+","Nxd7","Qb8+","Nxb8","Rd8#"];
+
+function destSquare(move, isWhite){
+  let m = move.replace(/[+#!?]/g,'');
+  if(m === 'O-O') return isWhite ? 'g1' : 'g8';
+  if(m === 'O-O-O') return isWhite ? 'c1' : 'c8';
+  m = m.split('=')[0];
+  return m.slice(-2);
+}
+function isCapture(move){ return move.indexOf('x') !== -1; }
+
+function buildBoard(container){
+  container.innerHTML = '';
+  const files = 'abcdefgh';
+  for(let r=0;r<8;r++){
+    for(let f=0;f<8;f++){
+      const sq = document.createElement('div');
+      const light = (r+f) % 2 === 0;
+      sq.className = 'sq ' + (light ? 'sq-light' : 'sq-dark');
+      sq.dataset.square = files[f] + (8-r);
+      container.appendChild(sq);
+    }
+  }
+  const token = document.createElement('div');
+  token.className = 'token';
+  container.appendChild(token);
+  return token;
+}
+
+function squareCenter(container, square){
+  const target = container.querySelector('.sq[data-square="'+square+'"]');
+  if(!target) return {x:0,y:0};
+  const tr = target.getBoundingClientRect();
+  const pr = container.getBoundingClientRect();
+  return { x: tr.left - pr.left + tr.width/2, y: tr.top - pr.top + tr.height/2 };
+}
+
+function runSequence(container, token, moves, opts){
+  opts = opts || {};
+  const interval = opts.interval || 1300;
+  const onMove = opts.onMove || function(){};
+  let i = 0;
+  function step(){
+    const move = moves[i];
+    const white = i % 2 === 0;
+    const sq = destSquare(move, white);
+    const pos = squareCenter(container, sq);
+    token.style.transform = 'translate('+ (pos.x - token.offsetWidth/2) +'px, '+ (pos.y - token.offsetHeight/2) +'px)';
+    token.style.background = white ? 'var(--bone)' : 'var(--espresso-2)';
+    token.style.boxShadow = white ? '0 2px 6px rgba(0,0,0,0.4)' : '0 0 0 1px var(--bone-dim), 0 2px 6px rgba(0,0,0,0.4)';
+    container.querySelectorAll('.sq-hit,.sq-cap').forEach(function(s){ s.classList.remove('sq-hit','sq-cap'); });
+    const target = container.querySelector('.sq[data-square="'+sq+'"]');
+    if(target) target.classList.add(isCapture(move) ? 'sq-cap' : 'sq-hit');
+    onMove(move, i, white);
+    i = (i+1) % moves.length;
+  }
+  step();
+  return setInterval(step, interval);
+}
+
+window.addEventListener('load', function(){
+  // hero board — ambient loop of the opening
+  const heroBoardEl = document.getElementById('heroBoard');
+  const heroToken = buildBoard(heroBoardEl);
+  const heroMoves = MOVES.slice(0, 12);
+  const readout = document.getElementById('heroReadout');
+  const moveLabel = document.getElementById('heroMoveLabel');
+  const states = ['LISTENING…','MAGNET ENGAGED','DRAGGING…','RELEASED'];
+
+  runSequence(heroBoardEl, heroToken, heroMoves, {
+    interval: 1500,
+    onMove: function(move, i, white){
+      const num = Math.floor(i/2) + 1;
+      moveLabel.textContent = white ? (num + '. ' + move) : move;
+      readout.textContent = states[0];
+      const t1 = setTimeout(function(){ readout.textContent = states[1] + ': ' + move; }, 250);
+      const t2 = setTimeout(function(){ readout.textContent = states[2]; }, 650);
+      const t3 = setTimeout(function(){ readout.textContent = states[3]; }, 1100);
+    }
+  });
+
+  // demo board — full opera game replay with move list
+  const demoBoardEl = document.getElementById('demoBoard');
+  const demoToken = buildBoard(demoBoardEl);
+  const moveListEl = document.getElementById('moveList');
+  const demoLatencyEl = document.getElementById('demoLatency');
+
+  runSequence(demoBoardEl, demoToken, MOVES, {
+    interval: 1300,
+    onMove: function(move, i, white){
+      if(white){
+        const li = document.createElement('li');
+        const num = document.createElement('span');
+        num.className = 'mv-num';
+        num.textContent = (Math.floor(i/2)+1) + '.';
+        const txt = document.createElement('span');
+        txt.textContent = move;
+        li.appendChild(num);
+        li.appendChild(txt);
+        moveListEl.appendChild(li);
+      } else {
+        const last = moveListEl.lastElementChild;
+        if(last){
+          const txt = document.createElement('span');
+          txt.textContent = move;
+          last.appendChild(txt);
+        }
+      }
+      moveListEl.scrollTop = moveListEl.scrollHeight;
+      while(moveListEl.children.length > 10){ moveListEl.removeChild(moveListEl.firstElementChild); }
+    }
+  });
+
+  // latency jitter, both hero + demo
+  const heroLatencyEl = document.getElementById('heroLatency');
+  setInterval(function(){
+    const v = 68 + Math.floor(Math.random()*46);
+    demoLatencyEl.textContent = v + 'ms';
+    heroLatencyEl.textContent = v + 'ms';
+  }, 1100);
+
+  // ticker tape
+  const tickerTrack = document.getElementById('tickerTrack');
+  let tickerHTML = '';
+  for(let i=0;i<MOVES.length;i+=2){
+    const num = Math.floor(i/2)+1;
+    tickerHTML += '<span><span class="mv-num">'+num+'.</span> '+MOVES[i]+(MOVES[i+1] ? ' '+MOVES[i+1] : '')+'</span>';
+  }
+  tickerTrack.innerHTML = tickerHTML + tickerHTML;
+
+  // scroll reveal
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const revealEls = document.querySelectorAll('.reveal');
+  if(reduced){
+    revealEls.forEach(function(el){ el.classList.add('in-view'); });
+  } else {
+    const io = new IntersectionObserver(function(entries){
+      entries.forEach(function(entry){
+        if(entry.isIntersecting){ entry.target.classList.add('in-view'); io.unobserve(entry.target); }
+      });
+    }, { threshold: 0.12 });
+    revealEls.forEach(function(el){ io.observe(el); });
+  }
+
+  // blueprint stroke-draw
+  const bpPaths = document.querySelectorAll('#bpSvg .draw');
+  bpPaths.forEach(function(p){
+    const len = p.getTotalLength ? p.getTotalLength() : 100;
+    p.style.strokeDasharray = len;
+    p.style.strokeDashoffset = reduced ? 0 : len;
+    p.style.transition = 'stroke-dashoffset 1.4s ease';
+  });
+  if(!reduced){
+    const bpEl = document.getElementById('blueprint');
+    const bpIo = new IntersectionObserver(function(entries){
+      entries.forEach(function(entry){
+        if(entry.isIntersecting){
+          bpPaths.forEach(function(p, idx){
+            setTimeout(function(){ p.style.strokeDashoffset = 0; }, idx*18);
+          });
+          bpIo.unobserve(entry.target);
+        }
+      });
+    }, {threshold:0.2});
+    bpIo.observe(bpEl);
+  }
+
+  // mobile nav
+  const navToggle = document.getElementById('navToggle');
+  const navEl = document.getElementById('nav');
+  navToggle.addEventListener('click', function(){ navEl.classList.toggle('nav-open'); });
+});
+</script>
+</body>
+</html>

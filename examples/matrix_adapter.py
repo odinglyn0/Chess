@@ -1,8 +1,3 @@
-"""Example adapter: compare two piece-id matrices and emit move-delta JSON.
-
-Matrix convention: matrix[y][x], where x=0 is file a and y=0 is rank 1.
-Cells contain a stable piece id string or None.
-"""
 
 from __future__ import annotations
 
@@ -29,15 +24,6 @@ def _positions(matrix: Matrix) -> Dict[str, Tuple[int, int]]:
 
 
 def diff_matrices(old: Matrix, new: Matrix, event_prefix: str = "matrix") -> List[dict]:
-    """Return one delta per surviving piece whose square changed.
-
-    A normal move returns one delta. Castling returns two. Captures add an
-    explicit ``capture`` object, including en passant where the captured piece
-    is not on the destination square.
-
-    Promotions should preserve the physical piece's stable id. Update your
-    separate piece-type dictionary after the move succeeds.
-    """
 
     old_positions = _positions(old)
     new_positions = _positions(new)

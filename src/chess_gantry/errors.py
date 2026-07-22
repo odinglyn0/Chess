@@ -1,29 +1,28 @@
-"""Project-specific exception types."""
 
 
 class GantryError(Exception):
-    """Base class for expected gantry errors."""
+    pass
 
 
 class ConfigurationError(GantryError):
-    """Raised when configuration is missing or unsafe."""
+    pass
 
 
 class ValidationError(GantryError):
-    """Raised when JSON input or persistent state is invalid."""
+    pass
 
 
 class StateError(GantryError):
-    """Raised when a move does not agree with the stored board state."""
+    pass
 
 
 class PlanningError(GantryError):
-    """Raised when a collision-free motion path cannot be generated."""
+    pass
 
 
 class SerialProtocolError(GantryError):
-    """Raised when Marlin reports an error or fails to acknowledge a command."""
+    pass
 
 
 class PendingTransactionError(GantryError):
-    """Raised when a previous move has not been reconciled."""
+    pass

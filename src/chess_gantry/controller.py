@@ -18,7 +18,12 @@ import threading
 from typing import Any, Callable, Mapping, Optional
 
 from .config import AppConfig, SerialSettings
-from .errors import ConfigurationError, PendingTransactionError, SerialProtocolError, ValidationError
+from .errors import (
+    ConfigurationError,
+    PendingTransactionError,
+    SerialProtocolError,
+    ValidationError,
+)
 from .models import MachinePoint, MoveDelta
 from .serial_link import DemoMarlinSerial, MarlinSerial, PortInfo, discover_serial_ports
 from .service import GantryService, MotionPlan
@@ -73,8 +78,12 @@ class GantryController:
         return {
             "connected": self.connected,
             "port": None if link is None else getattr(link, "active_port", None),
-            "baudrate": None if link is None else getattr(link, "active_baudrate", None),
-            "firmware": None if link is None else getattr(link, "firmware_identity", None),
+            "baudrate": (
+                None if link is None else getattr(link, "active_baudrate", None)
+            ),
+            "firmware": (
+                None if link is None else getattr(link, "firmware_identity", None)
+            ),
             "homed": self._homed,
             "position_mm": (
                 {"x": self._position.x, "y": self._position.y}
@@ -86,8 +95,6 @@ class GantryController:
                 "max_x": self.config.workspace.max_x_mm,
                 "min_y": self.config.workspace.min_y_mm,
                 "max_y": self.config.workspace.max_y_mm,
-        
-
             },
             "max_manual_feed_mm_min": self.config.motion.travel_feed_mm_min,
             "calibrated": self.config.safety.calibrated,
@@ -149,7 +156,9 @@ class GantryController:
         for line in responses:
             match = _POSITION_RE.search(line)
             if match:
-                self._position = MachinePoint(float(match.group(1)), float(match.group(2)))
+                self._position = MachinePoint(
+                    float(match.group(1)), float(match.group(2))
+                )
                 return self._position
         return None
 
@@ -188,7 +197,10 @@ class GantryController:
         feed_mm_min: float,
     ) -> dict[str, Any]:
         values = (x_mm, y_mm, feed_mm_min)
-        if not all(isinstance(value, (int, float)) and not isinstance(value, bool) for value in values):
+        if not all(
+            isinstance(value, (int, float)) and not isinstance(value, bool)
+            for value in values
+        ):
             raise ValidationError("X, Y, and feed rate must be numbers")
         x_mm, y_mm, feed_mm_min = map(float, values)
         if not all(math.isfinite(value) for value in (x_mm, y_mm, feed_mm_min)):
@@ -200,11 +212,15 @@ class GantryController:
             )
         point = MachinePoint(x_mm, y_mm)
         if not self.config.workspace.contains(point):
-            raise ValidationError("manual coordinate is outside the configured workspace")
+            raise ValidationError(
+                "manual coordinate is outside the configured workspace"
+            )
 
         with self._operation_lock:
             if not self._homed:
-                raise ConfigurationError("home X and Y before commanding an absolute coordinate")
+                raise ConfigurationError(
+                    "home X and Y before commanding an absolute coordinate"
+                )
             link = self._require_link()
             link.send_program(
                 (

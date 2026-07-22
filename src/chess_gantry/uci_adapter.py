@@ -71,7 +71,13 @@ def uci_to_move(
         capture_position = GridPosition(destination.x, source.y)
         victim = state.piece_at(capture_position)
         if victim is None or _piece_kind(victim) != "pawn":
-            raise ValidationError("no pawn is present at the requested en-passant capture square")
-        raw["capture"] = {"id": victim.piece_id, "x": capture_position.x, "y": capture_position.y}
+            raise ValidationError(
+                "no pawn is present at the requested en-passant capture square"
+            )
+        raw["capture"] = {
+            "id": victim.piece_id,
+            "x": capture_position.x,
+            "y": capture_position.y,
+        }
 
     return MoveDelta.from_mapping(raw, width, height)

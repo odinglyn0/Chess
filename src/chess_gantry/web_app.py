@@ -120,14 +120,21 @@ class RequestHandler(BaseHTTPRequestHandler):
             return
         if self.path == "/api/ports":
             self._send_json(
-                {"ok": True, "ports": [item.as_dict() for item in self.controller.available_ports()]}
+                {
+                    "ok": True,
+                    "ports": [
+                        item.as_dict() for item in self.controller.available_ports()
+                    ],
+                }
             )
             return
         if self.path == "/api/board":
             self._send_json({"ok": True, "board_state": self.controller.board_state()})
             return
         if self.path == "/api/pending":
-            self._send_json({"ok": True, "pending": self.controller.pending_transaction()})
+            self._send_json(
+                {"ok": True, "pending": self.controller.pending_transaction()}
+            )
             return
         self._send_json({"ok": False, "error": "not found"}, HTTPStatus.NOT_FOUND)
 
@@ -145,7 +152,9 @@ class RequestHandler(BaseHTTPRequestHandler):
                     try:
                         baudrate = int(baudrate)
                     except (TypeError, ValueError) as exc:
-                        raise ValidationError("baudrate must be an integer or null") from exc
+                        raise ValidationError(
+                            "baudrate must be an integer or null"
+                        ) from exc
                 status = self.controller.connect(port=port or None, baudrate=baudrate)
                 self._send_json({"ok": True, "status": status})
                 return
@@ -154,16 +163,26 @@ class RequestHandler(BaseHTTPRequestHandler):
                 return
             if self.path == "/api/endstops":
                 lines = self.controller.check_endstops()
-                self._send_json({"ok": True, "lines": list(lines), "status": self.controller.status()})
+                self._send_json(
+                    {
+                        "ok": True,
+                        "lines": list(lines),
+                        "status": self.controller.status(),
+                    }
+                )
                 return
             if self.path == "/api/home":
                 if payload.get("confirm_motion") is not True:
-                    raise ValidationError("homing requires explicit motion confirmation")
+                    raise ValidationError(
+                        "homing requires explicit motion confirmation"
+                    )
                 self._send_json({"ok": True, "status": self.controller.home_xy()})
                 return
             if self.path == "/api/move":
                 if payload.get("confirm_motion") is not True:
-                    raise ValidationError("manual movement requires explicit motion confirmation")
+                    raise ValidationError(
+                        "manual movement requires explicit motion confirmation"
+                    )
                 try:
                     x_mm = float(payload["x_mm"])
                     y_mm = float(payload["y_mm"])
@@ -171,8 +190,12 @@ class RequestHandler(BaseHTTPRequestHandler):
                 except KeyError as exc:
                     raise ValidationError(f"missing field: {exc.args[0]}") from exc
                 except (TypeError, ValueError) as exc:
-                    raise ValidationError("coordinates and feed rate must be numbers") from exc
-                status = self.controller.move_to_mm(x_mm=x_mm, y_mm=y_mm, feed_mm_min=feed)
+                    raise ValidationError(
+                        "coordinates and feed rate must be numbers"
+                    ) from exc
+                status = self.controller.move_to_mm(
+                    x_mm=x_mm, y_mm=y_mm, feed_mm_min=feed
+                )
                 self._send_json({"ok": True, "status": status})
                 return
             if self.path == "/api/plan":
@@ -201,7 +224,9 @@ class RequestHandler(BaseHTTPRequestHandler):
                 )
                 return
             if self.path == "/api/stop":
-                self._send_json({"ok": True, "status": self.controller.emergency_stop()})
+                self._send_json(
+                    {"ok": True, "status": self.controller.emergency_stop()}
+                )
                 return
             self._send_json({"ok": False, "error": "not found"}, HTTPStatus.NOT_FOUND)
         except GantryError as exc:

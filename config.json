@@ -42,7 +42,7 @@
     "park_x_mm": null,
     "park_y_mm": null
   },
-  
+
   "magnet": {
     "on_commands": [
       "M106 S255"
@@ -51,6 +51,7 @@
       "M107"
     ]
   },
+  
   "planner": {
     "kind": "astar",
     "grid_step_mm": 5.0,

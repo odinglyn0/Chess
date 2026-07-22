@@ -25,7 +25,6 @@
     "flip_y": false,
     "swap_xy": false
   },
-
   "workspace": {
     "min_x_mm": 0.0,
     "max_x_mm": 350.0,

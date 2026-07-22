@@ -138,19 +138,19 @@ Supports namespaces (`@acme`), public GitHub registry sources (`owner/repo`),
 and registry catalog URLs. Without `-q`, lists all items. When no registries are
 passed, searches every registry configured in `components.json`.
 
-| Flag                | Short | Description                                       | Default |
-| ------------------- | ----- | ------------------------------------------------- | ------- |
-| `--query <query>`   | `-q`  | Search query                                      | —       |
+| Flag                | Short | Description                                                       | Default |
+| ------------------- | ----- | ----------------------------------------------------------------- | ------- |
+| `--query <query>`   | `-q`  | Search query                                                      | —       |
 | `--type <type>`     | `-t`  | Filter by item type (e.g. `ui`, `block`, `hook`); comma-separated | —       |
-| `--limit <number>`  | `-l`  | Max items to display                              | `100`   |
-| `--offset <number>` | `-o`  | Items to skip                                     | `0`     |
-| `--json`            |       | Output as JSON                                    | `false` |
-| `--cwd <cwd>`       | `-c`  | Working directory                                 | current |
+| `--limit <number>`  | `-l`  | Max items to display                                              | `100`   |
+| `--offset <number>` | `-o`  | Items to skip                                                     | `0`     |
+| `--json`            |       | Output as JSON                                                    | `false` |
+| `--cwd <cwd>`       | `-c`  | Working directory                                                 | current |
 
 ### `view` — View item details
 
 ```bash
-npx shadcn@latest view <items...> [options]
+npx shadcn@latest view < items... > [options]
 ```
 
 Displays item info including file contents. Examples:
@@ -160,7 +160,7 @@ Displays item info including file contents. Examples:
 ### `docs` — Get component documentation URLs
 
 ```bash
-npx shadcn@latest docs <components...> [options]
+npx shadcn@latest docs < components... > [options]
 ```
 
 Outputs resolved URLs for component documentation, examples, and API references. Accepts one or more component names. Fetch the URLs to get the actual content.

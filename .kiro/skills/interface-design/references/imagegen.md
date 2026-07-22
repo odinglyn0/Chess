@@ -182,6 +182,7 @@ Suggested format:
 
 ```markdown
 ## Visual Direction
+
 Source: Codex image generation
 Selected reference: path/to/reference.png
 Prompt summary: [one paragraph]

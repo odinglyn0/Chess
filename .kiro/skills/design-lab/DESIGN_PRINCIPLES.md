@@ -135,10 +135,10 @@ Text tertiary:  #A3A3A3 / #737373 (dark)
 ```html
 <!-- On <html> element -->
 <html class="dark" style="color-scheme: dark">
-
-<!-- Theme color matching page background -->
-<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
-<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <!-- Theme color matching page background -->
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+</html>
 ```
 
 ### Content Handling
@@ -353,11 +353,11 @@ useEffect(() => {
   const handleBeforeUnload = (e) => {
     if (hasUnsavedChanges) {
       e.preventDefault();
-      e.returnValue = '';
+      e.returnValue = "";
     }
   };
-  window.addEventListener('beforeunload', handleBeforeUnload);
-  return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  window.addEventListener("beforeunload", handleBeforeUnload);
+  return () => window.removeEventListener("beforeunload", handleBeforeUnload);
 }, [hasUnsavedChanges]);
 ```
 
@@ -467,7 +467,9 @@ Empty      → No data to display (helpful message + action)
 
 ```css
 /* Remove 300ms tap delay on touch devices */
-button, a, [role="button"] {
+button,
+a,
+[role="button"] {
   touch-action: manipulation;
 }
 ```
@@ -476,7 +478,9 @@ button, a, [role="button"] {
 
 ```css
 /* Prevent scroll chaining to body when modal/drawer reaches edge */
-.modal, .drawer, .dropdown {
+.modal,
+.drawer,
+.dropdown {
   overscroll-behavior: contain;
 }
 ```
@@ -560,12 +564,12 @@ function useProximityPreload(ref, onApproach) {
       const rect = element.getBoundingClientRect();
       const distance = Math.hypot(
         e.clientX - (rect.left + rect.width / 2),
-        e.clientY - (rect.top + rect.height / 2)
+        e.clientY - (rect.top + rect.height / 2),
       );
       if (distance < 100) onApproach();
     };
-    document.addEventListener('mousemove', handleMouseMove);
-    return () => document.removeEventListener('mousemove', handleMouseMove);
+    document.addEventListener("mousemove", handleMouseMove);
+    return () => document.removeEventListener("mousemove", handleMouseMove);
   }, [ref, onApproach]);
 }
 ```
@@ -581,13 +585,13 @@ function useProximityPreload(ref, onApproach) {
 
 **Physical analogies users already understand:**
 
-| Gesture | Real-world Metaphor | UI Behavior |
-|---------|---------------------|-------------|
-| Drag | Moving physical objects | Reorder, move items |
-| Swipe | Flipping pages, pushing aside | Navigate, dismiss |
-| Pinch | Zooming a camera lens | Scale content |
-| Pull down | Stretching a spring | Refresh content |
-| Long press | Pressing firmly to reveal | Context menu |
+| Gesture    | Real-world Metaphor           | UI Behavior         |
+| ---------- | ----------------------------- | ------------------- |
+| Drag       | Moving physical objects       | Reorder, move items |
+| Swipe      | Flipping pages, pushing aside | Navigate, dismiss   |
+| Pinch      | Zooming a camera lens         | Scale content       |
+| Pull down  | Stretching a spring           | Refresh content     |
+| Long press | Pressing firmly to reveal     | Context menu        |
 
 **Consistency requirement:**
 
@@ -617,7 +621,7 @@ Once you establish a gesture metaphor, use it consistently:
 }
 
 .icon-button::after {
-  content: '';
+  content: "";
   position: absolute;
   inset: -12px; /* Expands hit area to 48x48px */
 }
@@ -657,7 +661,7 @@ Once you establish a gesture metaphor, use it consistently:
 /* Contain drag/swipe gestures within element */
 .draggable-area {
   touch-action: none; /* Disable browser handling */
-  user-select: none;  /* Prevent text selection during drag */
+  user-select: none; /* Prevent text selection during drag */
 }
 
 /* Allow vertical scroll but capture horizontal */
@@ -710,10 +714,7 @@ function useDragThreshold() {
   const handlePointerMove = (e) => {
     if (!startPos.current) return;
 
-    const distance = Math.hypot(
-      e.clientX - startPos.current.x,
-      e.clientY - startPos.current.y
-    );
+    const distance = Math.hypot(e.clientX - startPos.current.x, e.clientY - startPos.current.y);
 
     if (distance > DRAG_THRESHOLD) {
       setIsDragging(true);
@@ -749,10 +750,10 @@ DRAG_END → IDLE (animation complete)
 
 Animation frequency should match usage frequency:
 
-| Usage Pattern | Animation Approach |
-|---|---|
-| 100+ times/day | No animation—instant response |
-| Occasional use | Standard animation (150-300ms) |
+| Usage Pattern   | Animation Approach               |
+| --------------- | -------------------------------- |
+| 100+ times/day  | No animation—instant response    |
+| Occasional use  | Standard animation (150-300ms)   |
 | Rare/first-time | Can add delight, longer duration |
 
 Example: A "send message" button used constantly → instant. An "export report" button used weekly → can animate.
@@ -802,13 +803,13 @@ Is it constant/looping motion (spinner, progress)?
 
 ### Timing Guidelines
 
-| Element Type | Duration | Notes |
-|---|---|---|
-| Micro-interactions | 100-150ms | Buttons, toggles, hover states |
-| Tooltips, dropdowns | 150-250ms | Small UI appearing |
-| Modals, drawers | 200-300ms | Larger surfaces |
-| Page transitions | 300-400ms | Full view changes |
-| Staggered items | 30-50ms delay | Between each item |
+| Element Type        | Duration      | Notes                          |
+| ------------------- | ------------- | ------------------------------ |
+| Micro-interactions  | 100-150ms     | Buttons, toggles, hover states |
+| Tooltips, dropdowns | 150-250ms     | Small UI appearing             |
+| Modals, drawers     | 200-300ms     | Larger surfaces                |
+| Page transitions    | 300-400ms     | Full view changes              |
+| Staggered items     | 30-50ms delay | Between each item              |
 
 **Important:** Exit animations should be 20-30% faster than entrances.
 
@@ -879,9 +880,9 @@ const skipAnimation = Date.now() - lastTooltipTime < 300;
 ```jsx
 // Physical spring configuration
 const spring = {
-  stiffness: 300,  // Higher = faster, snappier
-  damping: 30,     // Higher = less oscillation
-  mass: 1          // Higher = more inertia, slower
+  stiffness: 300, // Higher = faster, snappier
+  damping: 30, // Higher = less oscillation
+  mass: 1, // Higher = more inertia, slower
 };
 
 // Typical ranges:
@@ -926,7 +927,7 @@ function project(velocity, position, deceleration = 0.998) {
   // v(t) = v0 * deceleration^t
   // When v(t) ≈ 0, t = log(0.001) / log(deceleration)
   const duration = Math.log(0.001) / Math.log(deceleration);
-  const distance = velocity * (1 - Math.pow(deceleration, duration)) / (1 - deceleration);
+  const distance = (velocity * (1 - Math.pow(deceleration, duration))) / (1 - deceleration);
   return position + distance;
 }
 ```
@@ -937,8 +938,8 @@ function project(velocity, position, deceleration = 0.998) {
 // Simple configuration
 const springConfig = {
   type: "spring",
-  duration: 0.5,  // Overall duration
-  bounce: 0.2     // 0 = no bounce, 1 = very bouncy
+  duration: 0.5, // Overall duration
+  bounce: 0.2, // 0 = no bounce, 1 = very bouncy
 };
 
 // Subtle bounce (most UI): 0.1 - 0.3
@@ -975,14 +976,14 @@ const container = {
     opacity: 1,
     transition: {
       staggerChildren: 0.04, // 40ms between each
-      delayChildren: 0.1,    // Wait 100ms before starting
-    }
-  }
+      delayChildren: 0.1, // Wait 100ms before starting
+    },
+  },
 };
 
 const item = {
   hidden: { opacity: 0, y: 8 },
-  show: { opacity: 1, y: 0 }
+  show: { opacity: 1, y: 0 },
 };
 ```
 
@@ -999,7 +1000,7 @@ function AnimatedPanel({ isOpen }) {
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{
         enter: { type: "spring", stiffness: 300, damping: 30 },
-        exit: { type: "spring", stiffness: 600, damping: 30 } // 2x stiffness
+        exit: { type: "spring", stiffness: 600, damping: 30 }, // 2x stiffness
       }}
     />
   );
@@ -1015,9 +1016,9 @@ When changing icons, don't just swap. Scale down + blur out the old, scale up + 
 <AnimatePresence mode="wait">
   <motion.div
     key={iconKey}
-    initial={{ opacity: 0, scale: 0.5, filter: 'blur(7px)' }}
-    animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-    exit={{ opacity: 0, scale: 0.5, filter: 'blur(7px)' }}
+    initial={{ opacity: 0, scale: 0.5, filter: "blur(7px)" }}
+    animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+    exit={{ opacity: 0, scale: 0.5, filter: "blur(7px)" }}
     transition={{ duration: 0.15 }}
   >
     <Icon />
@@ -1033,7 +1034,7 @@ When morphing between shapes, prevent content from spilling:
 // Container with overflow: hidden + crossfade content
 <motion.div
   layout
-  style={{ overflow: 'hidden', borderRadius: 12 }}
+  style={{ overflow: "hidden", borderRadius: 12 }}
   transition={{ layout: { duration: 0.3 } }}
 >
   <AnimatePresence mode="wait">
@@ -1111,7 +1112,7 @@ END (pointer up)      → Animate to final position
 **Use jump() for continuous updates, set() for animated snap:**
 
 ```jsx
-import { useMotionValue, useSpring } from 'framer-motion';
+import { useMotionValue, useSpring } from "framer-motion";
 
 function DraggableElement() {
   const x = useMotionValue(0);
@@ -1134,7 +1135,7 @@ function DraggableElement() {
 **useTransform for derived values:**
 
 ```jsx
-import { useMotionValue, useTransform } from 'framer-motion';
+import { useMotionValue, useTransform } from "framer-motion";
 
 function SwipeCard() {
   const x = useMotionValue(0);
@@ -1146,11 +1147,7 @@ function SwipeCard() {
   const opacity = useTransform(x, [-200, 0, 200], [0.5, 1, 0.5]);
 
   return (
-    <motion.div
-      style={{ x, rotate, opacity }}
-      drag="x"
-      dragConstraints={{ left: 0, right: 0 }}
-    />
+    <motion.div style={{ x, rotate, opacity }} drag="x" dragConstraints={{ left: 0, right: 0 }} />
   );
 }
 ```
@@ -1159,20 +1156,20 @@ function SwipeCard() {
 
 ```jsx
 function useGestureState() {
-  const [state, setState] = useState('idle');
+  const [state, setState] = useState("idle");
   // idle → press → drag → drag-end → idle
 
   const handlers = {
-    onPointerDown: () => setState('press'),
-    onDragStart: () => setState('drag'),
+    onPointerDown: () => setState("press"),
+    onDragStart: () => setState("drag"),
     onDragEnd: () => {
-      setState('drag-end');
+      setState("drag-end");
       // Return to idle after animation
-      setTimeout(() => setState('idle'), 300);
+      setTimeout(() => setState("idle"), 300);
     },
     onPointerUp: () => {
-      if (state === 'press') setState('idle'); // Was click, not drag
-    }
+      if (state === "press") setState("idle"); // Was click, not drag
+    },
   };
 
   return { state, handlers };
@@ -1209,8 +1206,9 @@ padding: 20px;
 
 /* ✅ Good - explicit properties */
 .element {
-  transition: transform 0.3s var(--ease-out-cubic),
-              opacity 0.3s var(--ease-out-cubic);
+  transition:
+    transform 0.3s var(--ease-out-cubic),
+    opacity 0.3s var(--ease-out-cubic);
 }
 ```
 
@@ -1227,12 +1225,12 @@ padding: 20px;
 
 **CSS vs JavaScript animations:**
 
-| Use CSS | Use JavaScript |
-|---|---|
-| Simple state transitions | Complex sequences |
-| Hover/focus effects | Gesture-based |
+| Use CSS                    | Use JavaScript           |
+| -------------------------- | ------------------------ |
+| Simple state transitions   | Complex sequences        |
+| Hover/focus effects        | Gesture-based            |
 | No user interaction during | Interruptible animations |
-| Performance-critical | Dynamic values |
+| Performance-critical       | Dynamic values           |
 
 ### Reduced Motion
 
@@ -1258,7 +1256,9 @@ padding: 20px;
   }
 
   @keyframes fadeIn {
-    from { opacity: 0; }
+    from {
+      opacity: 0;
+    }
   }
 }
 ```
@@ -1266,7 +1266,7 @@ padding: 20px;
 **Framer Motion hook:**
 
 ```jsx
-import { useReducedMotion } from 'framer-motion';
+import { useReducedMotion } from "framer-motion";
 
 function Modal({ children }) {
   const shouldReduceMotion = useReducedMotion();
@@ -1466,12 +1466,14 @@ function Modal({ children }) {
 
 ```jsx
 // Use virtualization for lists > 50 items
-import { VList } from 'virtua';
+import { VList } from "virtua";
 
 function LargeList({ items }) {
   return (
     <VList style={{ height: 400 }}>
-      {items.map(item => <ListItem key={item.id} item={item} />)}
+      {items.map((item) => (
+        <ListItem key={item.id} item={item} />
+      ))}
     </VList>
   );
 }
@@ -1495,7 +1497,7 @@ function LargeList({ items }) {
 // ❌ Bad - forces layout recalculation
 function Component() {
   const width = element.getBoundingClientRect().width; // Layout read
-  element.style.width = width + 10 + 'px'; // Layout write
+  element.style.width = width + 10 + "px"; // Layout write
   const height = element.offsetHeight; // Another layout read!
 }
 
@@ -1507,8 +1509,8 @@ function Component() {
 
   // Then batch writes
   requestAnimationFrame(() => {
-    element.style.width = width + 10 + 'px';
-    element.style.height = height + 10 + 'px';
+    element.style.width = width + 10 + "px";
+    element.style.height = height + 10 + "px";
   });
 }
 ```
@@ -1533,13 +1535,7 @@ function Component() {
 **Preload critical fonts:**
 
 ```html
-<link
-  rel="preload"
-  href="/fonts/inter-var.woff2"
-  as="font"
-  type="font/woff2"
-  crossorigin
-/>
+<link rel="preload" href="/fonts/inter-var.woff2" as="font" type="font/woff2" crossorigin />
 ```
 
 **Image loading strategy:**
@@ -1629,18 +1625,18 @@ const date = `${month}/${day}/${year}`;
 const price = `$${amount.toFixed(2)}`;
 
 // ✅ Locale-aware formatting
-const date = new Intl.DateTimeFormat('en-US', {
-  dateStyle: 'medium'
+const date = new Intl.DateTimeFormat("en-US", {
+  dateStyle: "medium",
 }).format(new Date());
 
-const price = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD'
+const price = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
 }).format(amount);
 
 // Relative time
-const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
-rtf.format(-1, 'day'); // "yesterday"
+const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+rtf.format(-1, "day"); // "yesterday"
 ```
 
 ---
@@ -1683,35 +1679,41 @@ Flag these patterns during design review:
 Test every interactive component against these stress conditions:
 
 **Rapid User Input:**
+
 - [ ] Scroll fast — does it break or show visual glitches?
 - [ ] Spam click — does it trigger multiple actions or crash?
 - [ ] Resize window rapidly — does layout break or cause errors?
 - [ ] Type very fast in inputs — does it lag or lose characters?
 
 **Animation Interruption:**
+
 - [ ] Interrupt animations mid-way — does it recover gracefully?
 - [ ] Close modal while opening — does it handle state correctly?
 - [ ] Navigate away during transition — does it clean up properly?
 - [ ] Trigger multiple animations simultaneously — do they conflict?
 
 **Network Conditions:**
+
 - [ ] Test with slow network (3G throttling) — does it show loading states?
 - [ ] Test with offline mode — does it fail gracefully?
 - [ ] Test with request timeout — does it retry or show error?
 
 **Input Methods:**
+
 - [ ] Test with keyboard only — is everything accessible?
 - [ ] Test with screen reader — are states announced?
 - [ ] Test with touch device — are hit areas adequate?
 - [ ] Test with trackpad gestures — do scroll/swipe work correctly?
 
 **State Combinations:**
+
 - [ ] Test all combinations of loading + error + empty states
 - [ ] Test disabled state during async operations
 - [ ] Test hover + focus + active simultaneously
 - [ ] Test with maximum and minimum content
 
 **Memory & Performance:**
+
 - [ ] Run for extended period — does memory grow unbounded?
 - [ ] Test with large datasets — does it virtualize or paginate?
 - [ ] Monitor for memory leaks in animations and observers
@@ -1769,19 +1771,21 @@ Practical patterns for implementing advanced interactions.
 ```jsx
 // ❌ Bad - triggers re-render on every frame
 const [x, setX] = useState(0);
-<div style={{ transform: `translateX(${x}px)` }} />
+<div style={{ transform: `translateX(${x}px)` }} />;
 
 // ✅ Good - bypasses React, updates directly
 const x = useMotionValue(0);
-<motion.div style={{ x }} />
+<motion.div style={{ x }} />;
 ```
 
 Use `useMotionValue` for:
+
 - Continuous animation values (position, scale, opacity)
 - Gesture-driven values (drag position)
 - Any value that changes at 60fps
 
 Use `useState` for:
+
 - Discrete states (open/closed, active tab)
 - Values that trigger layout changes
 
@@ -1809,13 +1813,15 @@ const handleRelease = () => springValue.set(snapPoint);
 // All children occupy the same grid cell
 function StackedElements({ children }) {
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: '1fr',
-      gridTemplateRows: '1fr',
-    }}>
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "1fr",
+        gridTemplateRows: "1fr",
+      }}
+    >
       {children.map((child, i) => (
-        <div key={i} style={{ gridArea: '1 / 1' }}>
+        <div key={i} style={{ gridArea: "1 / 1" }}>
           {child}
         </div>
       ))}
@@ -1825,6 +1831,7 @@ function StackedElements({ children }) {
 ```
 
 **Benefits over `position: absolute`:**
+
 - Children contribute to parent size
 - Natural document flow
 - Better for responsive layouts
@@ -1835,15 +1842,13 @@ function StackedElements({ children }) {
 
 ```jsx
 // ❌ Bad - janky, blocks main thread
-element.addEventListener('wheel', (e) => {
+element.addEventListener("wheel", (e) => {
   scrollPosition += e.deltaY;
   element.style.transform = `translateY(${-scrollPosition}px)`;
 });
 
 // ✅ Good - smooth, GPU-accelerated
-<div style={{ overflow: 'auto', scrollBehavior: 'smooth' }}>
-  {content}
-</div>
+<div style={{ overflow: "auto", scrollBehavior: "smooth" }}>{content}</div>;
 ```
 
 **When you need scroll position reactively:**
@@ -1852,13 +1857,13 @@ element.addEventListener('wheel', (e) => {
 // Use Intersection Observer for scroll-triggered effects
 const observer = new IntersectionObserver(
   (entries) => {
-    entries.forEach(entry => {
+    entries.forEach((entry) => {
       if (entry.isIntersecting) {
-        entry.target.classList.add('visible');
+        entry.target.classList.add("visible");
       }
     });
   },
-  { threshold: 0.1 }
+  { threshold: 0.1 },
 );
 ```
 
@@ -1904,13 +1909,7 @@ clip-path: circle(0% at 50% 50%) → circle(100% at 50% 50%)
 ```css
 .scroll-container {
   overflow-y: auto;
-  mask-image: linear-gradient(
-    to bottom,
-    transparent 0%,
-    black 10%,
-    black 90%,
-    transparent 100%
-  );
+  mask-image: linear-gradient(to bottom, transparent 0%, black 10%, black 90%, transparent 100%);
 }
 
 /* Or use scroll-driven animations (modern browsers) */
@@ -1922,8 +1921,14 @@ clip-path: circle(0% at 50% 50%) → circle(100% at 50% 50%)
   }
 
   @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 }
 ```
@@ -1934,13 +1939,18 @@ clip-path: circle(0% at 50% 50%) → circle(100% at 50% 50%)
 
 ```css
 /* hidden: creates scroll container, may affect stacking */
-.container { overflow: hidden; }
+.container {
+  overflow: hidden;
+}
 
 /* clip: just clips, no scroll container created */
-.container { overflow: clip; }
+.container {
+  overflow: clip;
+}
 ```
 
 **When to use each:**
+
 - `hidden` - Need scrollable overflow (JS can scroll it)
 - `clip` - Just want to hide overflow, no scroll needed (better perf)
 
@@ -1953,7 +1963,7 @@ clip-path: circle(0% at 50% 50%) → circle(100% at 50% 50%)
 function Notification({ message }) {
   const [key, setKey] = useState(0);
 
-  const triggerAnimation = () => setKey(k => k + 1);
+  const triggerAnimation = () => setKey((k) => k + 1);
 
   return (
     <div key={key} className="animate-shake">
@@ -1969,9 +1979,16 @@ function Notification({ message }) {
 }
 
 @keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-5px); }
-  75% { transform: translateX(5px); }
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-5px);
+  }
+  75% {
+    transform: translateX(5px);
+  }
 }
 ```
 
@@ -1983,26 +2000,22 @@ function Notification({ message }) {
 // Preload on hover (link navigation)
 function NavLink({ href, children }) {
   const preloadImages = () => {
-    const images = ['/hero.jpg', '/feature.png'];
-    images.forEach(src => {
+    const images = ["/hero.jpg", "/feature.png"];
+    images.forEach((src) => {
       const img = new Image();
       img.src = src;
     });
   };
 
   return (
-    <Link
-      href={href}
-      onMouseEnter={preloadImages}
-      onFocus={preloadImages}
-    >
+    <Link href={href} onMouseEnter={preloadImages} onFocus={preloadImages}>
       {children}
     </Link>
   );
 }
 
 // Preload based on viewport proximity
-function useImagePreload(src, rootMargin = '200px') {
+function useImagePreload(src, rootMargin = "200px") {
   const ref = useRef(null);
 
   useEffect(() => {
@@ -2014,7 +2027,7 @@ function useImagePreload(src, rootMargin = '200px') {
           observer.disconnect();
         }
       },
-      { rootMargin }
+      { rootMargin },
     );
 
     if (ref.current) observer.observe(ref.current);
@@ -2030,7 +2043,7 @@ function useImagePreload(src, rootMargin = '200px') {
 **Morph elements between views:**
 
 ```jsx
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from "framer-motion";
 
 function App() {
   const [selected, setSelected] = useState(null);
@@ -2038,12 +2051,8 @@ function App() {
   return (
     <>
       {/* Grid of cards */}
-      {items.map(item => (
-        <motion.div
-          key={item.id}
-          layoutId={`card-${item.id}`}
-          onClick={() => setSelected(item)}
-        >
+      {items.map((item) => (
+        <motion.div key={item.id} layoutId={`card-${item.id}`} onClick={() => setSelected(item)}>
           <Card item={item} />
         </motion.div>
       ))}
@@ -2051,10 +2060,7 @@ function App() {
       {/* Expanded view */}
       <AnimatePresence>
         {selected && (
-          <motion.div
-            layoutId={`card-${selected.id}`}
-            className="expanded-card"
-          >
+          <motion.div layoutId={`card-${selected.id}`} className="expanded-card">
             <ExpandedCard item={selected} />
           </motion.div>
         )}
@@ -2118,23 +2124,23 @@ Should this animate?
 
 ### Interaction Pattern Quick Reference
 
-| Situation | Solution |
-|-----------|----------|
-| Overlapping motion | Add 1-2px blur during transition |
-| Menu animation | Fade-out only, no fade-in (instant appear) |
-| Keyboard interactions | Often no animation needed (50ms max) |
-| High-frequency updates | Skip animation if update < 100ms apart |
-| Drag gesture | Use `jump()` during, `set()` at end |
-| Touch gestures | Use `touch-action: none` to capture |
-| Thin hit areas | Expand with `::after` pseudo-element |
-| Scroll-based animation | Use native scroll, not wheel event |
-| Width animation | Use `clip-path` instead of width |
-| Replay CSS animation | Change React `key` prop |
-| Morph between elements | Use Framer Motion `layoutId` |
-| State during gesture | Track: idle → press → drag → drag-end |
-| Overflow without scroll | Use `overflow: clip` |
-| Exit animations | Double the spring stiffness |
-| Icon swap | Crossfade with scale 0.5 + blur 7px |
-| Preload data | Start on `mousedown` (before click) |
-| Spring animation values | Never reuse — tune per interaction |
-| React animation perf | Use `useMotionValue`, not `useState` |
+| Situation               | Solution                                   |
+| ----------------------- | ------------------------------------------ |
+| Overlapping motion      | Add 1-2px blur during transition           |
+| Menu animation          | Fade-out only, no fade-in (instant appear) |
+| Keyboard interactions   | Often no animation needed (50ms max)       |
+| High-frequency updates  | Skip animation if update < 100ms apart     |
+| Drag gesture            | Use `jump()` during, `set()` at end        |
+| Touch gestures          | Use `touch-action: none` to capture        |
+| Thin hit areas          | Expand with `::after` pseudo-element       |
+| Scroll-based animation  | Use native scroll, not wheel event         |
+| Width animation         | Use `clip-path` instead of width           |
+| Replay CSS animation    | Change React `key` prop                    |
+| Morph between elements  | Use Framer Motion `layoutId`               |
+| State during gesture    | Track: idle → press → drag → drag-end      |
+| Overflow without scroll | Use `overflow: clip`                       |
+| Exit animations         | Double the spring stiffness                |
+| Icon swap               | Crossfade with scale 0.5 + blur 7px        |
+| Preload data            | Start on `mousedown` (before click)        |
+| Spring animation values | Never reuse — tune per interaction         |
+| React animation perf    | Use `useMotionValue`, not `useState`       |

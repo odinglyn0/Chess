@@ -12,8 +12,7 @@ if [ -n "$prettier_files" ]; then
 fi
 
 if [ -n "$py_files" ]; then
-  printf '%s\n' "$py_files" | xargs -r python scripts/strip_comments.py --write
-  printf '%s\n' "$py_files" | xargs -r python -m black
+  npm run format:python
 fi
 
 printf '%s\n' "$staged" | xargs -r git add

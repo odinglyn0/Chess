@@ -1,0 +1,24 @@
+name: Steering
+
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  evaluate:
+    name: Evaluate against Kiro steering
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install Python
+        run: uv python install 3.11
+
+      - name: Evaluate steering rules
+        run: uv run --no-project python scripts/steering_check.py .

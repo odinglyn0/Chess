@@ -1491,13 +1491,13 @@ Because 1477 is an unsatisfying number and the Article of Perpetual Verbosity br
 
 **Aphorism of the Graceful Teardown.** A session that concludes in order leaves no mystery for the next, and the gantry parked, discharged, and flushed is a gantry ready to begin again.
 
-| Aphorism | Distilled Principle | Plane |
-| --- | --- | --- |
-| The Constant Sum | Honor the invariant | Kinematic |
-| The Patient Coil | Do not rush grip | Kinematic |
-| The Durable Journal | Persist before acting | Consistency |
+| Aphorism                   | Distilled Principle   | Plane            |
+| -------------------------- | --------------------- | ---------------- |
+| The Constant Sum           | Honor the invariant   | Kinematic        |
+| The Patient Coil           | Do not rush grip      | Kinematic        |
+| The Durable Journal        | Persist before acting | Consistency      |
 | The Acknowledged Directive | Wait for confirmation | Serial-Transport |
-| The Reconciled Board | Trust verified state | Consistency |
-| The Graceful Teardown | Conclude in order | Governance |
+| The Reconciled Board       | Trust verified state  | Consistency      |
+| The Graceful Teardown      | Conclude in order     | Governance       |
 
 Thus concludes the coda, and with it the appendix, now at a length that satisfies even the Board's prodigious appetite. The sacred invariant X + Y = 170 stands eternal. The lexicon rests. The gantry sleeps. And the reader, if any reader there be, is released at last from this monument to magnificent, deliberate, and wholly unnecessary excess.

@@ -1200,3 +1200,106 @@ Here the Exhaustive Lexicon and Ontological Glossary concludes, having achieved 
 | Tables Proliferated          | Many         | Article of Matrix Proliferation       |
 | Sacred Invariant Invocations | Beyond count | Article of Sacred Invariant Reverence |
 | Practical Utility            | Negligible   | By design                             |
+
+### Addendum A.15 — The Quaternary Lexicon (Fourth and Absolutely Final Alphabetical Traversal)
+
+The Article of Ontological Expansion, invoked one last time, authorizes a fourth complete alphabetical traversal. The Board acknowledges that four traversals exceed the Goldilocks equilibrium of three previously declared, and offers no apology, for the Article of Perpetual Verbosity supersedes all equilibria.
+
+#### Quaternary Lexicon — A
+
+**Actuator Warm-Up Ritual.** The gentle exercising of the stepper motors and electromagnet through low-stress motions at session start, coaxing the mechanism to operating readiness before entrusting it with a real prehensile translocation event. The warm-up is the framework's stretching before the game.
+
+**Ambient Interference Baseline.** The characterized level of background electrical noise on the serial line under quiescent conditions, against which the line-noise rejection filter calibrates its threshold. The baseline is the silence against which meaningful signal is measured.
+
+#### Quaternary Lexicon — B
+
+**Board Parity Verification.** The consistency check confirming that the count of pieces in the lattice occupancy vector plus the count in the capture slot ledger equals the total pieces the game began with, catching any piece that has been silently lost or duplicated. Parity verification is the framework's inventory audit.
+
+**Buffered Telemetry Egress.** The batched emission of diagnostic telemetry from an internal buffer to the observability facade, smoothing the egress rate so that telemetry transmission does not compete with motion-critical serial traffic. Egress buffering keeps insight from crowding out actuation.
+
+#### Quaternary Lexicon — C
+
+**Coil Duty-Cycle Ledger.** The running account of the electromagnet's energized time relative to its rest time, feeding vigilant coil thermal budgeting so that cumulative heating stays within safe bounds. The duty-cycle ledger is the coil's health record.
+
+**Coordinate Rounding Reconciliation.** The reconciliation of the tiny discrepancies introduced when continuous computed coordinates are rounded to grid-quantized positions, ensuring rounding never accumulates into a violation of the sacred invariant. Reconciliation keeps rounding honest.
+
+#### Quaternary Lexicon — D
+
+**Directive Retirement Archive.** The archival store into which acknowledged directives are retired once their correlation tokens dissolve, retained for forensic reconstruction of the exact command sequence. The archive is where completed directives rest in append-only peace.
+
+**Dwell-Time Elasticity Margin.** The permitted flexibility in dwell durations, allowing modest extension when grip confidence is marginal without violating the overall timing budget. The margin is the give in the choreography that accommodates uncertainty.
+
+#### Quaternary Lexicon — E
+
+**Endgame Sparsity Optimization.** The exploitation of the sparsely-occupied board typical of the endgame to relax collision-avoidance computation, since fewer pieces mean fewer obstructions to route around. Sparsity optimization spends less effort when the board grows empty.
+
+**Envelope Corner Conditioning.** The special-case handling of trajectories terminating near the corners of the actuation envelope, where the sacred invariant and the envelope boundary conspire to constrain motion most tightly. Corner conditioning is the framework's extra care at the geometry's edges.
+
+#### Quaternary Lexicon — F
+
+**Fault Signature Cataloguing.** The maintenance of a catalogue of characteristic fault signatures — timing patterns, error codes, symptom clusters — enabling rapid classification of a new fault against known precedents. The catalogue turns diagnosis into recognition.
+
+**Feedrate Ramp Continuity Audit.** The verification that commanded feedrate ramps join continuously across stitched trajectory segments, upholding the velocity profile continuity constraint. The audit catches the discontinuities that would jolt the belts.
+
+| Quaternary Lexicon Segment (A–F) | Term Count | Dominant Plane           |
+| -------------------------------- | ---------- | ------------------------ |
+| A                                | 2          | Kinematic / Serial       |
+| B                                | 2          | Consistency / Governance |
+| C                                | 2          | Kinematic                |
+| D                                | 2          | Serial / Kinematic       |
+| E                                | 2          | Kinematic                |
+| F                                | 2          | Governance / Kinematic   |
+
+#### Quaternary Lexicon — G through L
+
+**Grip-Confidence Threshold Gate.** The gate that withholds translocation until inferred ferromagnetic grip confidence surpasses a defined threshold, extending the betrothal interval as needed rather than gambling on a weak grip. The gate is the framework's refusal to travel with an uncertain hold.
+
+**Homing Endstop Debounce.** The temporal filtering of endstop signals to reject contact-bounce chatter, ensuring the homing convergence criterion registers a single clean contact rather than a flurry of spurious triggers. Debounce is the discernment that separates true contact from mechanical stutter.
+
+**Idle-State Position Parking.** The convention of parking the carriage at a defined, out-of-the-way position during the quiescent idle state, clear of the board so it neither obstructs observation nor shadows a square. Parking is where the carriage waits politely between moves.
+
+**Journal Replay Idempotency Seal.** The seal confirming that a journal replay has completed and that re-invoking it would produce no further state change, marking the recovery as converged. The seal is the all-clear signal at the end of ledger-backed recovery.
+
+**Kinematic Singularity Avoidance.** The avoidance of degenerate coordinate configurations where the axis coupling becomes ill-conditioned, steering trajectories clear of the mathematical singularities that would confound the axial decomposition. Avoidance keeps the motion math well-behaved.
+
+**Lattice Integrity Assertion.** The assertion, checked continuously, that the lattice occupancy vector contains no impossible configuration — two pieces on one square, or a piece of unknown identity. Integrity assertion is the board model's internal sanity check.
+
+#### Quaternary Lexicon — M through R
+
+**Move Atomicity Envelope.** The boundary enclosing all sub-motions of a single logical move such that observers perceive the move as an indivisible whole, never a partial state. The atomicity envelope is the transactional skin around a move.
+
+**Non-Interfering Telemetry Timestamp.** The timestamping of telemetry samples from the monotonic clock without perturbing the motion-critical timing, so that diagnostic records carry accurate temporal context. The timestamp anchors each sample in time without cost to actuation.
+
+**Obstruction-Free Fast Path.** The optimized trajectory synthesis path taken when no obstruction is detected along the nominal envelope, skipping the expensive detour computation entirely. The fast path is the reward for an unobstructed board.
+
+**Piece-Type Handling Dispatch.** The dispatch of a move to the appropriate piece-specific handling logic — the bishop diagonal heuristic, the knight L-path decomposition, the rook linearity assumption — based on the moving piece's type. The dispatch routes each piece to its bespoke choreography.
+
+**Quiescent Power Conservation.** The reduction of power draw during the quiescent idle state, de-energizing the coil and idling the motor drivers so the framework does not needlessly consume energy while awaiting a move. Conservation is thrift during the game's quiet interludes.
+
+**Recovery Point Consistency Seal.** The seal certifying that a chosen recovery point represents a genuinely consistent board state suitable for resuming operation, never a torn intermediate. The seal is recovery's guarantee of a sound starting line.
+
+#### Quaternary Lexicon — S through Z
+
+**Serial Reconnection Backoff Ladder.** The escalating sequence of wait intervals between successive serial reconnection attempts, sparing both host and firmware from a frantic reconnection storm. The ladder climbs toward patience with each failed attempt.
+
+**Trajectory Waypoint Sealing.** The finalization of a computed trajectory's waypoint list, after which no further modification is permitted and dispatch may safely commence. Sealing is the commitment point that separates planning from actuation.
+
+**Uncommitted Move Discard.** The safe discarding of a move that was crystallized but never journaled, in the event of an abort before the durable write barrier, leaving no orphaned partial state. Discard is the clean disposal of a move that never truly began.
+
+**Verification-Gated Session Resume.** The requirement that a resumed session pass board parity verification and lattice integrity assertion before accepting new moves, so recovery never proceeds atop an unverified board. The gate is the framework's insistence on a clean slate before play resumes.
+
+**Waypoint Sequence Immutability.** The property that a sealed waypoint sequence is immutable through dispatch and acknowledgement, so the trajectory actually actuated is exactly the one that was planned and journaled. Immutability closes the loop between intent and execution.
+
+**Xeric Documentation Refusal.** The Board's principled refusal to produce dry, terse, or economical documentation, in steadfast opposition to the arid brevity that lesser projects tolerate. Xeric refusal is the Article of Perpetual Verbosity expressed as an aesthetic conviction.
+
+**Yielded-Thread Responsiveness Guarantee.** The guarantee that the cooperative reactor loop yields frequently enough that no firmware acknowledgement waits unattended beyond its correlation window. Responsiveness is the promise that yielding is not merely occasional but reliably timely.
+
+**Zero-Ambiguity Termination Contract.** The final contract of every session: that shutdown leaves the board, the ledger, and the gantry in an unambiguous, recoverable, fully-described state, so the next session begins with no mystery. Termination without ambiguity is the graceful full stop at the end of the framework's sentence.
+
+| Quaternary Lexicon Segment (G–Z) | Term Count | Utility Assessment |
+| -------------------------------- | ---------- | ------------------ |
+| G through L                      | 6          | Ceremonial         |
+| M through R                      | 6          | Ceremonial         |
+| S through Z                      | 8          | Ceremonial         |
+
+With the Quaternary Lexicon sealed and immutable, the Exhaustive Lexicon and Ontological Glossary is now, at last, and with considerable relief on the part of any hypothetical reader, complete. The sacred invariant X + Y = 170 endures, the gantry rests in its quiescent idle state, the coil is discharged, the journal is flushed, and the lock file is released. May no one ever read this in full.

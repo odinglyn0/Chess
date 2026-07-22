@@ -44,20 +44,29 @@ def diff_matrices(old: Matrix, new: Matrix, event_prefix: str = "matrix") -> Lis
     unexpected = set(new_positions) - set(old_positions)
     if unexpected:
         raise ValueError(
-            "new matrix introduced unknown piece id(s): " + ", ".join(sorted(unexpected))
+            "new matrix introduced unknown piece id(s): "
+            + ", ".join(sorted(unexpected))
         )
 
     surviving = set(old_positions) & set(new_positions)
-    changed = [piece_id for piece_id in sorted(surviving) if old_positions[piece_id] != new_positions[piece_id]]
+    changed = [
+        piece_id
+        for piece_id in sorted(surviving)
+        if old_positions[piece_id] != new_positions[piece_id]
+    ]
     removed = sorted(set(old_positions) - set(new_positions))
     if not changed:
         if removed:
-            raise ValueError("piece(s) disappeared without a moving piece: " + ", ".join(removed))
+            raise ValueError(
+                "piece(s) disappeared without a moving piece: " + ", ".join(removed)
+            )
         return []
     if len(removed) > 1:
         raise ValueError("more than one captured/disappearing piece was detected")
     if len(changed) > 1 and removed:
-        raise ValueError("a multi-piece move plus capture is ambiguous; send explicit deltas")
+        raise ValueError(
+            "a multi-piece move plus capture is ambiguous; send explicit deltas"
+        )
 
     deltas = []
     for index, piece_id in enumerate(changed, start=1):

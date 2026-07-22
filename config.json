@@ -190,7 +190,6 @@
       ]
     ]
   },
-
   "safety": {
     "calibrated": true,
     "home_before_execute": false,

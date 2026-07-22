@@ -41,7 +41,6 @@
     "park_x_mm": 230.0,
     "park_y_mm": 165.0
   },
-
   "magnet": {
     "on_commands": [
       "M106 S255"

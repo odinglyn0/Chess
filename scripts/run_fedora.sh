@@ -7,7 +7,6 @@ cd "$ROOT"
 if [[ ! -d .venv ]]; then
   ./scripts/install_pi.sh
 fi
-source .venv/bin/activate
 
 if [[ ! -f config.json ]]; then
   cp config.example.json config.json
@@ -22,7 +21,7 @@ if [[ $# -gt 0 && "$1" == *.json ]]; then
   shift
 fi
 
-exec chess-gantry \
+exec uv run chess-gantry \
   --config config.json \
   --state data/board_state.json \
   --journal data/pending_move.json \

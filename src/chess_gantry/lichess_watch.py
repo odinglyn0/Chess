@@ -20,9 +20,7 @@ async def watch_game(
     try:
         from websockets.asyncio.client import connect
     except ImportError as exc:
-        raise ConfigurationError(
-            "websockets is not installed; run 'python -m pip install -e .'"
-        ) from exc
+        raise ConfigurationError("websockets is not installed; run 'uv sync'") from exc
     if service.journal.exists():
         raise PendingTransactionError(
             f"pending transaction exists at {service.journal.path}; reconcile it first"

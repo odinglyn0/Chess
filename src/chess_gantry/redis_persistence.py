@@ -29,9 +29,7 @@ def redis_client(
         try:
             from upstash_redis import Redis
         except ImportError as exc:
-            raise StateError(
-                "Upstash support is not installed; run 'python -m pip install -e .'"
-            ) from exc
+            raise StateError("Upstash support is not installed; run 'uv sync'") from exc
         try:
             client = Redis(
                 url=upstash_url,
@@ -47,9 +45,7 @@ def redis_client(
     try:
         import redis
     except ImportError as exc:
-        raise StateError(
-            "Redis support is not installed; run 'python -m pip install -e .'"
-        ) from exc
+        raise StateError("Redis support is not installed; run 'uv sync'") from exc
     try:
         client = redis.Redis.from_url(url, decode_responses=True)
         client.ping()

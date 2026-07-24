@@ -160,7 +160,7 @@ class MarlinSerial:
             import serial
         except ImportError as exc:
             raise SerialProtocolError(
-                "pyserial is not installed; run 'python -m pip install -e .'"
+                "pyserial is not installed; run 'uv sync'"
             ) from exc
         return serial.Serial
 

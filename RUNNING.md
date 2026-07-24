@@ -18,9 +18,7 @@ and creates `config.json` and `data/board_state.json` when they do not exist.
 Manual equivalent:
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -e .
+uv sync
 cp config.example.json config.json
 mkdir -p data
 cp examples/board_state.standard.json data/board_state.json
@@ -274,15 +272,15 @@ Run Python compilation and the complete unit-test suite:
 Equivalent commands:
 
 ```bash
-PYTHONPATH=src python -m compileall -q src tests examples
-PYTHONPATH=src python -m unittest discover -s tests -v
+PYTHONPATH=src uv run python -m compileall -q src tests examples
+PYTHONPATH=src uv run python -m unittest discover -s tests -v
 ```
 
 Run one test module, class, or method by dotted name:
 
 ```bash
-PYTHONPATH=src python -m unittest tests.test_controller -v
-PYTHONPATH=src python -m unittest \
+PYTHONPATH=src uv run python -m unittest tests.test_controller -v
+PYTHONPATH=src uv run python -m unittest \
   tests.test_controller.ControllerTests.test_method_name -v
 ```
 

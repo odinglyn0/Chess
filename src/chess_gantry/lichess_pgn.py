@@ -28,7 +28,7 @@ def pgn_moves(game_id: str, pgn_text: str, state: BoardState) -> Iterator[MoveDe
         import chess.pgn
     except ImportError as exc:
         raise ConfigurationError(
-            "python-chess is not installed; run 'python -m pip install -e .'"
+            "python-chess is not installed; run 'uv sync'"
         ) from exc
     game = chess.pgn.read_game(StringIO(pgn_text))
     if game is None:

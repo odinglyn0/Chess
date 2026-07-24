@@ -60,9 +60,7 @@ Open <http://127.0.0.1:8000> if the browser does not open automatically.
 For a manual installation:
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -e .
+uv sync
 cp config.example.json config.json
 mkdir -p data
 docker run -d --name chess-redis -p 6379:6379 redis:7-alpine
@@ -70,12 +68,12 @@ docker run -d --name chess-redis -p 6379:6379 redis:7-alpine
 
 ## Run everything
 
-Run commands from the repository root with the virtual environment activated:
+`uv sync` creates `.venv`. Run commands from the repository root either through
+`uv run` or with that environment activated:
 
 ```bash
-source .venv/bin/activate
-chess-gantry --help
-chess-gantry COMMAND --help
+uv run chess-gantry --help
+uv run chess-gantry COMMAND --help
 ```
 
 Global options must precede the command. For example, use
@@ -190,8 +188,8 @@ Run the complete Python test suite and byte-compile the source:
 Run one test module or one specific test:
 
 ```bash
-PYTHONPATH=src python -m unittest tests.test_controller -v
-PYTHONPATH=src python -m unittest \
+PYTHONPATH=src uv run python -m unittest tests.test_controller -v
+PYTHONPATH=src uv run python -m unittest \
   tests.test_controller.ControllerTests.test_method_name -v
 ```
 

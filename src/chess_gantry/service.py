@@ -14,6 +14,7 @@ from typing import (
     Tuple,
     Union,
 )
+import math
 
 from .config import AppConfig
 from .errors import (
@@ -25,7 +26,14 @@ from .errors import (
 )
 from .gcode import GCodeGenerator, GCodeProgram
 from .kinematics import grid_to_machine, validate_board_inside_workspace
-from .models import BoardState, MachinePoint, MoveDelta, PieceState, PieceTransfer
+from .models import (
+    BoardState,
+    GridPosition,
+    MachinePoint,
+    MoveDelta,
+    PieceState,
+    PieceTransfer,
+)
 from .path_planning import plan_path
 from .persistence import AuditLog, BoardStore, JournalStore
 from .serial_link import MarlinSerial
@@ -97,52 +105,6 @@ class GantryService:
         self.audit = AuditLog(audit_path)
         self._link_factory = link_factory or (lambda settings: MarlinSerial(settings))
         self._generator = GCodeGenerator(config)
-        self.game_storage: Optional[Any] = None
-
-    @classmethod
-    def for_redis(
-        cls,
-        config: AppConfig,
-        redis_url: Optional[str],
-        game_id: str,
-        *,
-        upstash_url: Optional[str] = None,
-        upstash_token: Optional[str] = None,
-        completed_ttl_s: int = 86400,
-        key_prefix: str = "chess-gantry",
-        link_factory: Optional[Callable[[Any], MarlinSerial]] = None,
-    ) -> "GantryService":
-        from .redis_persistence import RedisGameStorage, redis_client
-
-        storage = RedisGameStorage(
-            redis_client(
-                redis_url,
-                upstash_url=upstash_url,
-                upstash_token=upstash_token,
-            ),
-            game_id,
-            config.board.width,
-            config.board.height,
-            key_prefix=key_prefix,
-            completed_ttl_s=completed_ttl_s,
-        )
-        instance = cls.__new__(cls)
-        instance.config = config
-        validate_board_inside_workspace(config.board, config.workspace)
-        instance.store = storage.store
-        instance.journal = storage.journal
-        instance.audit = storage.audit
-        instance._link_factory = link_factory or (
-            lambda settings: MarlinSerial(settings)
-        )
-        instance._generator = GCodeGenerator(config)
-        instance.game_storage = storage
-        storage.initialize_game()
-        return instance
-
-    def finish_game(self) -> None:
-        if self.game_storage is not None:
-            self.game_storage.finish_game()
 
     def _capture_slot_for(self, state: BoardState) -> int:
         if not self.config.capture.enabled:
@@ -338,21 +300,53 @@ class GantryService:
         with link:
             self.home_with_link(link)
 
-    def motor_test_program(self) -> Tuple[str, ...]:
-        mirror_origin = self.config.workspace.min_y_mm + self.config.workspace.max_y_mm
-        mirror_target = mirror_origin - 200.0
-        points = (
-            MachinePoint(0.0, 0.0),
-            MachinePoint(200.0, 0.0),
-            MachinePoint(200.0, 200.0),
-            MachinePoint(0.0, 0.0),
+    def motor_test_program(
+        self,
+        distance_mm: float = 20.0,
+        feed_mm_min: float = 600.0,
+        magnet_on: bool = False,
+        presentation_loops: int = 0,
+    ) -> Tuple[str, ...]:
+        if distance_mm <= 0:
+            raise ConfigurationError("motor-test distance must be greater than zero")
+        if feed_mm_min <= 0:
+            raise ConfigurationError("motor-test feed rate must be greater than zero")
+        if feed_mm_min > self.config.motion.travel_feed_mm_min:
+            raise ConfigurationError(
+                "motor-test feed rate cannot exceed motion.travel_feed_mm_min "
+                f"({self.config.motion.travel_feed_mm_min:g} mm/min)"
+            )
+        if presentation_loops < 0:
+            raise ConfigurationError("motor-test presentation loops cannot be negative")
+        if presentation_loops and not magnet_on:
+            raise ConfigurationError(
+                "motor-test presentation loops require the electromagnet to be on"
+            )
+        pickup_duration_s = distance_mm / feed_mm_min * 120.0
+        presentation_duration_s = pickup_duration_s * 2.0 * presentation_loops
+        if presentation_loops and presentation_duration_s > 30.0:
+            raise ConfigurationError(
+                "motor-test presentation would energize the electromagnet for more "
+                "than 30 seconds; reduce loops or distance, or increase feed rate"
+            )
+        if magnet_on and not presentation_loops and pickup_duration_s > 5.0:
+            raise ConfigurationError(
+                "motor-test pickup movement would energize the electromagnet "
+                "for more than 5 seconds; reduce distance or increase feed rate"
+            )
+        origin = MachinePoint(
+            self.config.workspace.min_x_mm, self.config.workspace.min_y_mm
         )
-        for point in points:
+        inner_target = MachinePoint(origin.x + distance_mm, origin.y)
+        outer_target = MachinePoint(origin.x, origin.y + distance_mm)
+        for point in (origin, inner_target, outer_target):
             if not self.config.workspace.contains(point):
                 raise ConfigurationError(
-                    f"motor-test point X{point.x:g} Y{point.y:g} is outside the configured workspace"
+                    f"motor-test distance {distance_mm:g} mm exceeds the configured workspace"
                 )
-        program = (
+        mirror_origin = self.config.workspace.min_y_mm + self.config.workspace.max_y_mm
+        mirror_target = mirror_origin - outer_target.y
+        program = [
             "G21",
             "G90",
             "M82",
@@ -363,27 +357,47 @@ class GantryService:
             "M201 X500 Y500 E300",
             "M205 X5 Y5 E5",
             "M211 S0",
-            f"G92 X0 Y{mirror_origin:g} E0",
+            f"G92 X{origin.y:g} Y{mirror_origin - origin.y:g} E{origin.x:g}",
             "M400",
-            "G1 E200 F3000",
-            "M400",
-            f"G1 X200 Y{mirror_target:g} F16971",
-            "M400",
-            "G1 E0 F3000",
-            "M400",
-            f"G1 X0 Y{mirror_origin:g} F16971",
-            "M400",
-            "M302 P0",
-            "M211 S1",
-            "M84",
+        ]
+        moves = (
+            f"G1 E{inner_target.x:g} F{feed_mm_min:g}",
+            f"G1 X{outer_target.y:g} Y{mirror_target:g} F{feed_mm_min:g}",
+            f"G1 E{origin.x:g} F{feed_mm_min:g}",
+            f"G1 X{origin.y:g} Y{mirror_origin - origin.y:g} F{feed_mm_min:g}",
         )
+        if magnet_on:
+            program.extend(self.config.magnet.on_commands)
+            if self.config.motion.magnet_on_dwell_ms:
+                program.append(f"G4 P{self.config.motion.magnet_on_dwell_ms}")
+        if presentation_loops:
+            for _ in range(presentation_loops):
+                for move in moves:
+                    program.extend(self.config.magnet.on_commands)
+                    program.extend((move, "M400"))
+        else:
+            for index, move in enumerate(moves):
+                program.extend((move, "M400"))
+                if magnet_on and index == 1:
+                    program.extend(self.config.magnet.off_commands)
+                    if self.config.motion.magnet_off_dwell_ms:
+                        program.append(f"G4 P{self.config.motion.magnet_off_dwell_ms}")
+        program.extend((*self.config.magnet.off_commands, "M302 P0", "M211 S1", "M84"))
         if any(command.strip().upper().startswith("G28") for command in program):
             raise ConfigurationError("motor-test must never issue a homing command")
-        return program
+        return tuple(program)
 
-    def motor_test(self) -> Tuple[str, ...]:
+    def motor_test(
+        self,
+        distance_mm: float = 20.0,
+        feed_mm_min: float = 600.0,
+        magnet_on: bool = False,
+        presentation_loops: int = 0,
+    ) -> Tuple[str, ...]:
         self._require_execution_unlocked()
-        program = self.motor_test_program()
+        program = self.motor_test_program(
+            distance_mm, feed_mm_min, magnet_on, presentation_loops
+        )
         link = self._link_factory(self.config.serial)
         with link:
             if self.config.safety.preflight_commands:
@@ -395,8 +409,156 @@ class GantryService:
                     (*self.config.magnet.off_commands, "M302 P0", "M211 S1")
                 )
                 raise
-        self.audit.append({"status": "motor_test_completed", "commands": list(program)})
+        self.audit.append(
+            {
+                "status": "motor_test_completed",
+                "magnet_on": magnet_on,
+                "presentation_loops": presentation_loops,
+                "commands": list(program),
+            }
+        )
         return program
+
+    def magnet_test_program(self, duration_s: float = 1.0) -> Tuple[str, ...]:
+        if not math.isfinite(duration_s) or duration_s <= 0 or duration_s > 5.0:
+            raise ConfigurationError(
+                "magnet-test duration must be greater than zero and no more than 5 seconds"
+            )
+        duration_ms = round(duration_s * 1000.0)
+        return (
+            *self.config.magnet.off_commands,
+            "M400",
+            *self.config.magnet.on_commands,
+            f"G4 P{duration_ms}",
+            *self.config.magnet.off_commands,
+            "M400",
+        )
+
+    def magnet_test(self, duration_s: float = 1.0) -> Tuple[str, ...]:
+        self._require_execution_unlocked()
+        program = self.magnet_test_program(duration_s)
+        link = self._link_factory(self.config.serial)
+        with link:
+            if self.config.safety.preflight_commands:
+                link.send_program(self.config.safety.preflight_commands)
+            try:
+                link.send_program(program)
+            except Exception:
+                link.best_effort(self.config.magnet.off_commands)
+                raise
+        self.audit.append(
+            {"status": "magnet_test_completed", "commands": list(program)}
+        )
+        return program
+
+    def board_sweep_program(
+        self, feed_mm_min: float = 1800.0, magnet_on: bool = False
+    ) -> Tuple[str, ...]:
+        if not math.isfinite(feed_mm_min) or feed_mm_min <= 0:
+            raise ConfigurationError(
+                "board-sweep feed rate must be finite and greater than zero"
+            )
+        if feed_mm_min > self.config.motion.travel_feed_mm_min:
+            raise ConfigurationError(
+                "board-sweep feed rate cannot exceed motion.travel_feed_mm_min "
+                f"({self.config.motion.travel_feed_mm_min:g} mm/min)"
+            )
+        positions = []
+        for y in range(self.config.board.height):
+            columns = (
+                range(self.config.board.width)
+                if y % 2 == 0
+                else range(self.config.board.width - 1, -1, -1)
+            )
+            positions.extend(
+                grid_to_machine(GridPosition(x, y), self.config.board) for x in columns
+            )
+        if not positions:
+            raise ConfigurationError("board-sweep requires at least one board square")
+        for point in positions:
+            if not self.config.workspace.contains(point):
+                raise ConfigurationError(
+                    "board-sweep square center is outside the configured workspace"
+                )
+        mirror_origin = self.config.workspace.min_y_mm + self.config.workspace.max_y_mm
+
+        def movement(command: str, point: MachinePoint) -> str:
+            return (
+                f"{command} X{point.y:g} Y{mirror_origin - point.y:g} "
+                f"E{point.x:g} F{feed_mm_min:g}"
+            )
+
+        program = [
+            "G21",
+            "G90",
+            "M82",
+            "M302 P1",
+            *self.config.magnet.off_commands,
+            "M92 X80 Y80 E80",
+            "M203 X200 Y200 E50",
+            "M201 X500 Y500 E300",
+            "M205 X5 Y5 E5",
+            "M211 S0",
+            (
+                f"G92 X{self.config.workspace.min_y_mm:g} "
+                f"Y{self.config.workspace.max_y_mm:g} "
+                f"E{self.config.workspace.min_x_mm:g}"
+            ),
+            movement("G0", positions[0]),
+            "M400",
+        ]
+        for index, point in enumerate(positions):
+            if magnet_on:
+                program.extend(self.config.magnet.on_commands)
+                if self.config.motion.magnet_on_dwell_ms:
+                    program.append(f"G4 P{self.config.motion.magnet_on_dwell_ms}")
+                program.extend(self.config.magnet.off_commands)
+                if self.config.motion.magnet_off_dwell_ms:
+                    program.append(f"G4 P{self.config.motion.magnet_off_dwell_ms}")
+            if index + 1 < len(positions):
+                program.extend((movement("G1", positions[index + 1]), "M400"))
+        program.extend(self.config.magnet.off_commands)
+        program.extend(("M302 P0", "M211 S1", "M84"))
+        return tuple(program)
+
+    def board_sweep(
+        self, feed_mm_min: float = 1800.0, magnet_on: bool = False
+    ) -> Tuple[str, ...]:
+        self._require_execution_unlocked()
+        program = self.board_sweep_program(feed_mm_min, magnet_on)
+        link = self._link_factory(self.config.serial)
+        with link:
+            if self.config.safety.preflight_commands:
+                link.send_program(self.config.safety.preflight_commands)
+            try:
+                link.send_program(program)
+            except Exception:
+                link.best_effort(
+                    (*self.config.magnet.off_commands, "M302 P0", "M211 S1", "M84")
+                )
+                raise
+        self.audit.append(
+            {
+                "status": "board_sweep_completed",
+                "feed_mm_min": feed_mm_min,
+                "magnet_on": magnet_on,
+                "commands": list(program),
+            }
+        )
+        return program
+
+    def reset_state(self) -> BoardState:
+        initial = BoardState.standard(self.config.board.width, self.config.board.height)
+        self.store.initialize(initial, overwrite=True)
+        if self.journal.exists():
+            self.journal.clear()
+        self.audit.append(
+            {
+                "status": "state_reset",
+                "revision": initial.revision,
+            }
+        )
+        return initial
 
     def emergency_stop_with_link(self, link: Any) -> None:
         if not getattr(link, "connected", False):

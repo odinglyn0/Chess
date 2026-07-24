@@ -7,12 +7,13 @@
     "write_timeout_s": 2.0,
     "command_timeout_s": 120.0,
     "startup_wait_s": 2.5,
-    "verify_marlin": true,
+    "verify_marlin": false,
     "handshake_timeout_s": 5.0
   },
+
   "board": {
-    "width": 4.0,
-    "height": 4.0,
+    "width": 8,
+    "height": 8,
     "square_size_mm": 0.05,
     "origin_x_mm": 2.0,
     "origin_y_mm": 2.0,
@@ -36,9 +37,8 @@
     "park_y_mm": 165.0
   },
   "magnet": {
-    "on_commands": ["M106 P1 S153"],
-    "off_commands": ["M107 P1"],
-    "PWM_power": 60
+    "on_commands": ["M106 P0 S255", "M106 P1 S255"],
+    "off_commands": ["M107 P0", "M107 P1"]
   },
   "planner": {
     "kind": "astar",
@@ -88,7 +88,7 @@
   "safety": {
     "calibrated": true,
     "home_before_execute": false,
-    "home_commands": ["M107 P1", "G92 X0 Y0 Z0", "M400"],
+    "home_commands": ["M107 P0", "M107 P1", "G92 X0 Y0 Z0", "M400"],
     "preflight_commands": ["M115"],
     "emergency_stop_command": "M112"
   }

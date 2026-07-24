@@ -88,5 +88,4 @@ async def watch_game(
                         str(message.get("message", "fatal Lichess stream error"))
                     )
                 if kind == "game_over":
-                    service.finish_game()
                     return

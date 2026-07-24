@@ -7,7 +7,6 @@ from typing import Any, Mapping, Optional, Sequence
 import json
 import sys
 import asyncio
-import os
 
 from .config import AppConfig
 from .errors import GantryError, PendingTransactionError, ValidationError
@@ -40,29 +39,6 @@ def _parser() -> ArgumentParser:
     parser.add_argument(
         "--audit", default="data/audit.jsonl", help="append-only audit log"
     )
-    parser.add_argument(
-        "--redis-url",
-        default=os.environ.get("REDIS_URL"),
-        help="store per-game state in Redis (or set REDIS_URL)",
-    )
-    parser.add_argument(
-        "--upstash-url",
-        default=os.environ.get("UPSTASH_REDIS_REST_URL"),
-        help="Upstash REST URL (or set UPSTASH_REDIS_REST_URL)",
-    )
-    parser.add_argument(
-        "--game-id",
-        dest="storage_game_id",
-        default=os.environ.get("GAME_ID"),
-        help="Redis game namespace for non-Lichess commands",
-    )
-    parser.add_argument(
-        "--completed-game-ttl",
-        type=int,
-        default=int(os.environ.get("COMPLETED_GAME_TTL_SECONDS", "86400")),
-        help="seconds to retain Redis data after game_over (default: 86400)",
-    )
-
     commands = parser.add_subparsers(dest="command", required=True)
 
     plan = commands.add_parser(
@@ -118,6 +94,15 @@ def _parser() -> ArgumentParser:
     )
 
     commands.add_parser("show-state", help="print the current board state")
+    reset_state = commands.add_parser(
+        "reset-state",
+        help="reset tracked state to the standard starting position and clear any journal",
+    )
+    reset_state.add_argument(
+        "--confirm-standard-position",
+        action="store_true",
+        help="required confirmation that all physical pieces are in their standard starting squares",
+    )
     uci = commands.add_parser(
         "uci-to-json",
         help="convert a legal UCI move such as e2e4 to gantry move-delta JSON",
@@ -266,9 +251,102 @@ def _parser() -> ArgumentParser:
         help="home and send the displayed test program to physical hardware",
     )
     motor_test.add_argument(
+        "--distance-mm",
+        type=float,
+        default=20.0,
+        help="distance to move each axis before returning (default: 20)",
+    )
+    motor_test.add_argument(
+        "--feed-mm-min",
+        type=float,
+        default=600.0,
+        help="test movement feed rate in mm/min (default: 600)",
+    )
+    motor_test.add_argument(
+        "--magnet-on",
+        action="store_true",
+        help="pick up at the origin, hold during the outbound move, and release before returning",
+    )
+    motor_test.add_argument(
+        "--confirm-magnet",
+        action="store_true",
+        help="required for physical motor tests with the electromagnet energized",
+    )
+    motor_test.add_argument(
+        "--presentation-loops",
+        type=int,
+        default=0,
+        help="repeat the four-leg path while continuously refreshing full magnet power",
+    )
+    motor_test.add_argument(
         "--demo",
         action="store_true",
         help="simulate Marlin instead of opening the serial port",
+    )
+
+    magnet_test = commands.add_parser(
+        "magnet-test",
+        help="pulse the configured electromagnet output; dry-run unless motion is confirmed",
+    )
+    magnet_test.add_argument(
+        "--duration-s",
+        type=float,
+        default=1.0,
+        help="energized duration in seconds, maximum 5 (default: 1)",
+    )
+    magnet_test.add_argument(
+        "--confirm-motion",
+        action="store_true",
+        help="required before energizing the physical electromagnet",
+    )
+    magnet_test.add_argument(
+        "--demo",
+        action="store_true",
+        help="simulate Marlin instead of opening the serial port",
+    )
+
+    board_sweep = commands.add_parser(
+        "board-sweep",
+        help="visit every board square in a serpentine path; dry-run by default",
+    )
+    board_sweep.add_argument(
+        "--feed-mm-min",
+        type=float,
+        default=1800.0,
+        help="sweep feed rate in mm/min (default: 1800)",
+    )
+    board_sweep.add_argument(
+        "--magnet-on",
+        action="store_true",
+        help="pulse the configured electromagnet at every square",
+    )
+    board_sweep.add_argument(
+        "--output", "-o", help="write the generated sweep G-code to this file"
+    )
+    board_sweep.add_argument(
+        "--confirm-motion",
+        action="store_true",
+        help="send the sweep to Marlin instead of printing a dry run",
+    )
+    board_sweep.add_argument(
+        "--confirm-empty-board",
+        action="store_true",
+        help="required for physical execution after removing all pieces and obstructions",
+    )
+    board_sweep.add_argument(
+        "--confirm-origin",
+        action="store_true",
+        help="required confirmation that the gantry is positioned at the configured coordinate origin",
+    )
+    board_sweep.add_argument(
+        "--confirm-magnet",
+        action="store_true",
+        help="required for a physical sweep with the electromagnet energized",
+    )
+    board_sweep.add_argument(
+        "--demo",
+        action="store_true",
+        help="simulate acknowledged Marlin streaming without opening a serial port",
     )
 
     commands.add_parser(
@@ -304,22 +382,6 @@ def _load_move(path: Path, config: AppConfig) -> MoveDelta:
 
 
 def _service(args: Namespace, config: AppConfig) -> GantryService:
-    upstash_token = os.environ.get("UPSTASH_REDIS_REST_TOKEN")
-    if args.redis_url or args.upstash_url or upstash_token:
-        game_id = getattr(args, "game_id", None) or args.storage_game_id
-        if not game_id:
-            raise ValidationError(
-                "Redis or Upstash storage requires --game-id "
-                "(Lichess commands use their positional game id)"
-            )
-        return GantryService.for_redis(
-            config,
-            args.redis_url,
-            game_id,
-            upstash_url=args.upstash_url,
-            upstash_token=upstash_token,
-            completed_ttl_s=args.completed_game_ttl,
-        )
     return GantryService(config, args.state, args.journal, args.audit)
 
 
@@ -335,6 +397,7 @@ _COMMANDS = frozenset(
         "run",
         "init-state",
         "show-state",
+        "reset-state",
         "uci-to-json",
         "lichess-event",
         "lichess-watch",
@@ -345,6 +408,8 @@ _COMMANDS = frozenset(
         "web",
         "home",
         "motor-test",
+        "magnet-test",
+        "board-sweep",
         "stop",
         "reconcile",
     }
@@ -357,10 +422,6 @@ _OPTION_VALUE_FLAGS = frozenset(
         "--state",
         "--journal",
         "--audit",
-        "--redis-url",
-        "--upstash-url",
-        "--game-id",
-        "--completed-game-ttl",
         "--port",
         "--output",
         "-o",
@@ -440,11 +501,6 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
                 open_browser=not args.no_browser,
                 demo=args.demo,
                 allow_network=args.allow_network,
-                redis_url=args.redis_url,
-                upstash_url=args.upstash_url,
-                upstash_token=os.environ.get("UPSTASH_REDIS_REST_TOKEN"),
-                game_id=args.storage_game_id,
-                completed_game_ttl_s=args.completed_game_ttl,
             )
             return 0
 
@@ -482,6 +538,18 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
 
         if args.command == "show-state":
             _print_json(service.store.load().to_dict())
+            return 0
+
+        if args.command == "reset-state":
+            if not args.confirm_standard_position:
+                parser.error(
+                    "reset-state requires --confirm-standard-position after arranging the physical board"
+                )
+            state = service.reset_state()
+            print(
+                "Board state reset to the standard starting position at "
+                f"revision {state.revision}; pending journal cleared."
+            )
             return 0
 
         if args.command == "uci-to-json":
@@ -624,7 +692,12 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
             return 0
 
         if args.command == "motor-test":
-            program = service.motor_test_program()
+            program = service.motor_test_program(
+                args.distance_mm,
+                args.feed_mm_min,
+                args.magnet_on,
+                args.presentation_loops,
+            )
             if not args.confirm_motion:
                 print("; DRY RUN ONLY: no serial port was opened")
                 print("; outer X and Y are coupled; inner E moves independently")
@@ -639,9 +712,71 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
                     link.send_program(program)
                 print("; DEMO ONLY: no serial port was opened")
             else:
-                program = service.motor_test()
-            print("; fixed outer X/Y and inner E motor test sent successfully")
+                if args.magnet_on and not args.confirm_magnet:
+                    parser.error(
+                        "physical motor-test --magnet-on requires --confirm-magnet"
+                    )
+                program = service.motor_test(
+                    args.distance_mm,
+                    args.feed_mm_min,
+                    args.magnet_on,
+                    args.presentation_loops,
+                )
+            print("; outer X/Y and inner E motor test sent successfully")
             print("\n".join(program))
+            return 0
+
+        if args.command == "magnet-test":
+            program = service.magnet_test_program(args.duration_s)
+            if not args.confirm_motion:
+                print("; DRY RUN ONLY: no serial port was opened")
+                print("\n".join(program))
+                return 0
+            if args.demo:
+                from .serial_link import DemoMarlinSerial
+
+                link = DemoMarlinSerial(config.serial)
+                with link:
+                    link.send_program(config.safety.preflight_commands)
+                    link.send_program(program)
+                print("; DEMO ONLY: no serial port was opened")
+            else:
+                program = service.magnet_test(args.duration_s)
+            print("; configured electromagnet test completed successfully")
+            print("\n".join(program))
+            return 0
+
+        if args.command == "board-sweep":
+            program = service.board_sweep_program(args.feed_mm_min, args.magnet_on)
+            if not args.confirm_motion:
+                print("; DRY RUN ONLY: no serial port was opened")
+            elif args.demo:
+                from .serial_link import DemoMarlinSerial
+
+                link = DemoMarlinSerial(config.serial)
+                with link:
+                    link.send_program(config.safety.preflight_commands)
+                    link.send_program(program)
+                print("; DEMO ONLY: no serial port was opened")
+            else:
+                if not args.confirm_empty_board:
+                    parser.error("physical board-sweep requires --confirm-empty-board")
+                if not args.confirm_origin:
+                    parser.error("physical board-sweep requires --confirm-origin")
+                if args.magnet_on and not args.confirm_magnet:
+                    parser.error(
+                        "physical board-sweep --magnet-on requires --confirm-magnet"
+                    )
+                program = service.board_sweep(args.feed_mm_min, args.magnet_on)
+                print("; physical board sweep completed successfully")
+            text = "\n".join(program) + "\n"
+            if args.output:
+                output = Path(args.output)
+                output.parent.mkdir(parents=True, exist_ok=True)
+                output.write_text(text, encoding="ascii")
+                print(f"; wrote board sweep G-code to {output}")
+            else:
+                print(text, end="")
             return 0
 
         if args.command == "stop":

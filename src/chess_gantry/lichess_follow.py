@@ -136,7 +136,6 @@ def follow_game(
             )
             session.save(session_path)
         if _game_is_finished(pgn):
-            service.finish_game()
             return
         if once:
             return

@@ -15,6 +15,7 @@ data/
 # Editor / agent tooling (not project source)
 .kiro/
 .kilo/
+.vscode/
 .husky/_/
 
 # Python is handled by Black, not Prettier

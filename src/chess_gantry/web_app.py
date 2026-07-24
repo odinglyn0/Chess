@@ -256,11 +256,6 @@ def run_web_server(
     open_browser: bool = True,
     demo: bool = False,
     allow_network: bool = False,
-    redis_url: str | None = None,
-    upstash_url: str | None = None,
-    upstash_token: str | None = None,
-    game_id: str | None = None,
-    completed_game_ttl_s: int = 86400,
 ) -> None:
     if not 1 <= port <= 65_535:
         raise ValidationError("web port must be between 1 and 65535")
@@ -269,19 +264,7 @@ def run_web_server(
             "refusing a network-visible bind without --allow-network; use 127.0.0.1 for local control"
         )
 
-    if redis_url or upstash_url or upstash_token:
-        if not game_id:
-            raise ValidationError("Redis-backed web mode requires --game-id")
-        service = GantryService.for_redis(
-            config,
-            redis_url,
-            game_id,
-            upstash_url=upstash_url,
-            upstash_token=upstash_token,
-            completed_ttl_s=completed_game_ttl_s,
-        )
-    else:
-        service = GantryService(config, state_path, journal_path, audit_path)
+    service = GantryService(config, state_path, journal_path, audit_path)
     controller = GantryController(config, service, demo=demo)
     RequestHandler.controller = controller
     server = GantryHTTPServer((host, port), RequestHandler)

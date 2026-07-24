@@ -36,8 +36,8 @@
     "park_y_mm": 165.0
   },
   "magnet": {
-    "on_commands": ["M106 P1 S153"],
-    "off_commands": ["M107 P1"]
+    "on_commands": ["M106 P0 S255", "M106 P1 S255"],
+    "off_commands": ["M107 P0", "M107 P1"]
   },
   "planner": {
     "kind": "astar",
@@ -85,9 +85,10 @@
     ]
   },
   "safety": {
-    "calibrated": false,
+    "calibrated": true,
     "home_before_execute": false,
     "home_commands": [
+      "M107 P0",
       "M107 P1",
       "M82",
       "M302 P1",

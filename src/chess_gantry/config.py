@@ -316,10 +316,12 @@ class MagnetSettings:
         _unknown(raw, {"on_commands", "off_commands"}, "magnet")
         return cls(
             on_commands=_commands(
-                raw.get("on_commands", ["M106 P1 S153"]), "magnet.on_commands"
+                raw.get("on_commands", ["M106 P0 S255", "M106 P1 S255"]),
+                "magnet.on_commands",
             ),
             off_commands=_commands(
-                raw.get("off_commands", ["M107 P1"]), "magnet.off_commands"
+                raw.get("off_commands", ["M107 P0", "M107 P1"]),
+                "magnet.off_commands",
             ),
         )
 

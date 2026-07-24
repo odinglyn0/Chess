@@ -12,6 +12,8 @@ MARKER_PATTERN = re.compile(r"\b(" + "|".join(MARKERS) + r")\b")
 UNIMPLEMENTED_PATTERN = re.compile(r"raise\s+NotImplementedError")
 SHELL_EXCLUDED_PARTS = {
     ".git",
+    ".kilo",
+    ".kiro",
     ".venv",
     "venv",
     "build",

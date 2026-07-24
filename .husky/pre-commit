@@ -11,8 +11,8 @@ shell_files=$(printf '%s\n' "$staged" | grep -Ei '\.(sh|bash)$' || true)
 printf '%s\n' "$staged" | xargs -r node node_modules/prettier/bin/prettier.cjs --write --ignore-unknown --log-level warn
 
 if [ -n "$py_files" ]; then
-  python scripts/strip_comments.py --write src tests examples scripts
-  python -m black . --quiet
+  uv run python scripts/strip_comments.py --write src tests examples scripts
+  uv run python -m black . --quiet
 fi
 
 printf '%s\n' "$staged" | while IFS= read -r f; do
@@ -22,5 +22,5 @@ printf '%s\n' "$staged" | while IFS= read -r f; do
 done
 
 if [ -n "$py_files" ] || [ -n "$shell_files" ]; then
-  python scripts/steering_check.py .
+  uv run python scripts/steering_check.py .
 fi

@@ -8,9 +8,9 @@
     "format:check": "npm run format:prettier:check && npm run format:python:check",
     "format:prettier": "node node_modules/prettier/bin/prettier.cjs --write .",
     "format:prettier:check": "node node_modules/prettier/bin/prettier.cjs --check .",
-    "format:python": "python scripts/strip_comments.py --write src tests examples scripts && python -m black .",
-    "format:python:check": "python -m black --check . && python scripts/strip_comments.py --check src tests examples scripts",
-    "steering:check": "python scripts/steering_check.py .",
+    "format:python": "uv run python scripts/strip_comments.py --write src tests examples scripts && uv run python -m black .",
+    "format:python:check": "uv run python -m black --check . && uv run python scripts/strip_comments.py --check src tests examples scripts",
+    "steering:check": "uv run python scripts/steering_check.py .",
     "check": "npm run format:check && npm run steering:check",
     "prepare": "husky"
   },

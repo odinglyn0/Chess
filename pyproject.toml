@@ -8,13 +8,7 @@ version = "0.2.0"
 description = "JSON-to-G-code framework for a Raspberry Pi chess gantry using Marlin over serial"
 readme = "README.md"
 requires-python = ">=3.9"
-dependencies = [
-  "pyserial>=3.5,<4",
-  "websockets>=15,<17",
-  "chess>=1.11.2,<2",
-  "redis>=5,<7",
-  "upstash-redis>=1,<2",
-]
+dependencies = ["pyserial>=3.5,<4", "websockets>=15,<17", "chess>=1.11.2,<2"]
 
 [project.scripts]
 chess-gantry = "chess_gantry.cli:main"
@@ -32,7 +26,8 @@ dev = ["black>=25.9,<26"]
 target-version = ["py39"]
 extend-exclude = '''
 /(
-  \.venv
+  \.kilo
+  | \.venv
   | build
   | dist
   | data

@@ -22,6 +22,10 @@ _POSITION_RE = re.compile(
     r"\bX:\s*(-?\d+(?:\.\d+)?)\s+Y:\s*(-?\d+(?:\.\d+)?)",
     re.IGNORECASE,
 )
+_INNER_POSITION_RE = re.compile(
+    r"\bE:\s*(-?\d+(?:\.\d+)?)",
+    re.IGNORECASE,
+)
 
 
 class GantryController:
@@ -144,8 +148,14 @@ class GantryController:
         for line in responses:
             match = _POSITION_RE.search(line)
             if match:
+                inner_match = _INNER_POSITION_RE.search(line)
                 self._position = MachinePoint(
-                    float(match.group(1)), float(match.group(2))
+                    (
+                        float(inner_match.group(1))
+                        if inner_match is not None
+                        else float(match.group(1))
+                    ),
+                    float(match.group(2)),
                 )
                 return self._position
         return None
@@ -205,7 +215,7 @@ class GantryController:
         with self._operation_lock:
             if not self._homed:
                 raise ConfigurationError(
-                    "home X and Y before commanding an absolute coordinate"
+                    "initialize the outer X/Y axes before commanding an absolute coordinate"
                 )
             link = self._require_link()
             link.send_program(
@@ -213,7 +223,7 @@ class GantryController:
                     "G21",
                     "G90",
                     *self.config.magnet.off_commands,
-                    f"G1 X{x_mm:.3f} Y{y_mm:.3f} Z{y_mm:.3f} F{feed_mm_min:.0f}",
+                    f"G1 X{y_mm:.3f} Y{y_mm:.3f} E{x_mm:.3f} F{feed_mm_min:.0f}",
                     "M400",
                 )
             )

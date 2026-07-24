@@ -274,6 +274,36 @@ class BoardState:
     processed_events: Tuple[str, ...] = ()
 
     @classmethod
+    def standard(cls, width: int = 8, height: int = 8) -> "BoardState":
+        if width != 8 or height != 8:
+            raise ValidationError(
+                "automatic game initialization currently requires an 8x8 board"
+            )
+        pieces: Dict[str, PieceState] = {}
+        back_rank = (
+            ("rook", "a"),
+            ("knight", "b"),
+            ("bishop", "c"),
+            ("queen", "d"),
+            ("king", "e"),
+            ("bishop", "f"),
+            ("knight", "g"),
+            ("rook", "h"),
+        )
+        for color, pawn_y, back_y in (("white", 1, 0), ("black", 6, 7)):
+            for x, file_name in enumerate("abcdefgh"):
+                piece_id = f"{color}_pawn_{file_name}"
+                pieces[piece_id] = PieceState(
+                    piece_id, x=x, y=pawn_y, metadata={"color": color, "kind": "pawn"}
+                )
+            for x, (kind, file_name) in enumerate(back_rank):
+                piece_id = f"{color}_{kind}_{file_name}"
+                pieces[piece_id] = PieceState(
+                    piece_id, x=x, y=back_y, metadata={"color": color, "kind": kind}
+                )
+        return cls(schema_version=1, revision=0, pieces=pieces)
+
+    @classmethod
     def from_mapping(
         cls, raw: Mapping[str, Any], width: int = 8, height: int = 8
     ) -> "BoardState":

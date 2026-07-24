@@ -37,7 +37,8 @@
   },
   "magnet": {
     "on_commands": ["M106 P1 S153"],
-    "off_commands": ["M107 P1"]
+    "off_commands": ["M107 P1"],
+    "PWM_power": 60
   },
   "planner": {
     "kind": "astar",

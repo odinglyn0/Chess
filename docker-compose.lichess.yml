@@ -1,4 +1,13 @@
 services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - chess-redis:/data
+    restart: unless-stopped
+
   lichess-stream:
     build:
       context: .
@@ -12,4 +21,9 @@ services:
       CHESS_STREAM_LOG_LEVEL: "info"
       CHESS_STREAM_LICHESS_BASE_URL: "https://lichess.org"
       CHESS_STREAM_LICHESS_TOKEN: "${LICHESS_TOKEN:-}"
+    depends_on:
+      - redis
     restart: unless-stopped
+
+volumes:
+  chess-redis:

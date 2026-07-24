@@ -5,12 +5,21 @@ from pathlib import Path
 from time import sleep
 from typing import Any, Iterable, Mapping
 import json
+import re
 
 from .errors import ConfigurationError, PlanningError, ValidationError
 from .lichess_pgn import fetch_pgn, pgn_moves
 from .models import BoardState, MoveDelta
 from .persistence import atomic_write_json, read_json
 from .service import GantryService
+
+
+_RESULT_RE = re.compile(r'^\[Result\s+"([^"]+)"\]\s*$', re.MULTILINE)
+
+
+def _game_is_finished(pgn: str) -> bool:
+    match = _RESULT_RE.search(pgn)
+    return match is not None and match.group(1) in {"1-0", "0-1", "1/2-1/2"}
 
 
 @dataclass(frozen=True)
@@ -126,6 +135,9 @@ def follow_game(
                 session.emitted_event_ids | {move.event_id},
             )
             session.save(session_path)
+        if _game_is_finished(pgn):
+            service.finish_game()
+            return
         if once:
             return
         sleep(interval_s)

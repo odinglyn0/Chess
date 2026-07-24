@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from chess_gantry.lichess_follow import FollowSession
+from chess_gantry.lichess_follow import FollowSession, _game_is_finished
 from chess_gantry.lichess_pgn import pgn_moves
 from chess_gantry.models import BoardState, GridPosition
 
@@ -47,6 +47,10 @@ class LichessPgnTests(unittest.TestCase):
                 path, "game123", self.standard_state(), reset=False
             )
             self.assertEqual(loaded.emitted_event_ids, frozenset({"game123.1"}))
+
+    def test_finished_pgn_detection(self) -> None:
+        self.assertTrue(_game_is_finished('[Result "1-0"]\n\n1. e4 1-0'))
+        self.assertFalse(_game_is_finished('[Result "*"]\n\n1. e4 *'))
 
 
 if __name__ == "__main__":

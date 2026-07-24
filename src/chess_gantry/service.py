@@ -97,6 +97,52 @@ class GantryService:
         self.audit = AuditLog(audit_path)
         self._link_factory = link_factory or (lambda settings: MarlinSerial(settings))
         self._generator = GCodeGenerator(config)
+        self.game_storage: Optional[Any] = None
+
+    @classmethod
+    def for_redis(
+        cls,
+        config: AppConfig,
+        redis_url: Optional[str],
+        game_id: str,
+        *,
+        upstash_url: Optional[str] = None,
+        upstash_token: Optional[str] = None,
+        completed_ttl_s: int = 86400,
+        key_prefix: str = "chess-gantry",
+        link_factory: Optional[Callable[[Any], MarlinSerial]] = None,
+    ) -> "GantryService":
+        from .redis_persistence import RedisGameStorage, redis_client
+
+        storage = RedisGameStorage(
+            redis_client(
+                redis_url,
+                upstash_url=upstash_url,
+                upstash_token=upstash_token,
+            ),
+            game_id,
+            config.board.width,
+            config.board.height,
+            key_prefix=key_prefix,
+            completed_ttl_s=completed_ttl_s,
+        )
+        instance = cls.__new__(cls)
+        instance.config = config
+        validate_board_inside_workspace(config.board, config.workspace)
+        instance.store = storage.store
+        instance.journal = storage.journal
+        instance.audit = storage.audit
+        instance._link_factory = link_factory or (
+            lambda settings: MarlinSerial(settings)
+        )
+        instance._generator = GCodeGenerator(config)
+        instance.game_storage = storage
+        storage.initialize_game()
+        return instance
+
+    def finish_game(self) -> None:
+        if self.game_storage is not None:
+            self.game_storage.finish_game()
 
     def _capture_slot_for(self, state: BoardState) -> int:
         if not self.config.capture.enabled:

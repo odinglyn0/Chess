@@ -7,6 +7,7 @@ from typing import Any, Mapping, Optional, Sequence
 import json
 import sys
 import asyncio
+import os
 
 from .config import AppConfig
 from .errors import GantryError, PendingTransactionError, ValidationError
@@ -38,6 +39,28 @@ def _parser() -> ArgumentParser:
     )
     parser.add_argument(
         "--audit", default="data/audit.jsonl", help="append-only audit log"
+    )
+    parser.add_argument(
+        "--redis-url",
+        default=os.environ.get("REDIS_URL"),
+        help="store per-game state in Redis (or set REDIS_URL)",
+    )
+    parser.add_argument(
+        "--upstash-url",
+        default=os.environ.get("UPSTASH_REDIS_REST_URL"),
+        help="Upstash REST URL (or set UPSTASH_REDIS_REST_URL)",
+    )
+    parser.add_argument(
+        "--game-id",
+        dest="storage_game_id",
+        default=os.environ.get("GAME_ID"),
+        help="Redis game namespace for non-Lichess commands",
+    )
+    parser.add_argument(
+        "--completed-game-ttl",
+        type=int,
+        default=int(os.environ.get("COMPLETED_GAME_TTL_SECONDS", "86400")),
+        help="seconds to retain Redis data after game_over (default: 86400)",
     )
 
     commands = parser.add_subparsers(dest="command", required=True)
@@ -281,6 +304,22 @@ def _load_move(path: Path, config: AppConfig) -> MoveDelta:
 
 
 def _service(args: Namespace, config: AppConfig) -> GantryService:
+    upstash_token = os.environ.get("UPSTASH_REDIS_REST_TOKEN")
+    if args.redis_url or args.upstash_url or upstash_token:
+        game_id = getattr(args, "game_id", None) or args.storage_game_id
+        if not game_id:
+            raise ValidationError(
+                "Redis or Upstash storage requires --game-id "
+                "(Lichess commands use their positional game id)"
+            )
+        return GantryService.for_redis(
+            config,
+            args.redis_url,
+            game_id,
+            upstash_url=args.upstash_url,
+            upstash_token=upstash_token,
+            completed_ttl_s=args.completed_game_ttl,
+        )
     return GantryService(config, args.state, args.journal, args.audit)
 
 
@@ -318,6 +357,10 @@ _OPTION_VALUE_FLAGS = frozenset(
         "--state",
         "--journal",
         "--audit",
+        "--redis-url",
+        "--upstash-url",
+        "--game-id",
+        "--completed-game-ttl",
         "--port",
         "--output",
         "-o",
@@ -397,6 +440,11 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
                 open_browser=not args.no_browser,
                 demo=args.demo,
                 allow_network=args.allow_network,
+                redis_url=args.redis_url,
+                upstash_url=args.upstash_url,
+                upstash_token=os.environ.get("UPSTASH_REDIS_REST_TOKEN"),
+                game_id=args.storage_game_id,
+                completed_game_ttl_s=args.completed_game_ttl,
             )
             return 0
 

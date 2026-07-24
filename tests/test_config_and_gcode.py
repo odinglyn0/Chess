@@ -57,7 +57,7 @@ class ConfigAndGCodeTests(unittest.TestCase):
             ),
         )
         commands = GCodeGenerator(config).generate([transfer]).commands
-        on_index = commands.index("M106 S255")
+        on_index = commands.index("M106 P1 S153")
         self.assertIn("M82", commands)
         self.assertIn("M302 P1", commands)
         self.assertIn("G0 X10 Y340 E10 F12000", commands)
@@ -66,7 +66,7 @@ class ConfigAndGCodeTests(unittest.TestCase):
         off_after_drag = next(
             index
             for index in range(final_drag + 1, len(commands))
-            if commands[index] == "M107"
+            if commands[index] == "M107 P1"
         )
         self.assertEqual(commands[on_index - 1], "M400")
         self.assertLess(on_index, first_drag)

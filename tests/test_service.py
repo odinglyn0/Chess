@@ -103,10 +103,11 @@ class ServiceTests(unittest.TestCase):
             self.assertEqual(service.store.load().revision, 0)
             self.assertFalse(journal_path.exists())
             commands = plan.program.commands
-            self.assertIn("M106 S255", commands)
-            self.assertIn("M107", commands)
+            self.assertIn("M106 P1 S153", commands)
+            self.assertIn("M107 P1", commands)
             self.assertLess(
-                commands.index("M106 S255"), commands.index("G1 X70 Y280 E90 F3000")
+                commands.index("M106 P1 S153"),
+                commands.index("G1 X70 Y280 E90 F3000"),
             )
 
     def test_capture_generates_two_transfers_and_updates_expected_state(self) -> None:
@@ -218,7 +219,7 @@ class ServiceTests(unittest.TestCase):
             self.assertTrue(journal_path.exists())
             self.assertEqual(service.journal.load()["status"], "failed_or_unknown")
             self.assertEqual(
-                fake.best_effort_programs, [("M107", "M302 P0", "M211 S1")]
+                fake.best_effort_programs, [("M107 P1", "M302 P0", "M211 S1")]
             )
 
             reconciled = service.reconcile_mark_applied()

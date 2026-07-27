@@ -15,46 +15,28 @@ from .persistence import utc_now
 _GAME_ID_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,120}$")
 
 
-def redis_client(
-    url: Optional[str] = None,
-    *,
-    upstash_url: Optional[str] = None,
-    upstash_token: Optional[str] = None,
-) -> Any:
-    if upstash_url or upstash_token:
-        if not upstash_url or not upstash_token:
-            raise StateError(
-                "both UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required"
-            )
-        try:
-            from upstash_redis import Redis
-        except ImportError as exc:
-            raise StateError("Upstash support is not installed; run 'uv sync'") from exc
-        try:
-            client = Redis(
-                url=upstash_url,
-                token=upstash_token,
-                allow_telemetry=False,
-            )
-            client.ping()
-            return client
-        except Exception as exc:
-            raise StateError(f"cannot connect to Upstash Redis: {exc}") from exc
-    if not url:
-        raise StateError("a Redis URL or Upstash REST credentials are required")
+def upstash_client(upstash_url: Optional[str], upstash_token: Optional[str]) -> Any:
+    if not upstash_url or not upstash_token:
+        raise StateError(
+            "both UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required"
+        )
     try:
-        import redis
+        from upstash_redis import Redis
     except ImportError as exc:
-        raise StateError("Redis support is not installed; run 'uv sync'") from exc
+        raise StateError("Upstash support is not installed; run 'uv sync'") from exc
     try:
-        client = redis.Redis.from_url(url, decode_responses=True)
+        client = Redis(
+            url=upstash_url,
+            token=upstash_token,
+            allow_telemetry=False,
+        )
         client.ping()
         return client
-    except redis.RedisError as exc:
-        raise StateError(f"cannot connect to Redis: {exc}") from exc
+    except Exception as exc:
+        raise StateError(f"cannot connect to Upstash Redis: {exc}") from exc
 
 
-class RedisGameStorage:
+class UpstashGameStorage:
     def __init__(
         self,
         client: Any,
@@ -79,10 +61,9 @@ class RedisGameStorage:
         self.journal_key = f"{self.root_key}:journal"
         self.audit_key = f"{self.root_key}:audit"
         self.lock_key = f"{self.root_key}:lock"
-        self.is_upstash = client.__class__.__module__.startswith("upstash_redis")
-        self.store = RedisBoardStore(self)
-        self.journal = RedisJournalStore(self)
-        self.audit = RedisAuditLog(self)
+        self.store = UpstashBoardStore(self)
+        self.journal = UpstashJournalStore(self)
+        self.audit = UpstashAuditLog(self)
 
     def initialize_game(self) -> BoardState:
         initial = BoardState.standard(self.width, self.height)
@@ -95,7 +76,7 @@ class RedisGameStorage:
             self.client.expire(key, self.completed_ttl_s)
 
 
-class _UpstashLock:
+class UpstashLock:
     def __init__(
         self, client: Any, key: str, timeout: int, blocking_timeout: int
     ) -> None:
@@ -123,8 +104,8 @@ class _UpstashLock:
         )
 
 
-class RedisBoardStore:
-    def __init__(self, storage: RedisGameStorage) -> None:
+class UpstashBoardStore:
+    def __init__(self, storage: UpstashGameStorage) -> None:
         self.storage = storage
         self.path = storage.state_key
         self.width = storage.width
@@ -132,17 +113,11 @@ class RedisBoardStore:
 
     @contextmanager
     def locked(self) -> Iterator[None]:
-        lock = (
-            _UpstashLock(
-                self.storage.client,
-                self.storage.lock_key,
-                timeout=180,
-                blocking_timeout=30,
-            )
-            if self.storage.is_upstash
-            else self.storage.client.lock(
-                self.storage.lock_key, timeout=180, blocking_timeout=30
-            )
+        lock = UpstashLock(
+            self.storage.client,
+            self.storage.lock_key,
+            timeout=180,
+            blocking_timeout=30,
         )
         if not lock.acquire(blocking=True):
             raise StateError(f"timed out locking game {self.storage.game_id!r}")
@@ -161,7 +136,7 @@ class RedisBoardStore:
         try:
             raw = json.loads(encoded)
         except (TypeError, json.JSONDecodeError) as exc:
-            raise StateError("Redis board state is invalid JSON") from exc
+            raise StateError("Upstash board state is invalid JSON") from exc
         return BoardState.from_mapping(raw, self.width, self.height)
 
     def save(self, state: BoardState) -> None:
@@ -181,8 +156,8 @@ class RedisBoardStore:
             raise StateError(f"state already exists for game {self.storage.game_id!r}")
 
 
-class RedisJournalStore:
-    def __init__(self, storage: RedisGameStorage) -> None:
+class UpstashJournalStore:
+    def __init__(self, storage: UpstashGameStorage) -> None:
         self.storage = storage
         self.path = storage.journal_key
 
@@ -192,7 +167,7 @@ class RedisJournalStore:
     def load(self) -> Mapping[str, Any]:
         encoded = self.storage.client.get(self.storage.journal_key)
         if encoded is None:
-            raise StateError("pending Redis transaction does not exist")
+            raise StateError("pending Upstash transaction does not exist")
         return json.loads(encoded)
 
     def create(self, payload: Mapping[str, Any]) -> None:
@@ -221,8 +196,8 @@ class RedisJournalStore:
         self.storage.client.delete(self.storage.journal_key)
 
 
-class RedisAuditLog:
-    def __init__(self, storage: RedisGameStorage) -> None:
+class UpstashAuditLog:
+    def __init__(self, storage: UpstashGameStorage) -> None:
         self.storage = storage
         self.path = storage.audit_key
 

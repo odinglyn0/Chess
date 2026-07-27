@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any, Mapping, Optional, Sequence
 import json
 import sys
-import asyncio
 import os
 
 from .config import AppConfig
@@ -15,8 +14,6 @@ from .models import BoardState, MoveDelta
 from .persistence import read_json
 from .serial_link import MarlinSerial, discover_serial_ports
 from .service import GantryService
-from .lichess_adapter import stream_event_to_move
-from .lichess_watch import watch_game
 from .lichess_pgn import fetch_pgn, pgn_moves
 from .lichess_follow import follow_game
 from .uci_adapter import uci_to_move
@@ -41,26 +38,21 @@ def _parser() -> ArgumentParser:
         "--audit", default="data/audit.jsonl", help="append-only audit log"
     )
     parser.add_argument(
-        "--redis-url",
-        default=os.environ.get("REDIS_URL"),
-        help="store per-game state in Redis (or set REDIS_URL)",
-    )
-    parser.add_argument(
         "--upstash-url",
         default=os.environ.get("UPSTASH_REDIS_REST_URL"),
-        help="Upstash REST URL (or set UPSTASH_REDIS_REST_URL)",
+        help="store per-game state in Upstash (or set UPSTASH_REDIS_REST_URL)",
     )
     parser.add_argument(
         "--game-id",
         dest="storage_game_id",
         default=os.environ.get("GAME_ID"),
-        help="Redis game namespace for non-Lichess commands",
+        help="Upstash game namespace for non-Lichess commands",
     )
     parser.add_argument(
         "--completed-game-ttl",
         type=int,
         default=int(os.environ.get("COMPLETED_GAME_TTL_SECONDS", "86400")),
-        help="seconds to retain Redis data after game_over (default: 86400)",
+        help="seconds to retain Upstash data after game_over (default: 86400)",
     )
 
     commands = parser.add_subparsers(dest="command", required=True)
@@ -132,40 +124,6 @@ def _parser() -> ArgumentParser:
     uci.add_argument(
         "--output", "-o", help="write move JSON to this file instead of stdout"
     )
-    lichess = commands.add_parser(
-        "lichess-event",
-        help="convert a move envelope from services/lichess_stream into gantry JSON and G-code",
-    )
-    lichess.add_argument(
-        "event_json", help="saved type=move WebSocket envelope from the Lichess stream"
-    )
-    lichess.add_argument(
-        "--move-output", help="write converted gantry move JSON to this file"
-    )
-    lichess.add_argument("--gcode-output", help="write planned G-code to this file")
-    watch = commands.add_parser(
-        "lichess-watch",
-        help="subscribe to the upstream Lichess API and plan or execute moves",
-    )
-    watch.add_argument("game_id", help="Lichess game id")
-    watch.add_argument(
-        "--stream-url",
-        default="ws://127.0.0.1:8010",
-        help="upstream stream service URL",
-    )
-    watch.add_argument(
-        "--output-dir",
-        default="data/lichess",
-        help="directory for generated event JSON and G-code",
-    )
-    watch.add_argument(
-        "--execute",
-        action="store_true",
-        help="execute every received move instead of planning only",
-    )
-    watch.add_argument(
-        "--confirm-motion", action="store_true", help="required with --execute"
-    )
     pgn = commands.add_parser(
         "lichess-pgn",
         help="fetch a Lichess game and dry-run all recorded moves to JSON and G-code",
@@ -178,7 +136,7 @@ def _parser() -> ArgumentParser:
     )
     follow = commands.add_parser(
         "lichess-follow",
-        help="poll Lichess PGN and automatically create JSON/G-code for new moves",
+        help="stream a Lichess game in real time and create JSON/G-code for new moves",
     )
     follow.add_argument("game_id", help="Lichess game id")
     follow.add_argument(
@@ -188,12 +146,15 @@ def _parser() -> ArgumentParser:
     )
     follow.add_argument("--session", help="persistent follow-session JSON path")
     follow.add_argument(
-        "--interval", type=float, default=5.0, help="PGN polling interval in seconds"
+        "--interval",
+        type=float,
+        default=5.0,
+        help="seconds to wait before reconnecting a dropped stream",
     )
     follow.add_argument(
         "--once",
         action="store_true",
-        help="poll once, generate available new moves, then exit",
+        help="process the current game state once, then exit",
     )
     follow.add_argument(
         "--reset-session",
@@ -305,16 +266,15 @@ def _load_move(path: Path, config: AppConfig) -> MoveDelta:
 
 def _service(args: Namespace, config: AppConfig) -> GantryService:
     upstash_token = os.environ.get("UPSTASH_REDIS_REST_TOKEN")
-    if args.redis_url or args.upstash_url or upstash_token:
+    if args.upstash_url or upstash_token:
         game_id = getattr(args, "game_id", None) or args.storage_game_id
         if not game_id:
             raise ValidationError(
-                "Redis or Upstash storage requires --game-id "
+                "Upstash storage requires --game-id "
                 "(Lichess commands use their positional game id)"
             )
-        return GantryService.for_redis(
+        return GantryService.for_upstash(
             config,
-            args.redis_url,
             game_id,
             upstash_url=args.upstash_url,
             upstash_token=upstash_token,
@@ -336,8 +296,6 @@ _COMMANDS = frozenset(
         "init-state",
         "show-state",
         "uci-to-json",
-        "lichess-event",
-        "lichess-watch",
         "lichess-pgn",
         "lichess-follow",
         "ports",
@@ -357,7 +315,6 @@ _OPTION_VALUE_FLAGS = frozenset(
         "--state",
         "--journal",
         "--audit",
-        "--redis-url",
         "--upstash-url",
         "--game-id",
         "--completed-game-ttl",
@@ -440,7 +397,6 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
                 open_browser=not args.no_browser,
                 demo=args.demo,
                 allow_network=args.allow_network,
-                redis_url=args.redis_url,
                 upstash_url=args.upstash_url,
                 upstash_token=os.environ.get("UPSTASH_REDIS_REST_TOKEN"),
                 game_id=args.storage_game_id,
@@ -504,50 +460,6 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
                 print(f"Wrote move JSON to {output}.")
             else:
                 _print_json(payload)
-            return 0
-
-        if args.command == "lichess-event":
-            if service.journal.exists():
-                raise PendingTransactionError(
-                    f"a pending transaction exists at {service.journal.path}; state may not match the physical board"
-                )
-            with service.store.locked():
-                state = service.store.load()
-                move = stream_event_to_move(
-                    read_json(Path(args.event_json)),
-                    config.board.width,
-                    config.board.height,
-                    state,
-                )
-                plan = service.plan(move, state)
-            if args.move_output:
-                output = Path(args.move_output)
-                output.parent.mkdir(parents=True, exist_ok=True)
-                output.write_text(
-                    json.dumps(move.to_dict(), indent=2, sort_keys=True) + "\n",
-                    encoding="ascii",
-                )
-                print(f"Wrote move JSON to {output}.")
-            if args.gcode_output:
-                output = Path(args.gcode_output)
-                output.parent.mkdir(parents=True, exist_ok=True)
-                output.write_text(plan.program.text(), encoding="ascii")
-                print(f"Wrote {len(plan.program.commands)} commands to {output}.")
-            _print_json(plan.summary())
-            return 0
-
-        if args.command == "lichess-watch":
-            if args.execute and not args.confirm_motion:
-                parser.error("lichess-watch --execute requires --confirm-motion")
-            asyncio.run(
-                watch_game(
-                    service,
-                    args.stream_url,
-                    args.game_id,
-                    Path(args.output_dir),
-                    execute=args.execute,
-                )
-            )
             return 0
 
         if args.command == "lichess-pgn":

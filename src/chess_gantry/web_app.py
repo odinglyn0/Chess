@@ -256,7 +256,6 @@ def run_web_server(
     open_browser: bool = True,
     demo: bool = False,
     allow_network: bool = False,
-    redis_url: str | None = None,
     upstash_url: str | None = None,
     upstash_token: str | None = None,
     game_id: str | None = None,
@@ -269,12 +268,11 @@ def run_web_server(
             "refusing a network-visible bind without --allow-network; use 127.0.0.1 for local control"
         )
 
-    if redis_url or upstash_url or upstash_token:
+    if upstash_url or upstash_token:
         if not game_id:
-            raise ValidationError("Redis-backed web mode requires --game-id")
-        service = GantryService.for_redis(
+            raise ValidationError("Upstash-backed web mode requires --game-id")
+        service = GantryService.for_upstash(
             config,
-            redis_url,
             game_id,
             upstash_url=upstash_url,
             upstash_token=upstash_token,

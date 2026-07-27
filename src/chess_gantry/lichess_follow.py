@@ -3,12 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from time import sleep
-from typing import Any, Iterable, Mapping
+from typing import Any, Iterable, Optional, Tuple
 import json
 import re
 
-from .errors import ConfigurationError, PlanningError, ValidationError
-from .lichess_pgn import fetch_pgn, pgn_moves
+from .errors import ConfigurationError, GantryError, PlanningError, ValidationError
+from .lichess_pgn import fetch_pgn, lichess_client, pgn_moves
 from .models import BoardState, MoveDelta
 from .persistence import atomic_write_json, read_json
 from .service import GantryService
@@ -60,87 +60,19 @@ class FollowSession:
             },
         )
 
+    def with_emitted(self, event_id: str) -> "FollowSession":
+        return FollowSession(
+            self.game_id,
+            self.base_state,
+            self.emitted_event_ids | {event_id},
+        )
+
 
 def _write_plan(output_dir: Path, move: MoveDelta, program_text: str) -> None:
     (output_dir / f"{move.event_id}.json").write_text(
         json.dumps(move.to_dict(), indent=2, sort_keys=True) + "\n", encoding="ascii"
     )
     (output_dir / f"{move.event_id}.gcode").write_text(program_text, encoding="ascii")
-
-
-def follow_game(
-    service: GantryService,
-    game_id: str,
-    output_dir: Path,
-    session_path: Path,
-    *,
-    interval_s: float,
-    execute: bool,
-    execute_existing: bool,
-    reset_session: bool,
-    once: bool,
-) -> None:
-    if interval_s <= 0:
-        raise ConfigurationError("poll interval must be positive")
-    if service.journal.exists():
-        raise ConfigurationError(
-            f"pending transaction exists at {service.journal.path}; reconcile it first"
-        )
-    output_dir.mkdir(parents=True, exist_ok=True)
-    session = FollowSession.load_or_create(
-        session_path, game_id, service.store.load(), reset_session
-    )
-    session.save(session_path)
-    print(
-        f"Following Lichess game {game_id}; {'executing' if execute else 'dry-running'} "
-        f"every {interval_s:g}s. Files: {output_dir}"
-    )
-    while True:
-        pgn = fetch_pgn(game_id)
-        moves = tuple(pgn_moves(game_id, pgn, session.base_state))
-        for move in moves:
-            already_emitted = move.event_id in session.emitted_event_ids
-            already_executed = move.event_id in service.store.load().processed_events
-            if execute:
-                if already_executed:
-                    continue
-                if already_emitted and not execute_existing:
-                    continue
-                plan = service.execute(move)
-                _write_plan(output_dir, move, plan.program.text())
-                print(
-                    f"\n; executed Lichess move {move.event_id}\n{plan.program.text()}",
-                    end="",
-                )
-            else:
-                if already_emitted:
-                    continue
-                try:
-                    plan = service.plan(
-                        move, _state_before(moves, move, session.base_state, service)
-                    )
-                except PlanningError as exc:
-                    raise PlanningError(
-                        f"Lichess move {move.event_id} ({move.piece_id}: "
-                        f"{move.previous.x},{move.previous.y} -> {move.new.x},{move.new.y}) failed: {exc}"
-                    ) from exc
-                _write_plan(output_dir, move, plan.program.text())
-                print(
-                    f"\n; dry-run Lichess move {move.event_id}\n{plan.program.text()}",
-                    end="",
-                )
-            session = FollowSession(
-                session.game_id,
-                session.base_state,
-                session.emitted_event_ids | {move.event_id},
-            )
-            session.save(session_path)
-        if _game_is_finished(pgn):
-            service.finish_game()
-            return
-        if once:
-            return
-        sleep(interval_s)
 
 
 def _state_before(
@@ -158,3 +90,146 @@ def _state_before(
     raise ValidationError(
         f"Lichess move {target.event_id} is missing from its PGN sequence"
     )
+
+
+def _process_available(
+    service: GantryService,
+    game_id: str,
+    output_dir: Path,
+    session_path: Path,
+    session: FollowSession,
+    *,
+    execute: bool,
+    execute_existing: bool,
+    token: Optional[str],
+    client: Any,
+) -> Tuple[FollowSession, bool]:
+    pgn = fetch_pgn(game_id, token=token, client=client)
+    moves = tuple(pgn_moves(game_id, pgn, session.base_state))
+    for move in moves:
+        assert move.event_id is not None
+        already_emitted = move.event_id in session.emitted_event_ids
+        already_executed = move.event_id in service.store.load().processed_events
+        if execute:
+            if already_executed:
+                continue
+            if already_emitted and not execute_existing:
+                continue
+            plan = service.execute(move)
+            _write_plan(output_dir, move, plan.program.text())
+            print(
+                f"\n; executed Lichess move {move.event_id}\n{plan.program.text()}",
+                end="",
+            )
+        else:
+            if already_emitted:
+                continue
+            try:
+                plan = service.plan(
+                    move, _state_before(moves, move, session.base_state, service)
+                )
+            except PlanningError as exc:
+                raise PlanningError(
+                    f"Lichess move {move.event_id} ({move.piece_id}: "
+                    f"{move.previous.x},{move.previous.y} -> "
+                    f"{move.new.x},{move.new.y}) failed: {exc}"
+                ) from exc
+            _write_plan(output_dir, move, plan.program.text())
+            print(
+                f"\n; dry-run Lichess move {move.event_id}\n{plan.program.text()}",
+                end="",
+            )
+        session = session.with_emitted(move.event_id)
+        session.save(session_path)
+    return session, _game_is_finished(pgn)
+
+
+def follow_game(
+    service: GantryService,
+    game_id: str,
+    output_dir: Path,
+    session_path: Path,
+    *,
+    interval_s: float,
+    execute: bool,
+    execute_existing: bool,
+    reset_session: bool,
+    once: bool,
+    token: Optional[str] = None,
+) -> None:
+    if interval_s <= 0:
+        raise ConfigurationError("reconnect interval must be positive")
+    if service.journal.exists():
+        raise ConfigurationError(
+            f"pending transaction exists at {service.journal.path}; reconcile it first"
+        )
+    output_dir.mkdir(parents=True, exist_ok=True)
+    session = FollowSession.load_or_create(
+        session_path, game_id, service.store.load(), reset_session
+    )
+    session.save(session_path)
+    client = lichess_client(token)
+    print(
+        f"Following Lichess game {game_id} in real time; "
+        f"{'executing' if execute else 'dry-running'} new moves. Files: {output_dir}"
+    )
+
+    session, finished = _process_available(
+        service,
+        game_id,
+        output_dir,
+        session_path,
+        session,
+        execute=execute,
+        execute_existing=execute_existing,
+        token=token,
+        client=client,
+    )
+    if finished:
+        service.finish_game()
+        return
+    if once:
+        return
+
+    while True:
+        try:
+            for _event in client.games.stream_game_moves(game_id):
+                session, finished = _process_available(
+                    service,
+                    game_id,
+                    output_dir,
+                    session_path,
+                    session,
+                    execute=execute,
+                    execute_existing=execute_existing,
+                    token=token,
+                    client=client,
+                )
+                if finished:
+                    service.finish_game()
+                    return
+        except GantryError:
+            raise
+        except Exception as exc:
+            print(
+                f"\n; Lichess stream interrupted ({exc}); "
+                f"reconnecting in {interval_s:g}s",
+                end="",
+            )
+            sleep(interval_s)
+            continue
+        session, finished = _process_available(
+            service,
+            game_id,
+            output_dir,
+            session_path,
+            session,
+            execute=execute,
+            execute_existing=execute_existing,
+            token=token,
+            client=client,
+        )
+        if finished:
+            service.finish_game()
+            return
+        sleep(interval_s)

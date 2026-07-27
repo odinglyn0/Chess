@@ -211,7 +211,8 @@ chess-gantry --config config.json --state data/board_state.json \
   lichess-pgn GAME_ID --output-dir data/lichess
 ```
 
-Poll a public game and create JSON/G-code for new moves:
+Stream a public game in real time and create JSON/G-code for new moves as they
+are played:
 
 ```bash
 chess-gantry --config config.json --state data/board_state.json \
@@ -227,6 +228,9 @@ chess-gantry --config config.json --state data/board_state.json \
   lichess-follow GAME_ID --interval 10
 ```
 
+`--once` processes the current game state a single time and exits. `--interval`
+is the delay in seconds before reconnecting a dropped stream.
+
 Physical execution of followed moves requires explicit opt-in:
 
 ```bash
@@ -234,31 +238,12 @@ chess-gantry --config config.json --state data/board_state.json \
   lichess-follow GAME_ID --execute --confirm-motion
 ```
 
-To use the WebSocket pipeline, initialize and start its external service:
+Following streams directly from `https://lichess.org` through the official
+`berserk` client. No stream service, container, or submodule is required. To
+raise rate limits or read your own games, export a personal token first:
 
 ```bash
-git submodule update --init --recursive
-./scripts/start_lichess_stream.sh
-```
-
-The service normally listens at `ws://127.0.0.1:8010`. The repository's
-currently recorded submodule pin may be unavailable; `lichess-pgn` and
-`lichess-follow` do not require this service.
-
-Consume the WebSocket stream in dry-run mode:
-
-```bash
-chess-gantry --config config.json --state data/board_state.json \
-  lichess-watch GAME_ID --output-dir data/lichess
-```
-
-Convert one saved stream event into move JSON and G-code:
-
-```bash
-chess-gantry --config config.json --state data/board_state.json \
-  lichess-event examples/lichess_e2_e4_event.json \
-  --move-output data/lichess_e2e4.json \
-  --gcode-output data/lichess_e2e4.gcode
+export LICHESS_TOKEN="lip_xxxxxxxxxxxxxxxx"
 ```
 
 ## Tests and checks

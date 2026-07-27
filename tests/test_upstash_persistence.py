@@ -4,39 +4,16 @@ import json
 import unittest
 
 from chess_gantry.models import GridPosition, MoveDelta
-from chess_gantry.redis_persistence import RedisGameStorage
+from chess_gantry.upstash_persistence import UpstashGameStorage
 
 
-class FakeLock:
-    def acquire(self, blocking=True):
-        return True
-
-    def release(self):
-        return None
-
-
-class FakePipeline:
-    def __init__(self, client):
-        self.client = client
-        self.expiries = []
-
-    def expire(self, key, ttl):
-        self.expiries.append((key, ttl))
-        return self
-
-    def execute(self):
-        for key, ttl in self.expiries:
-            self.client.ttls[key] = ttl
-        return [True] * len(self.expiries)
-
-
-class FakeRedis:
+class FakeUpstash:
     def __init__(self):
         self.values = {}
         self.lists = {}
         self.ttls = {}
 
-    def set(self, key, value, nx=False):
+    def set(self, key, value, nx=False, ex=None):
         if nx and key in self.values:
             return False
         self.values[key] = value
@@ -55,21 +32,23 @@ class FakeRedis:
     def rpush(self, key, value):
         self.lists.setdefault(key, []).append(value)
 
-    def lock(self, key, timeout, blocking_timeout):
-        return FakeLock()
-
-    def pipeline(self):
-        return FakePipeline(self)
+    def eval(self, script, keys=None, args=None):
+        key = keys[0]
+        token = args[0]
+        if self.values.get(key) == token:
+            self.values.pop(key, None)
+            return 1
+        return 0
 
     def expire(self, key, ttl):
         self.ttls[key] = ttl
         return self.exists(key)
 
 
-class RedisPersistenceTests(unittest.TestCase):
+class UpstashPersistenceTests(unittest.TestCase):
     def test_game_auto_initializes_and_is_shared_between_instances(self):
-        client = FakeRedis()
-        first = RedisGameStorage(client, "game123")
+        client = FakeUpstash()
+        first = UpstashGameStorage(client, "game123")
         state = first.initialize_game()
         move = MoveDelta.from_mapping(
             {
@@ -83,7 +62,7 @@ class RedisPersistenceTests(unittest.TestCase):
         )
         first.store.save(state.applied(move, None))
 
-        restarted = RedisGameStorage(client, "game123")
+        restarted = UpstashGameStorage(client, "game123")
         loaded = restarted.store.load()
         self.assertEqual(loaded.revision, 1)
         self.assertEqual(
@@ -91,10 +70,18 @@ class RedisPersistenceTests(unittest.TestCase):
         )
         self.assertEqual(loaded.processed_events, ("game123.1",))
 
+    def test_lock_round_trip_acquires_and_releases(self):
+        client = FakeUpstash()
+        storage = UpstashGameStorage(client, "game-lock")
+        storage.initialize_game()
+        with storage.store.locked():
+            self.assertIn(storage.lock_key, client.values)
+        self.assertNotIn(storage.lock_key, client.values)
+
     def test_games_are_isolated_and_completion_sets_ttl(self):
-        client = FakeRedis()
-        first = RedisGameStorage(client, "game-one", completed_ttl_s=90)
-        second = RedisGameStorage(client, "game-two", completed_ttl_s=90)
+        client = FakeUpstash()
+        first = UpstashGameStorage(client, "game-one", completed_ttl_s=90)
+        second = UpstashGameStorage(client, "game-two", completed_ttl_s=90)
         first.initialize_game()
         second.initialize_game()
         first.audit.append({"status": "completed"})

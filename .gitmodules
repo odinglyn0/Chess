@@ -1,3 +1,0 @@
-[submodule "services/lichess_stream"]
-	path = services/lichess_stream
-	url = https://github.com/odinglyn0/Chess.git

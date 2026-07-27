@@ -1,25 +1,45 @@
 from __future__ import annotations
 
 from io import StringIO
-from typing import Iterator
-from urllib.request import Request, urlopen
+from typing import Any, Iterator, Optional
+import os
 
 from .errors import ConfigurationError, ValidationError
 from .models import BoardState, GridPosition, MoveDelta
 
 
-def fetch_pgn(game_id: str) -> str:
-    request = Request(
-        f"https://lichess.org/game/export/{game_id}",
-        headers={"Accept": "application/x-chess-pgn", "User-Agent": "chess-gantry/0.2"},
-    )
+def resolve_token(token: Optional[str] = None) -> Optional[str]:
+    if token is not None:
+        return token
+    value = os.environ.get("LICHESS_TOKEN")
+    return value.strip() if isinstance(value, str) and value.strip() else None
+
+
+def lichess_client(token: Optional[str] = None) -> Any:
     try:
-        with urlopen(request, timeout=30) as response:
-            return response.read().decode("utf-8")
-    except OSError as exc:
+        import berserk
+    except ImportError as exc:
+        raise ConfigurationError(
+            "berserk (the Lichess client) is not installed; run 'uv sync'"
+        ) from exc
+    resolved = resolve_token(token)
+    session = berserk.TokenSession(resolved) if resolved else None
+    return berserk.Client(session=session)
+
+
+def fetch_pgn(game_id: str, *, token: Optional[str] = None, client: Any = None) -> str:
+    active = client if client is not None else lichess_client(token)
+    try:
+        pgn = active.games.export(game_id, as_pgn=True)
+    except Exception as exc:
         raise ConfigurationError(
             f"could not fetch Lichess game {game_id!r}: {exc}"
         ) from exc
+    if not isinstance(pgn, str) or not pgn.strip():
+        raise ValidationError(
+            f"Lichess returned an empty or non-PGN response for game {game_id!r}"
+        )
+    return pgn
 
 
 def pgn_moves(game_id: str, pgn_text: str, state: BoardState) -> Iterator[MoveDelta]:

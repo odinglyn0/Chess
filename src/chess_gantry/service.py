@@ -100,26 +100,21 @@ class GantryService:
         self.game_storage: Optional[Any] = None
 
     @classmethod
-    def for_redis(
+    def for_upstash(
         cls,
         config: AppConfig,
-        redis_url: Optional[str],
         game_id: str,
         *,
-        upstash_url: Optional[str] = None,
-        upstash_token: Optional[str] = None,
+        upstash_url: Optional[str],
+        upstash_token: Optional[str],
         completed_ttl_s: int = 86400,
         key_prefix: str = "chess-gantry",
         link_factory: Optional[Callable[[Any], MarlinSerial]] = None,
     ) -> "GantryService":
-        from .redis_persistence import RedisGameStorage, redis_client
+        from .upstash_persistence import UpstashGameStorage, upstash_client
 
-        storage = RedisGameStorage(
-            redis_client(
-                redis_url,
-                upstash_url=upstash_url,
-                upstash_token=upstash_token,
-            ),
+        storage = UpstashGameStorage(
+            upstash_client(upstash_url, upstash_token),
             game_id,
             config.board.width,
             config.board.height,

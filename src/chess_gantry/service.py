@@ -303,22 +303,7 @@ class GantryService:
 
     def _gantry_home_reference(self) -> Tuple[float, float, float]:
         workspace = self.config.workspace
-        x = (
-            workspace.min_y_mm
-            if self.config.safety.home_x_direction < 0
-            else workspace.max_y_mm
-        )
-        y = (
-            workspace.min_y_mm
-            if self.config.safety.home_y_direction < 0
-            else workspace.max_y_mm
-        )
-        e = (
-            workspace.min_x_mm
-            if self.config.safety.home_e_direction < 0
-            else workspace.max_x_mm
-        )
-        return x, y, e
+        return workspace.min_y_mm, workspace.max_y_mm, workspace.max_x_mm
 
     def _gantry_logical_home(self) -> MachinePoint:
         _, y, e = self._gantry_home_reference()
@@ -368,33 +353,8 @@ class GantryService:
     def home_gantry(
         self,
         record_path: Path,
-        step_mm: float = 0.5,
-        feed_mm_min: float = 300.0,
-        max_travel_mm: Optional[float] = None,
     ) -> Mapping[str, Any]:
         self._require_execution_unlocked()
-        if not math.isfinite(step_mm) or step_mm <= 0 or step_mm > 2.0:
-            raise ConfigurationError(
-                "home-gantry step must be greater than zero and no more than 2 mm"
-            )
-        if not math.isfinite(feed_mm_min) or feed_mm_min <= 0 or feed_mm_min > 600:
-            raise ConfigurationError(
-                "home-gantry feed must be greater than zero and no more than 600 mm/min"
-            )
-        if max_travel_mm is None:
-            max_travel_mm = (
-                max(
-                    self.config.workspace.max_x_mm - self.config.workspace.min_x_mm,
-                    self.config.workspace.max_y_mm - self.config.workspace.min_y_mm,
-                )
-                + 20.0
-            )
-        if not math.isfinite(max_travel_mm) or max_travel_mm <= 0:
-            raise ConfigurationError(
-                "home-gantry maximum travel must be finite and greater than zero"
-            )
-        required = ("x_min", "y_min", "z_min")
-        travelled = {name: 0.0 for name in required}
         link = self._link_factory(self.config.serial)
         with link:
             try:
@@ -402,66 +362,15 @@ class GantryService:
                     (
                         *self.config.magnet.off_commands,
                         "G21",
-                        "G91",
-                        "M83",
-                        "M302 P1",
-                        "M211 S0",
-                        "M120",
-                        "M92 X80 Y80 E80",
-                        "M203 X50 Y50 E50",
-                        "M201 X200 Y200 E200",
-                        "M205 X2 Y2 E2",
+                        *self.config.safety.home_commands,
                     )
                 )
-                while True:
-                    result = link.send_command("M119", timeout_s=10.0)
-                    states = parse_endstop_states(result.responses)
-                    missing = [name for name in required if name not in states]
-                    if missing:
-                        raise ConfigurationError(
-                            "cannot home gantry: M119 did not report "
-                            + ", ".join(missing)
-                        )
-                    if all(states[name] for name in required):
-                        break
-                    words = []
-                    directions = {
-                        "x_min": ("X", self.config.safety.home_x_direction),
-                        "y_min": ("Y", self.config.safety.home_y_direction),
-                        "z_min": ("E", self.config.safety.home_e_direction),
-                    }
-                    for name in required:
-                        if states[name]:
-                            continue
-                        travelled[name] += step_mm
-                        if travelled[name] > max_travel_mm:
-                            raise ConfigurationError(
-                                f"home-gantry exceeded {max_travel_mm:g} mm without triggering {name}"
-                            )
-                        axis, direction = directions[name]
-                        words.append(f"{axis}{direction * step_mm:g}")
-                    link.send_program(
-                        (f"G1 {' '.join(words)} F{feed_mm_min:g}", "M400")
-                    )
-                home_x, home_y, home_e = self._gantry_home_reference()
-                reference = (
-                    "G90",
-                    "M82",
-                    (f"G92 X{home_x:g} Y{home_y:g} E{home_e:g}"),
-                    "M400",
-                    "M302 P0",
-                    "M211 S1",
-                )
-                link.send_program(reference)
+                endstop_result = link.send_command("M119", timeout_s=10.0)
                 position_result = link.send_command("M114", timeout_s=10.0)
             except Exception:
                 link.best_effort(
                     (
                         *self.config.magnet.off_commands,
-                        "G90",
-                        "M82",
-                        "M302 P0",
-                        "M211 S1",
                         "M84",
                     )
                 )
@@ -470,17 +379,10 @@ class GantryService:
             record = {
                 "schema_version": 1,
                 "homed_at": utc_now(),
-                "reference": {
-                    "x": home_x,
-                    "y": home_y,
-                    "e": home_e,
-                },
-                "switches": {name: "TRIGGERED" for name in required},
-                "travelled_mm": travelled,
-                "step_mm": step_mm,
-                "feed_mm_min": feed_mm_min,
+                "method": "marlin_g28",
                 "port": getattr(info, "port", None),
                 "baudrate": getattr(info, "baudrate", None),
+                "endstop_response": list(endstop_result.responses),
                 "position_response": list(position_result.responses),
             }
             atomic_write_json(record_path, record)

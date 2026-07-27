@@ -52,7 +52,6 @@ case "$ACTION" in
     initialize
     uv run chess-gantry --config config.json home-gantry \
       --record "$GAME_DIR/gantry_home.json" \
-      --step-mm 0.5 --feed-mm-min 300 \
       --confirm-motion --confirm-clear-path
     "${base[@]}" lichess-follow "$GAME_ID" \
       --output-dir "$GAME_DIR/physical" \
@@ -75,7 +74,6 @@ case "$ACTION" in
   home)
     uv run chess-gantry --config config.json home-gantry \
       --record "$GAME_DIR/gantry_home.json" \
-      --step-mm 0.5 --feed-mm-min 300 \
       --confirm-motion --confirm-clear-path
     ;;
   *)

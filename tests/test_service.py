@@ -167,19 +167,12 @@ class ServiceTests(unittest.TestCase):
             self.assertIn("G92 X0 Y350 E350", program)
             self.assertEqual(fake.programs, [program])
 
-    def test_home_gantry_stops_each_axis_and_saves_record(self) -> None:
+    def test_home_gantry_runs_marlin_g28_and_saves_responses(self) -> None:
         with TemporaryDirectory() as directory:
             temp = Path(directory)
             state_path, journal_path, audit_path = self.paths(temp)
             atomic_write_json(state_path, self.minimal_state().to_dict())
-            fake = FakeLink(
-                endstop_sequence=[
-                    {"x_min": False, "y_min": False, "z_min": False},
-                    {"x_min": True, "y_min": False, "z_min": False},
-                    {"x_min": True, "y_min": True, "z_min": False},
-                    {"x_min": True, "y_min": True, "z_min": True},
-                ]
-            )
+            fake = FakeLink()
             service = GantryService(
                 test_config(),
                 state_path,
@@ -188,62 +181,21 @@ class ServiceTests(unittest.TestCase):
                 link_factory=lambda settings: fake,
             )
             record_path = temp / "gantry_home.json"
-            record = service.home_gantry(record_path, 0.5, 300.0, 10.0)
-            moves = [
-                command
-                for program in fake.programs
-                for command in program
-                if command.startswith("G1 ")
-            ]
+            record = service.home_gantry(record_path)
             self.assertEqual(
-                moves,
-                [
-                    "G1 X-0.5 Y0.5 E0.5 F300",
-                    "G1 Y0.5 E0.5 F300",
-                    "G1 E0.5 F300",
-                ],
+                fake.programs, [("M107 P0", "M107 P1", "G21", "G28", "M400")]
             )
-            self.assertEqual(record["reference"], {"x": 0.0, "y": 350.0, "e": 350.0})
-            self.assertEqual(
-                record["travelled_mm"],
-                {"x_min": 0.5, "y_min": 1.0, "z_min": 1.5},
-            )
-            self.assertEqual(read_json(record_path)["switches"]["z_min"], "TRIGGERED")
-            self.assertIn(
-                ("G90", "M82", "G92 X0 Y350 E350", "M400", "M302 P0", "M211 S1"),
-                fake.programs,
-            )
+            self.assertEqual(record["method"], "marlin_g28")
+            saved = read_json(record_path)
+            self.assertIn("x_min: TRIGGERED", saved["endstop_response"])
+            self.assertIn("X:350.00 Y:0.00 Z:0.00 E:0.00", saved["position_response"])
 
-    def test_home_gantry_uses_workspace_span_for_default_maximum(self) -> None:
+    def test_home_gantry_failure_does_not_save_record(self) -> None:
         with TemporaryDirectory() as directory:
             temp = Path(directory)
             state_path, journal_path, audit_path = self.paths(temp)
             atomic_write_json(state_path, self.minimal_state().to_dict())
-            fake = FakeLink(
-                endstop_sequence=[
-                    {"x_min": False, "y_min": False, "z_min": False},
-                    {"x_min": True, "y_min": True, "z_min": True},
-                ]
-            )
-            service = GantryService(
-                test_config(),
-                state_path,
-                journal_path,
-                audit_path,
-                link_factory=lambda settings: fake,
-            )
-            record = service.home_gantry(temp / "gantry_home.json")
-            self.assertEqual(
-                record["travelled_mm"],
-                {"x_min": 0.5, "y_min": 0.5, "z_min": 0.5},
-            )
-
-    def test_home_gantry_aborts_after_bounded_travel(self) -> None:
-        with TemporaryDirectory() as directory:
-            temp = Path(directory)
-            state_path, journal_path, audit_path = self.paths(temp)
-            atomic_write_json(state_path, self.minimal_state().to_dict())
-            fake = FakeLink(endstops={"x_min": False, "y_min": True, "z_min": True})
+            fake = FakeLink(fail=True)
             service = GantryService(
                 test_config(),
                 state_path,
@@ -252,12 +204,12 @@ class ServiceTests(unittest.TestCase):
                 link_factory=lambda settings: fake,
             )
             record_path = temp / "gantry_home.json"
-            with self.assertRaisesRegex(ConfigurationError, "x_min"):
-                service.home_gantry(record_path, 0.5, 300.0, 1.0)
+            with self.assertRaises(SerialProtocolError):
+                service.home_gantry(record_path)
             self.assertFalse(record_path.exists())
             self.assertEqual(
                 fake.best_effort_programs[-1],
-                ("M107 P0", "M107 P1", "G90", "M82", "M302 P0", "M211 S1", "M84"),
+                ("M107 P0", "M107 P1", "M84"),
             )
 
     def test_workspace_test_visits_grid_and_returns_to_reference(self) -> None:

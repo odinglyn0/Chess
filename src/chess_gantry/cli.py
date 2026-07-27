@@ -260,17 +260,6 @@ def _parser() -> ArgumentParser:
         help="move X/Y/E toward their X/Y/Z switches, assign the reference, and save JSON",
     )
     home_gantry.add_argument(
-        "--step-mm", type=float, default=0.5, help="maximum homing step (default: 0.5)"
-    )
-    home_gantry.add_argument(
-        "--feed-mm-min", type=float, default=300.0, help="homing feed (default: 300)"
-    )
-    home_gantry.add_argument(
-        "--max-travel-mm",
-        type=float,
-        help="maximum travel per switch before aborting (default: workspace + 20)",
-    )
-    home_gantry.add_argument(
         "--record",
         default="data/gantry_home.json",
         help="JSON homing record path (default: data/gantry_home.json)",
@@ -701,12 +690,7 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
             if not args.confirm_clear_path:
                 parser.error("home-gantry requires --confirm-clear-path")
             service = _service(args, config)
-            record = service.home_gantry(
-                Path(args.record),
-                args.step_mm,
-                args.feed_mm_min,
-                args.max_travel_mm,
-            )
+            record = service.home_gantry(Path(args.record))
             _print_json(record)
             print(f"Saved gantry homing record to {args.record}")
             return 0

@@ -290,19 +290,11 @@ original assumption, so the configured switch reference is `X=0`,
 
 ### Automatic Gantry Homing
 
-Use `home-gantry` when the carriages are away from their switches. Physical
-testing established these configured directions toward the switches:
-
-```text
-X: -1
-Y: +1
-E: +1
-```
-
-They are stored as `safety.home_x_direction`, `home_y_direction`, and
-`home_e_direction`. The command moves in bounded 0.5 mm steps at 300 mm/min.
-After every completed step, it polls `M119`; an axis stops receiving further
-commands as soon as its switch triggers.
+The Ender firmware contains the complete homing sequence. `home-gantry` does
+not choose directions, speeds, distances, backoff, or coordinates. It switches
+both magnet outputs off and sends the commands listed in
+`safety.home_commands`. The checked-in physical configuration uses `G28`
+followed by `M400`.
 
 Before running:
 
@@ -315,27 +307,38 @@ Then run:
 
 ```bash
 uv run chess-gantry --config config.json home-gantry \
-  --step-mm 0.5 \
-  --feed-mm-min 300 \
   --record data/gantry_home.json \
   --confirm-motion \
   --confirm-clear-path
 ```
 
-Homing enables Marlin endstop monitoring with `M120`, uses relative movements,
-and aborts if any switch does not trigger within the configured workspace plus
-20 mm. On failure it restores absolute modes, re-enables software endstops,
-switches both magnet outputs off, and disables motors.
-
-After all three switches trigger, it assigns:
+The host sends exactly:
 
 ```gcode
-G92 X0 Y350 E350
+M107 P0
+M107 P1
+G21
+G28
+M400
+M119
+M114
 ```
 
-It then writes `data/gantry_home.json` atomically. The record contains the UTC
-time, serial connection, assigned reference, switch states, measured travel to
-each switch, homing settings, and final `M114` response.
+Marlin performs all real-time endstop handling. After `G28` completes, the host
+records the raw `M119` endstop report and `M114` coordinates in
+`data/gantry_home.json`. No host-generated `G1` or `G92` command is part of this
+homing path.
+
+If `G28` or either verification command fails, no homing record is written and
+the host attempts to switch both magnet outputs off and disable motors.
+
+The latest physical `G28` attempt entered Marlin's BLTouch Z routine and
+aborted with `STOP called because of BLTouch error`. This means the active
+firmware still includes BLTouch in all-axis homing. Reset the controller and
+correct/reflash Marlin's homing configuration before retrying. If only X and Y
+should be homed by firmware, set `safety.home_commands` to `["G28 X Y",
+"M400"]`; do that only if the E-driven inner carriage has a separate validated
+reference procedure.
 
 The record is evidence of the last successful homing operation; it cannot prove
 that the gantry has not been manually moved or lost steps afterward. Home again

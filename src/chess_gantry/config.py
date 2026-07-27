@@ -412,9 +412,6 @@ class SafetySettings:
     home_commands: Tuple[str, ...]
     preflight_commands: Tuple[str, ...]
     emergency_stop_command: str
-    home_x_direction: float
-    home_y_direction: float
-    home_e_direction: float
 
     @classmethod
     def from_mapping(cls, raw: Mapping[str, Any]) -> "SafetySettings":
@@ -426,9 +423,6 @@ class SafetySettings:
                 "home_commands",
                 "preflight_commands",
                 "emergency_stop_command",
-                "home_x_direction",
-                "home_y_direction",
-                "home_e_direction",
             },
             "safety",
         )
@@ -439,20 +433,6 @@ class SafetySettings:
             raise ConfigurationError(
                 "safety.emergency_stop_command cannot contain a newline"
             )
-        directions = {
-            "home_x_direction": _number(
-                raw.get("home_x_direction", -1), "safety.home_x_direction"
-            ),
-            "home_y_direction": _number(
-                raw.get("home_y_direction", 1), "safety.home_y_direction"
-            ),
-            "home_e_direction": _number(
-                raw.get("home_e_direction", 1), "safety.home_e_direction"
-            ),
-        }
-        for name, direction in directions.items():
-            if direction not in {-1.0, 1.0}:
-                raise ConfigurationError(f"safety.{name} must be -1 or 1")
         return cls(
             calibrated=_boolean(raw.get("calibrated", False), "safety.calibrated"),
             home_before_execute=_boolean(
@@ -482,7 +462,6 @@ class SafetySettings:
                 allow_empty=True,
             ),
             emergency_stop_command=emergency,
-            **directions,
         )
 
 

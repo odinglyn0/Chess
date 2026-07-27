@@ -491,9 +491,7 @@ class GantryService:
                 self.reference_gantry_with_link(link)
                 link.send_program(program)
             except Exception:
-                link.best_effort(
-                    (*self.config.magnet.off_commands, "M211 S1", "M84")
-                )
+                link.best_effort((*self.config.magnet.off_commands, "M211 S1", "M84"))
                 raise
         self.audit.append(
             {
@@ -611,9 +609,7 @@ class GantryService:
             try:
                 link.send_program(program)
             except Exception:
-                link.best_effort(
-                    (*self.config.magnet.off_commands, "M211 S1")
-                )
+                link.best_effort((*self.config.magnet.off_commands, "M211 S1"))
                 raise
         self.audit.append(
             {
@@ -645,9 +641,7 @@ class GantryService:
                 self.reference_gantry_with_link(link)
                 link.send_program(program)
             except Exception:
-                link.best_effort(
-                    (*self.config.magnet.off_commands, "M211 S1", "M84")
-                )
+                link.best_effort((*self.config.magnet.off_commands, "M211 S1", "M84"))
                 raise
         self.audit.append(
             {
@@ -768,9 +762,7 @@ class GantryService:
             try:
                 link.send_program(program)
             except Exception:
-                link.best_effort(
-                    (*self.config.magnet.off_commands, "M211 S1", "M84")
-                )
+                link.best_effort((*self.config.magnet.off_commands, "M211 S1", "M84"))
                 raise
         self.audit.append(
             {

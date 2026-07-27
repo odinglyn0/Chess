@@ -248,6 +248,87 @@ class RunCommandTests(unittest.TestCase):
         self.assertIn("DEMO ONLY", buffer.getvalue())
         self.assertIn("G4 P250", buffer.getvalue())
 
+    def test_circle_demo_dry_run_generates_200_mm_circle(self) -> None:
+        buffer = StringIO()
+        with contextlib.redirect_stdout(buffer):
+            code = run(
+                self.args(
+                    "circle-demo",
+                    "--diameter-mm",
+                    "200",
+                    "--feed-mm-min",
+                    "1800",
+                    "--segments",
+                    "72",
+                )
+            )
+        self.assertEqual(code, 0)
+        output = buffer.getvalue()
+        self.assertIn("DRY RUN ONLY", output)
+        self.assertIn("G28 X Y Z", output)
+        self.assertIn("M106 P0 S255", output)
+        self.assertEqual(output.count("G1 "), 74)
+        self.assertIn("G1 X0 Y350 Z350 F1800", output)
+
+    def test_physical_circle_demo_requires_both_confirmations(self) -> None:
+        errors = StringIO()
+        with contextlib.redirect_stderr(errors), self.assertRaises(SystemExit):
+            run(self.args("circle-demo", "--confirm-motion"))
+        self.assertIn("--confirm-clear-workspace", errors.getvalue())
+
+        errors = StringIO()
+        with contextlib.redirect_stderr(errors), self.assertRaises(SystemExit):
+            run(
+                self.args(
+                    "circle-demo",
+                    "--confirm-motion",
+                    "--confirm-clear-workspace",
+                )
+            )
+        self.assertIn("--confirm-magnet", errors.getvalue())
+
+    def test_perimeter_demo_dry_run_generates_closed_rectangle(self) -> None:
+        buffer = StringIO()
+        with contextlib.redirect_stdout(buffer):
+            code = run(
+                self.args(
+                    "perimeter-demo",
+                    "--margin-mm",
+                    "20",
+                    "--feed-mm-min",
+                    "1800",
+                )
+            )
+        self.assertEqual(code, 0)
+        output = buffer.getvalue()
+        self.assertIn("DRY RUN ONLY", output)
+        self.assertIn("G28 X Y Z", output)
+        self.assertEqual(output.count("G1 "), 6)
+        self.assertIn("G1 X20 Y330 Z330 F1800", output)
+        self.assertIn("G1 X330 Y20 Z20 F1800", output)
+        self.assertIn("G1 X0 Y350 Z350 F1800", output)
+        self.assertNotIn("M106", output)
+
+    def test_physical_perimeter_demo_requires_confirmations(self) -> None:
+        errors = StringIO()
+        with contextlib.redirect_stderr(errors), self.assertRaises(SystemExit):
+            run(self.args("perimeter-demo", "--confirm-motion"))
+        self.assertIn("--confirm-clear-workspace", errors.getvalue())
+
+        errors = StringIO()
+        with contextlib.redirect_stderr(errors), self.assertRaises(SystemExit):
+            run(
+                self.args(
+                    "perimeter-demo",
+                    "--confirm-motion",
+                    "--confirm-clear-workspace",
+                    "--magnet-on",
+                    "--feed-mm-min",
+                    "3000",
+                )
+            )
+        self.assertIn("--confirm-magnet", errors.getvalue())
+
     def test_board_sweep_dry_run_visits_all_squares_with_fan_one(self) -> None:
         buffer = StringIO()
         with contextlib.redirect_stdout(buffer):

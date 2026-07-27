@@ -431,6 +431,114 @@ uv run chess-gantry --config config.json workspace-test \
   --confirm-at-switches
 ```
 
+### 8a. Run The 20 cm Magnet Circle
+
+`circle-demo` interprets 20 cm as a 200 mm diameter. It homes with Marlin,
+energizes fan `P0`, approaches a circle centered at logical `(250, 250)`, traces
+72 linear segments, switches the magnet off, returns to `X0 Y350 Z350`, and
+disables the motors.
+
+Generate and inspect the G-code without connecting:
+
+```bash
+uv run chess-gantry --config config.json circle-demo \
+  --diameter-mm 200 \
+  --feed-mm-min 1800 \
+  --segments 72 \
+  --output data/circle-demo.gcode
+```
+
+Simulate the complete stream:
+
+```bash
+uv run chess-gantry --config config.demo.json circle-demo \
+  --diameter-mm 200 \
+  --feed-mm-min 1800 \
+  --segments 72 \
+  --confirm-motion \
+  --demo
+```
+
+For physical execution, remove every piece and obstruction from the complete
+200 mm circle and its approach path. Keep the emergency cutoff ready. The
+magnet remains energized for approximately 22 seconds at 1,800 mm/min.
+
+```bash
+uv run chess-gantry --config config.json circle-demo \
+  --diameter-mm 200 \
+  --feed-mm-min 1800 \
+  --segments 72 \
+  --confirm-motion \
+  --confirm-clear-workspace \
+  --confirm-magnet
+```
+
+The command refuses circles outside the configured workspace, fewer than 12 or
+more than 360 segments, feed rates above the configured travel feed, or magnet
+energization estimates above 30 seconds. On serial failure it attempts to turn
+the magnet off and disable the motors.
+
+### 8b. Trace The Board Perimeter
+
+`perimeter-demo` homes first, moves to the nearest corner of an inset rectangle,
+traces all four edges, closes the rectangle, returns to `X0 Y350 Z350`, and
+disables the motors. The recommended first run uses a 20 mm safety inset, giving
+a 310 x 310 mm perimeter inside the configured 350 x 350 mm workspace.
+
+Generate and inspect it without connecting:
+
+```bash
+uv run chess-gantry --config config.json perimeter-demo \
+  --margin-mm 20 \
+  --feed-mm-min 1800 \
+  --output data/perimeter-demo.gcode
+```
+
+Simulate it:
+
+```bash
+uv run chess-gantry --config config.demo.json perimeter-demo \
+  --margin-mm 20 \
+  --feed-mm-min 1800 \
+  --confirm-motion \
+  --demo
+```
+
+Clear the complete rectangle and keep the emergency cutoff ready, then run the
+physical inset perimeter with the magnet off:
+
+```bash
+uv run chess-gantry --config config.json perimeter-demo \
+  --margin-mm 20 \
+  --feed-mm-min 1800 \
+  --confirm-motion \
+  --confirm-clear-workspace
+```
+
+After the inset test confirms the real travel limits, trace the exact configured
+350 x 350 mm workspace boundary with:
+
+```bash
+uv run chess-gantry --config config.json perimeter-demo \
+  --margin-mm 0 \
+  --feed-mm-min 1800 \
+  --confirm-motion \
+  --confirm-clear-workspace
+```
+
+The magnet is off by default. A magnet-on perimeter is allowed only when the
+estimated hold is at most 30 seconds, so the 20 mm inset requires 3,000 mm/min:
+
+```bash
+uv run chess-gantry --config config.json perimeter-demo \
+  --margin-mm 20 \
+  --feed-mm-min 3000 \
+  --magnet-on \
+  --confirm-motion \
+  --confirm-clear-workspace \
+  --confirm-magnet
+```
+
 ### 9. Run The Browser Software
 
 Simulated UI:

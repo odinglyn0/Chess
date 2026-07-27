@@ -685,6 +685,239 @@ class GantryService:
         )
         return program
 
+    def circle_demo_program(
+        self,
+        diameter_mm: float = 200.0,
+        feed_mm_min: float = 1800.0,
+        segments: int = 72,
+    ) -> Tuple[str, ...]:
+        if not math.isfinite(diameter_mm) or diameter_mm <= 0:
+            raise ConfigurationError(
+                "circle-demo diameter must be finite and greater than zero"
+            )
+        if not math.isfinite(feed_mm_min) or feed_mm_min <= 0:
+            raise ConfigurationError(
+                "circle-demo feed rate must be finite and greater than zero"
+            )
+        if feed_mm_min > self.config.motion.travel_feed_mm_min:
+            raise ConfigurationError(
+                "circle-demo feed rate cannot exceed motion.travel_feed_mm_min "
+                f"({self.config.motion.travel_feed_mm_min:g} mm/min)"
+            )
+        if segments < 12 or segments > 360:
+            raise ConfigurationError("circle-demo segments must be between 12 and 360")
+        workspace = self.config.workspace
+        radius = diameter_mm / 2.0
+        if diameter_mm > min(
+            workspace.max_x_mm - workspace.min_x_mm,
+            workspace.max_y_mm - workspace.min_y_mm,
+        ):
+            raise ConfigurationError(
+                "circle-demo diameter exceeds the configured workspace"
+            )
+        center = MachinePoint(workspace.max_x_mm - radius, workspace.max_y_mm - radius)
+        if (
+            center.x - radius < workspace.min_x_mm
+            or center.y - radius < workspace.min_y_mm
+        ):
+            raise ConfigurationError(
+                "circle-demo circle does not fit inside the configured workspace"
+            )
+        home = self._gantry_logical_home()
+        start_angle = math.pi / 4.0
+        points = tuple(
+            MachinePoint(
+                center.x
+                + radius * math.cos(start_angle + 2.0 * math.pi * index / segments),
+                center.y
+                + radius * math.sin(start_angle + 2.0 * math.pi * index / segments),
+            )
+            for index in range(segments + 1)
+        )
+        approach_mm = math.hypot(points[0].x - home.x, points[0].y - home.y)
+        energized_s = (approach_mm + math.pi * diameter_mm) / feed_mm_min * 60.0
+        if energized_s > 30.0:
+            raise ConfigurationError(
+                "circle-demo would energize the electromagnet for more than 30 seconds; "
+                "increase feed rate or reduce diameter"
+            )
+        mirror_origin = workspace.min_y_mm + workspace.max_y_mm
+
+        def number(value: float) -> str:
+            return f"{value:.3f}".rstrip("0").rstrip(".")
+
+        def movement(point: MachinePoint) -> str:
+            return (
+                f"G1 X{number(mirror_origin - point.y)} Y{number(point.y)} "
+                f"Z{number(point.x)} F{number(feed_mm_min)}"
+            )
+
+        home_x, home_y, home_z = self._gantry_home_reference()
+
+        program = [
+            *self.config.magnet.off_commands,
+            "G21",
+            "G90",
+            *self.config.safety.home_commands,
+            "M211 S1",
+            *self.config.magnet.on_commands,
+        ]
+        if self.config.motion.magnet_on_dwell_ms:
+            program.append(f"G4 P{self.config.motion.magnet_on_dwell_ms}")
+        program.extend((movement(points[0]), "M400"))
+        for point in points[1:]:
+            program.append(movement(point))
+        program.extend(("M400", *self.config.magnet.off_commands))
+        if self.config.motion.magnet_off_dwell_ms:
+            program.append(f"G4 P{self.config.motion.magnet_off_dwell_ms}")
+        program.extend(
+            (
+                f"G1 X{number(home_x)} Y{number(home_y)} Z{number(home_z)} "
+                f"F{number(feed_mm_min)}",
+                "M400",
+                "M84",
+            )
+        )
+        return tuple(program)
+
+    def circle_demo(
+        self,
+        diameter_mm: float = 200.0,
+        feed_mm_min: float = 1800.0,
+        segments: int = 72,
+    ) -> Tuple[str, ...]:
+        self._require_execution_unlocked()
+        program = self.circle_demo_program(diameter_mm, feed_mm_min, segments)
+        link = self._link_factory(self.config.serial)
+        with link:
+            if self.config.safety.preflight_commands:
+                link.send_program(self.config.safety.preflight_commands)
+            try:
+                link.send_program(program)
+            except Exception:
+                link.best_effort((*self.config.magnet.off_commands, "M84"))
+                raise
+        self.audit.append(
+            {
+                "status": "circle_demo_completed",
+                "diameter_mm": diameter_mm,
+                "feed_mm_min": feed_mm_min,
+                "segments": segments,
+                "commands": list(program),
+            }
+        )
+        return program
+
+    def perimeter_demo_program(
+        self,
+        margin_mm: float = 20.0,
+        feed_mm_min: float = 1800.0,
+        magnet_on: bool = False,
+    ) -> Tuple[str, ...]:
+        if not math.isfinite(margin_mm) or margin_mm < 0:
+            raise ConfigurationError(
+                "perimeter-demo margin must be finite and non-negative"
+            )
+        if not math.isfinite(feed_mm_min) or feed_mm_min <= 0:
+            raise ConfigurationError(
+                "perimeter-demo feed rate must be finite and greater than zero"
+            )
+        if feed_mm_min > self.config.motion.travel_feed_mm_min:
+            raise ConfigurationError(
+                "perimeter-demo feed rate cannot exceed motion.travel_feed_mm_min "
+                f"({self.config.motion.travel_feed_mm_min:g} mm/min)"
+            )
+        workspace = self.config.workspace
+        min_x = workspace.min_x_mm + margin_mm
+        max_x = workspace.max_x_mm - margin_mm
+        min_y = workspace.min_y_mm + margin_mm
+        max_y = workspace.max_y_mm - margin_mm
+        if min_x >= max_x or min_y >= max_y:
+            raise ConfigurationError(
+                "perimeter-demo margin leaves no usable rectangular path"
+            )
+        perimeter_mm = 2.0 * ((max_x - min_x) + (max_y - min_y))
+        energized_s = perimeter_mm / feed_mm_min * 60.0
+        if magnet_on and energized_s > 30.0:
+            raise ConfigurationError(
+                "perimeter-demo would energize the electromagnet for more than 30 seconds; "
+                "increase feed rate, increase margin, or disable the magnet"
+            )
+        corners = (
+            MachinePoint(max_x, max_y),
+            MachinePoint(min_x, max_y),
+            MachinePoint(min_x, min_y),
+            MachinePoint(max_x, min_y),
+            MachinePoint(max_x, max_y),
+        )
+        mirror_origin = workspace.min_y_mm + workspace.max_y_mm
+
+        def number(value: float) -> str:
+            return f"{value:.3f}".rstrip("0").rstrip(".")
+
+        def movement(point: MachinePoint) -> str:
+            return (
+                f"G1 X{number(mirror_origin - point.y)} Y{number(point.y)} "
+                f"Z{number(point.x)} F{number(feed_mm_min)}"
+            )
+
+        home_x, home_y, home_z = self._gantry_home_reference()
+        program = [
+            *self.config.magnet.off_commands,
+            "G21",
+            "G90",
+            *self.config.safety.home_commands,
+            "M211 S1",
+            movement(corners[0]),
+            "M400",
+        ]
+        if magnet_on:
+            program.extend(self.config.magnet.on_commands)
+            if self.config.motion.magnet_on_dwell_ms:
+                program.append(f"G4 P{self.config.motion.magnet_on_dwell_ms}")
+        for point in corners[1:]:
+            program.append(movement(point))
+        program.extend(("M400", *self.config.magnet.off_commands))
+        if magnet_on and self.config.motion.magnet_off_dwell_ms:
+            program.append(f"G4 P{self.config.motion.magnet_off_dwell_ms}")
+        program.extend(
+            (
+                f"G1 X{number(home_x)} Y{number(home_y)} Z{number(home_z)} "
+                f"F{number(feed_mm_min)}",
+                "M400",
+                "M84",
+            )
+        )
+        return tuple(program)
+
+    def perimeter_demo(
+        self,
+        margin_mm: float = 20.0,
+        feed_mm_min: float = 1800.0,
+        magnet_on: bool = False,
+    ) -> Tuple[str, ...]:
+        self._require_execution_unlocked()
+        program = self.perimeter_demo_program(margin_mm, feed_mm_min, magnet_on)
+        link = self._link_factory(self.config.serial)
+        with link:
+            if self.config.safety.preflight_commands:
+                link.send_program(self.config.safety.preflight_commands)
+            try:
+                link.send_program(program)
+            except Exception:
+                link.best_effort((*self.config.magnet.off_commands, "M84"))
+                raise
+        self.audit.append(
+            {
+                "status": "perimeter_demo_completed",
+                "margin_mm": margin_mm,
+                "feed_mm_min": feed_mm_min,
+                "magnet_on": magnet_on,
+                "commands": list(program),
+            }
+        )
+        return program
+
     def board_sweep_program(
         self, feed_mm_min: float = 1800.0, magnet_on: bool = False
     ) -> Tuple[str, ...]:

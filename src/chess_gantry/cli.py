@@ -405,6 +405,89 @@ def _parser() -> ArgumentParser:
         help="simulate Marlin instead of opening the serial port",
     )
 
+    circle_demo = commands.add_parser(
+        "circle-demo",
+        help="home, energize the magnet, and trace a circular gantry path",
+    )
+    circle_demo.add_argument(
+        "--diameter-mm",
+        type=float,
+        default=200.0,
+        help="circle diameter in millimetres (default: 200)",
+    )
+    circle_demo.add_argument(
+        "--feed-mm-min",
+        type=float,
+        default=1800.0,
+        help="circle feed rate in mm/min (default: 1800)",
+    )
+    circle_demo.add_argument(
+        "--segments",
+        type=int,
+        default=72,
+        help="linear segments used for the circle (default: 72)",
+    )
+    circle_demo.add_argument(
+        "--output", "-o", help="write generated circle G-code to this file"
+    )
+    circle_demo.add_argument(
+        "--confirm-motion", action="store_true", help="stream the test to Marlin"
+    )
+    circle_demo.add_argument(
+        "--confirm-clear-workspace",
+        action="store_true",
+        help="required confirmation that the full 200 mm circle path is clear",
+    )
+    circle_demo.add_argument(
+        "--confirm-magnet",
+        action="store_true",
+        help="required confirmation that the magnet driver is safe to energize",
+    )
+    circle_demo.add_argument(
+        "--demo", action="store_true", help="simulate Marlin without opening serial"
+    )
+
+    perimeter_demo = commands.add_parser(
+        "perimeter-demo",
+        help="home and trace the configured rectangular workspace perimeter",
+    )
+    perimeter_demo.add_argument(
+        "--margin-mm",
+        type=float,
+        default=20.0,
+        help="inset from each workspace edge (default: 20)",
+    )
+    perimeter_demo.add_argument(
+        "--feed-mm-min",
+        type=float,
+        default=1800.0,
+        help="perimeter feed rate in mm/min (default: 1800)",
+    )
+    perimeter_demo.add_argument(
+        "--magnet-on",
+        action="store_true",
+        help="energize the magnet while tracing the four perimeter edges",
+    )
+    perimeter_demo.add_argument(
+        "--output", "-o", help="write generated perimeter G-code to this file"
+    )
+    perimeter_demo.add_argument(
+        "--confirm-motion", action="store_true", help="stream the test to Marlin"
+    )
+    perimeter_demo.add_argument(
+        "--confirm-clear-workspace",
+        action="store_true",
+        help="required confirmation that the complete rectangular path is clear",
+    )
+    perimeter_demo.add_argument(
+        "--confirm-magnet",
+        action="store_true",
+        help="required for a physical perimeter with the magnet energized",
+    )
+    perimeter_demo.add_argument(
+        "--demo", action="store_true", help="simulate Marlin without opening serial"
+    )
+
     board_sweep = commands.add_parser(
         "board-sweep",
         help="visit every board square in a serpentine path; dry-run by default",
@@ -555,6 +638,8 @@ _COMMANDS = frozenset(
         "motor-test",
         "piece-demo",
         "magnet-test",
+        "circle-demo",
+        "perimeter-demo",
         "board-sweep",
         "workspace-test",
         "stop",
@@ -975,6 +1060,74 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
                 program = service.magnet_test(args.duration_s)
             print("; configured electromagnet test completed successfully")
             print("\n".join(program))
+            return 0
+
+        if args.command == "circle-demo":
+            program = service.circle_demo_program(
+                args.diameter_mm, args.feed_mm_min, args.segments
+            )
+            if not args.confirm_motion:
+                print("; DRY RUN ONLY: no serial port was opened")
+            elif args.demo:
+                link = DemoMarlinSerial(config.serial)
+                with link:
+                    link.send_program(config.safety.preflight_commands)
+                    link.send_program(program)
+                print("; DEMO ONLY: no serial port was opened")
+            else:
+                if not args.confirm_clear_workspace:
+                    parser.error(
+                        "physical circle-demo requires --confirm-clear-workspace"
+                    )
+                if not args.confirm_magnet:
+                    parser.error("physical circle-demo requires --confirm-magnet")
+                program = service.circle_demo(
+                    args.diameter_mm, args.feed_mm_min, args.segments
+                )
+                print("; physical circle demo completed successfully")
+            text = "\n".join(program) + "\n"
+            if args.output:
+                output = Path(args.output)
+                output.parent.mkdir(parents=True, exist_ok=True)
+                output.write_text(text, encoding="ascii")
+                print(f"; wrote circle-demo G-code to {output}")
+            else:
+                print(text, end="")
+            return 0
+
+        if args.command == "perimeter-demo":
+            program = service.perimeter_demo_program(
+                args.margin_mm, args.feed_mm_min, args.magnet_on
+            )
+            if not args.confirm_motion:
+                print("; DRY RUN ONLY: no serial port was opened")
+            elif args.demo:
+                link = DemoMarlinSerial(config.serial)
+                with link:
+                    link.send_program(config.safety.preflight_commands)
+                    link.send_program(program)
+                print("; DEMO ONLY: no serial port was opened")
+            else:
+                if not args.confirm_clear_workspace:
+                    parser.error(
+                        "physical perimeter-demo requires --confirm-clear-workspace"
+                    )
+                if args.magnet_on and not args.confirm_magnet:
+                    parser.error(
+                        "physical perimeter-demo --magnet-on requires --confirm-magnet"
+                    )
+                program = service.perimeter_demo(
+                    args.margin_mm, args.feed_mm_min, args.magnet_on
+                )
+                print("; physical perimeter demo completed successfully")
+            text = "\n".join(program) + "\n"
+            if args.output:
+                output = Path(args.output)
+                output.parent.mkdir(parents=True, exist_ok=True)
+                output.write_text(text, encoding="ascii")
+                print(f"; wrote perimeter-demo G-code to {output}")
+            else:
+                print(text, end="")
             return 0
 
         if args.command == "board-sweep":

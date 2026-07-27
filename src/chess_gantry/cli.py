@@ -419,10 +419,16 @@ def _parser() -> ArgumentParser:
         help="home and trace the configured rectangular workspace perimeter",
     )
     perimeter_demo.add_argument(
-        "--margin-mm",
+        "--width-mm",
         type=float,
-        default=20.0,
-        help="inset from each workspace edge (default: 20)",
+        default=250.0,
+        help="rectangle width from the home corner (default: 250)",
+    )
+    perimeter_demo.add_argument(
+        "--height-mm",
+        type=float,
+        default=250.0,
+        help="rectangle height from the home corner (default: 250)",
     )
     perimeter_demo.add_argument(
         "--feed-mm-min",
@@ -1018,7 +1024,7 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
 
         if args.command == "perimeter-demo":
             program = service.perimeter_demo_program(
-                args.margin_mm, args.feed_mm_min, args.magnet_on
+                args.width_mm, args.height_mm, args.feed_mm_min, args.magnet_on
             )
             if not args.confirm_motion:
                 print("; DRY RUN ONLY: no serial port was opened")
@@ -1038,7 +1044,7 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
                         "physical perimeter-demo --magnet-on requires --confirm-magnet"
                     )
                 program = service.perimeter_demo(
-                    args.margin_mm, args.feed_mm_min, args.magnet_on
+                    args.width_mm, args.height_mm, args.feed_mm_min, args.magnet_on
                 )
                 print("; physical perimeter demo completed successfully")
             text = "\n".join(program) + "\n"

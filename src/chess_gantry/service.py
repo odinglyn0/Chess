@@ -810,13 +810,18 @@ class GantryService:
 
     def perimeter_demo_program(
         self,
-        margin_mm: float = 20.0,
+        width_mm: float = 250.0,
+        height_mm: float = 250.0,
         feed_mm_min: float = 1800.0,
         magnet_on: bool = False,
     ) -> Tuple[str, ...]:
-        if not math.isfinite(margin_mm) or margin_mm < 0:
+        if not math.isfinite(width_mm) or width_mm <= 0:
             raise ConfigurationError(
-                "perimeter-demo margin must be finite and non-negative"
+                "perimeter-demo width must be finite and greater than zero"
+            )
+        if not math.isfinite(height_mm) or height_mm <= 0:
+            raise ConfigurationError(
+                "perimeter-demo height must be finite and greater than zero"
             )
         if not math.isfinite(feed_mm_min) or feed_mm_min <= 0:
             raise ConfigurationError(
@@ -828,27 +833,32 @@ class GantryService:
                 f"({self.config.motion.travel_feed_mm_min:g} mm/min)"
             )
         workspace = self.config.workspace
-        min_x = workspace.min_x_mm + margin_mm
-        max_x = workspace.max_x_mm - margin_mm
-        min_y = workspace.min_y_mm + margin_mm
-        max_y = workspace.max_y_mm - margin_mm
-        if min_x >= max_x or min_y >= max_y:
+        if width_mm > workspace.max_x_mm - workspace.min_x_mm:
             raise ConfigurationError(
-                "perimeter-demo margin leaves no usable rectangular path"
+                "perimeter-demo width exceeds the configured workspace"
             )
-        perimeter_mm = 2.0 * ((max_x - min_x) + (max_y - min_y))
+        if height_mm > workspace.max_y_mm - workspace.min_y_mm:
+            raise ConfigurationError(
+                "perimeter-demo height exceeds the configured workspace"
+            )
+        perimeter_mm = 2.0 * (width_mm + height_mm)
         energized_s = perimeter_mm / feed_mm_min * 60.0
         if magnet_on and energized_s > 30.0:
             raise ConfigurationError(
                 "perimeter-demo would energize the electromagnet for more than 30 seconds; "
-                "increase feed rate, increase margin, or disable the magnet"
+                "increase feed rate, reduce dimensions, or disable the magnet"
             )
+        home = self._gantry_logical_home()
+        inner_direction = -1.0 if home.x == workspace.max_x_mm else 1.0
+        outer_direction = -1.0 if home.y == workspace.max_y_mm else 1.0
+        inner_end = home.x + inner_direction * width_mm
+        outer_end = home.y + outer_direction * height_mm
         corners = (
-            MachinePoint(max_x, max_y),
-            MachinePoint(min_x, max_y),
-            MachinePoint(min_x, min_y),
-            MachinePoint(max_x, min_y),
-            MachinePoint(max_x, max_y),
+            home,
+            MachinePoint(inner_end, home.y),
+            MachinePoint(inner_end, outer_end),
+            MachinePoint(home.x, outer_end),
+            home,
         )
         mirror_origin = workspace.min_y_mm + workspace.max_y_mm
 
@@ -861,15 +871,12 @@ class GantryService:
                 f"Z{number(point.x)} F{number(feed_mm_min)}"
             )
 
-        home_x, home_y, home_z = self._gantry_home_reference()
         program = [
             *self.config.magnet.off_commands,
             "G21",
             "G90",
             *self.config.safety.home_commands,
             "M211 S1",
-            movement(corners[0]),
-            "M400",
         ]
         if magnet_on:
             program.extend(self.config.magnet.on_commands)
@@ -880,24 +887,20 @@ class GantryService:
         program.extend(("M400", *self.config.magnet.off_commands))
         if magnet_on and self.config.motion.magnet_off_dwell_ms:
             program.append(f"G4 P{self.config.motion.magnet_off_dwell_ms}")
-        program.extend(
-            (
-                f"G1 X{number(home_x)} Y{number(home_y)} Z{number(home_z)} "
-                f"F{number(feed_mm_min)}",
-                "M400",
-                "M84",
-            )
-        )
+        program.extend(("M84",))
         return tuple(program)
 
     def perimeter_demo(
         self,
-        margin_mm: float = 20.0,
+        width_mm: float = 250.0,
+        height_mm: float = 250.0,
         feed_mm_min: float = 1800.0,
         magnet_on: bool = False,
     ) -> Tuple[str, ...]:
         self._require_execution_unlocked()
-        program = self.perimeter_demo_program(margin_mm, feed_mm_min, magnet_on)
+        program = self.perimeter_demo_program(
+            width_mm, height_mm, feed_mm_min, magnet_on
+        )
         link = self._link_factory(self.config.serial)
         with link:
             if self.config.safety.preflight_commands:
@@ -910,7 +913,8 @@ class GantryService:
         self.audit.append(
             {
                 "status": "perimeter_demo_completed",
-                "margin_mm": margin_mm,
+                "width_mm": width_mm,
+                "height_mm": height_mm,
                 "feed_mm_min": feed_mm_min,
                 "magnet_on": magnet_on,
                 "commands": list(program),

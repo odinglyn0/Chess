@@ -29,12 +29,10 @@ Known physical findings:
 
 - The Ender controller was detected as `/dev/ttyUSB0` at 115200 baud.
 - The controller accepted movement, endstop, position, and fan commands.
-- Its firmware acknowledges `M115` without returning a Marlin identity, so
-  `config.json` uses `verify_marlin: false` while still requiring command
-  acknowledgements.
-- The electromagnet is configured to drive logical fan indices `P0` and `P1`
-  at full PWM because the Ender connector label does not necessarily match the
-  logical Marlin fan number.
+- The custom firmware identifies itself as `Relay Chess Gantry` through `M115`,
+  and `config.json` requires Marlin identity verification.
+- The custom firmware exposes the Creality 4.2.2 controllable fan output as
+  logical fan `P0` at full PWM.
 - A physical test with the electromagnet directly attached caused the USB or
   controller connection to reset under load.
 - After that event, `/dev/ttyUSB0` temporarily disappeared. Always run
@@ -44,20 +42,158 @@ The configured magnet commands are:
 
 ```gcode
 M106 P0 S255
-M106 P1 S255
 ```
 
 Both outputs are disabled with:
 
 ```gcode
 M107 P0
-M107 P1
 ```
 
 If energizing the magnet resets the controller, do not repeatedly retry it.
 Drive the magnet through a correctly rated MOSFET or relay module with flyback
 protection and an appropriate external supply. Use the Ender output as a control
 signal and share ground where required by the driver design.
+
+## Flash The Gantry Firmware
+
+The flashable binary is:
+
+```text
+firmware/relay-chess-v422-stm32f103ret6.bin
+```
+
+It is built specifically for:
+
+```text
+Creality motherboard: 4.2.2
+MCU: STM32F103RET6, 512 KB
+Stepper-driver code: C, HR4988/A4988-compatible
+Marlin source: chicken, commit 8f2968f16a
+PlatformIO target: STM32F103RE_creality
+```
+
+Do not flash this binary onto a GD32, STM32F103RCT6, 4.2.7, or 8-bit board.
+
+Verify the binary before copying it:
+
+```bash
+cd firmware
+sha256sum -c relay-chess-v422-stm32f103ret6.bin.sha256
+cd ..
+```
+
+Rebuild it from source when needed:
+
+```bash
+./scripts/build_firmware.sh
+```
+
+### SD-Card Flash Procedure
+
+1. Use a FAT32-formatted microSD card, preferably 8 GB or smaller.
+2. Remove old `.bin` files from the card.
+3. Copy `firmware/relay-chess-v422-stm32f103ret6.bin` to the card root.
+4. Rename the copied file to a short unique name not previously flashed, such
+   as `RCG0727.bin`.
+5. Switch the Ender controller off.
+6. Insert the card into the Creality 4.2.2 board.
+7. Keep USB disconnected during flashing.
+8. Switch the controller on and wait at least 30 seconds without interruption.
+9. Switch it off, remove the card, and reconnect USB.
+10. The board may rename the file to `.CUR`; that indicates the bootloader
+    consumed it.
+
+After flashing, initialize the new firmware defaults once:
+
+```bash
+uv run python - << 'PY'
+from chess_gantry.config import AppConfig
+from chess_gantry.serial_link import MarlinSerial
+
+config = AppConfig.load("config.json")
+with MarlinSerial(config.serial) as link:
+    link.send_program(("M502", "M500", "M115", "M119", "M114"))
+PY
+```
+
+`M502` is important because old printer EEPROM values can override the new
+80-steps/mm gantry settings.
+
+Verify the custom firmware identity and endstop names without movement:
+
+```bash
+uv run python scripts/check_firmware.py
+```
+
+Expected endstop names are:
+
+```text
+x_min
+y_max
+z_max
+```
+
+After manually testing all three switches and clearing every homing path, run
+the firmware homing acceptance test:
+
+```bash
+uv run python scripts/check_firmware.py \
+  --home --confirm-clear-path
+```
+
+It runs `G28 X Y Z` and requires `M114` to finish at:
+
+```text
+X:0.00 Y:350.00 Z:350.00
+```
+
+The normal application invokes the same firmware sequence with:
+
+```bash
+uv run chess-gantry --config config.json home-gantry \
+  --record data/gantry_home.json \
+  --confirm-motion --confirm-clear-path
+```
+
+### Firmware Wiring Contract
+
+The custom firmware maps the machine as follows:
+
+```text
+Physical X driver -> logical X -> X-stop connector -> x_min -> homes to X=0
+Physical Y driver -> logical Y -> Y-stop connector -> y_max -> homes to Y=350
+Physical E driver -> logical Z -> Z-stop connector -> z_max -> homes to Z=350
+Physical Z driver -> unused
+```
+
+The physical E connector is deliberately controlled with G-code `Z`, not `E`.
+The pin remap is in
+`chicken/Marlin/src/pins/stm32f1/pins_CREALITY_V422.h`:
+
+```cpp
+#define Z_STEP_PIN PB4
+#define Z_DIR_PIN  PB3
+```
+
+BLTouch and Z-probe homing are disabled. Extruders, hotend sensing, and bed
+temperature sensing are disabled. The firmware build succeeds at 80,760 bytes
+flash and 6,192 bytes RAM.
+
+### Firmware Homing Sequence
+
+The host sends `G28 X Y Z`. Marlin performs:
+
+1. A simultaneous X/Y quick-home approach. X and Y each stop on their own
+   hardware switch, squaring the two outer gantry sides.
+2. Standard Marlin backoff and slower precision bump homing for X and Y.
+3. Z homing. Logical Z drives the motor physically plugged into E until the
+   switch plugged into Z-stop triggers.
+4. A 2 mm post-home backoff on all three axes.
+5. Final logical coordinates `X0 Y350 Z350`.
+
+Endstop stopping occurs inside Marlin's real-time stepper/endstop code, not by
+USB polling.
 
 ## Install
 
@@ -129,9 +265,9 @@ It does not open the Ender serial port or modify physical-game state.
 
 ## Presentation Movement Demo
 
-The presentation mode repeats a fixed four-leg path while keeping both fan
-outputs at full power. It refreshes both `M106 ... S255` commands before every
-movement leg and sends no `M107` until the final return.
+The presentation mode repeats a fixed four-leg path while keeping fan `P0` at
+full power. It refreshes `M106 P0 S255` before every movement leg and sends no
+`M107 P0` until the final return.
 
 ### 1. Print The G-code
 
@@ -202,8 +338,8 @@ origin -> inner +20 mm -> outer +20 mm -> inner origin -> outer origin
 Presentation mode:
 
 - keeps the magnet on through all movement loops
-- refreshes `P0` and `P1` at `S255` before each leg
-- turns both outputs off after the final movement
+- refreshes `P0` at `S255` before each leg
+- turns the output off after the final movement
 - disables motors after completion
 - performs best-effort magnet and motor shutdown after a serial failure
 - rejects configurations whose estimated energized movement exceeds 30 seconds
@@ -234,11 +370,14 @@ every transition immediately. Press and release each switch by hand. Example:
 ```text
 Watching endstops on /dev/ttyUSB0 at 115200 baud; press Ctrl+C to stop.
 INITIAL x_min OPEN
-INITIAL y_min OPEN
+INITIAL y_max OPEN
+INITIAL z_max OPEN
 HIT x_min
 RELEASED x_min
-HIT y_min
-RELEASED y_min
+HIT y_max
+RELEASED y_max
+HIT z_max
+RELEASED z_max
 ```
 
 Stop with `Ctrl+C`. To poll more slowly:
@@ -265,14 +404,13 @@ side. Both expected switches should be `TRIGGERED` when the mechanism is
 physically square at the homing end. A single switch total cannot prove that
 two independently driven sides are aligned.
 
-On this machine, `z_min` is mechanically attached to the inner gantry carriage
-whose motor is driven through Marlin `E`. Therefore the complete manual
-reference consists of:
+On this machine the inner gantry motor is physically connected to the E driver,
+but the custom firmware exposes it as logical Z. The complete reference is:
 
 ```text
 x_min TRIGGERED -> first outer gantry motor at its end
-y_min TRIGGERED -> second outer gantry motor at its end
-z_min TRIGGERED -> inner E-driven carriage at its end
+y_max TRIGGERED -> second outer gantry motor at its end
+z_max TRIGGERED -> inner carriage on the physical E driver
 ```
 
 Manually hold all three carriages against their switches, verify all three with
@@ -283,17 +421,16 @@ uv run chess-gantry --config config.json reference-gantry \
   --confirm-at-switches
 ```
 
-The command refuses unless Marlin reports `x_min`, `y_min`, and `z_min` as
-`TRIGGERED`. The switches are physically at the opposite corner from the
-original assumption, so the configured switch reference is `X=0`,
-`Y=workspace max`, and `E=workspace max`. It does not drive toward the switches.
+The command refuses unless Marlin reports `x_min`, `y_max`, and `z_max` as
+`TRIGGERED`. The switch reference is `X=0`, `Y=workspace max`, and
+`Z=workspace max`. It does not drive toward the switches.
 
 ### Automatic Gantry Homing
 
 The Ender firmware contains the complete homing sequence. `home-gantry` does
 not choose directions, speeds, distances, backoff, or coordinates. It switches
 both magnet outputs off and sends the commands listed in
-`safety.home_commands`. The checked-in physical configuration uses `G28`
+`safety.home_commands`. The checked-in physical configuration uses `G28 X Y Z`
 followed by `M400`.
 
 Before running:
@@ -316,9 +453,8 @@ The host sends exactly:
 
 ```gcode
 M107 P0
-M107 P1
 G21
-G28
+G28 X Y Z
 M400
 M119
 M114
@@ -332,13 +468,9 @@ homing path.
 If `G28` or either verification command fails, no homing record is written and
 the host attempts to switch both magnet outputs off and disable motors.
 
-The latest physical `G28` attempt entered Marlin's BLTouch Z routine and
-aborted with `STOP called because of BLTouch error`. This means the active
-firmware still includes BLTouch in all-axis homing. Reset the controller and
-correct/reflash Marlin's homing configuration before retrying. If only X and Y
-should be homed by firmware, set `safety.home_commands` to `["G28 X Y",
-"M400"]`; do that only if the E-driven inner carriage has a separate validated
-reference procedure.
+The previous stock firmware entered a BLTouch routine and failed. The custom
+firmware in `chicken` disables BLTouch, remaps the physical E driver to logical
+Z, and uses the mechanical Z-stop switch directly.
 
 The record is evidence of the last successful homing operation; it cannot prove
 that the gantry has not been manually moved or lost steps afterward. Home again
@@ -395,15 +527,15 @@ uv run chess-gantry --config config.json magnet-test \
   --duration-s 1 --confirm-motion
 ```
 
-The command sends both outputs off before the pulse, drives both at full PWM,
-and sends both outputs off afterward. Magnet-only pulses are limited to five
+The command sends fan `P0` off before the pulse, drives it at full PWM, and
+sends it off afterward. Magnet-only pulses are limited to five
 seconds.
 
 ### Pickup, Move, Release, Return
 
 The dedicated `piece-demo` combines all three endstops, gantry movement, and
-the electromagnet in one guarded test. It requires `x_min`, `y_min`, and
-`z_min` to be triggered immediately before movement.
+the electromagnet in one guarded test. It requires `x_min`, `y_max`, and
+`z_max` to be triggered immediately before movement.
 
 Print the exact test without connecting:
 
@@ -426,7 +558,7 @@ For the physical test:
 1. Correct the electromagnet driver if direct coil load still resets the Ender
    controller.
 2. Clear a 20 mm by 20 mm path away from the switches.
-3. Manually place both outer sides and the inner E-driven carriage on their
+3. Manually place both outer sides and the inner Z carriage on their
    X/Y/Z switches.
 4. Put one piece directly beneath the magnet at that reference position.
 5. Verify all three switches are `TRIGGERED` with `endstop-watch`.
@@ -443,9 +575,9 @@ uv run chess-gantry --config config.json piece-demo \
 ```
 
 The command queries `M119` again and refuses to move unless all three switches
-remain triggered. It then assigns `X0 Y350 E350`, energizes both configured fan
-outputs at full PWM, moves inner `E` to 330 mm, moves the aligned outer pair to
-`X20 Y330`, releases the piece, and returns to `X0 Y350 E350` with the magnet off.
+remain triggered. It then assigns `X0 Y350 Z350`, energizes fan `P0` at full
+PWM, moves inner `Z` to 330 mm, moves the aligned outer pair to `X20 Y330`,
+releases the piece, and returns to `X0 Y350 Z350` with the magnet off.
 It finishes by disabling the motors and does not modify chess-state JSON.
 
 The test is deliberately limited to a short transfer. Do not increase distance
@@ -527,7 +659,7 @@ uv run chess-gantry --config config.json workspace-test \
 ```
 
 Immediately before movement, the command queries `M119` and refuses to continue
-unless `x_min`, `y_min`, and `z_min` are all triggered. This is a movement test,
+unless `x_min`, `y_max`, and `z_max` are all triggered. This is a movement test,
 not firmware homing: it does not drive toward switches and cannot realign a
 gantry that starts away from its verified mechanical reference.
 
@@ -857,7 +989,7 @@ Ensure the current user can access the serial device, commonly through the
 
 ### Controller Disconnects When Magnet Turns On
 
-Treat this as an electrical load or interference problem. Switch both outputs
+Treat this as an electrical load or interference problem. Switch fan `P0`
 off, power-cycle the controller, and correct the magnet driver circuit. Do not
 solve a controller reset by increasing pulse duration or repeatedly retrying
 full power.

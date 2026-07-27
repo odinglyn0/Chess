@@ -14,6 +14,7 @@ EXCLUDED_PARTS = {
     ".venv",
     "venv",
     "build",
+    "chicken",
     "dist",
     "data",
     "__pycache__",

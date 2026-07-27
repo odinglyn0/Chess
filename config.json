@@ -7,7 +7,7 @@
     "write_timeout_s": 2.0,
     "command_timeout_s": 120.0,
     "startup_wait_s": 2.5,
-    "verify_marlin": false,
+    "verify_marlin": true,
     "handshake_timeout_s": 5.0
   },
 

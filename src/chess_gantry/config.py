@@ -449,7 +449,7 @@ class SafetySettings:
                         "M203 X50 Y50 E50",
                         "M201 X500 Y500 E500",
                         "M205 X5 Y5 E5",
-                        "G92 X0 Y170 E0",
+                        "G92 X170 Y0 E0",
                         "M302 P0",
                         "M400",
                     ],

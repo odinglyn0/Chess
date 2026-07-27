@@ -5,7 +5,12 @@ import unittest
 
 from chess_gantry.config import SerialSettings
 from chess_gantry.errors import SerialProtocolError
-from chess_gantry.serial_link import MarlinSerial, discover_serial_ports
+from chess_gantry.serial_link import (
+    MarlinSerial,
+    discover_serial_ports,
+    endstop_transition_lines,
+    parse_endstop_states,
+)
 
 
 class FakeSerial:
@@ -72,6 +77,20 @@ class SerialLinkTests(unittest.TestCase):
         self.assertEqual(fake.writes, [b"G90\n"])
         self.assertEqual(result.responses[-1], "ok")
         self.assertTrue(fake.closed)
+
+    def test_endstop_parser_and_transition_messages(self) -> None:
+        initial = parse_endstop_states(
+            ("Reporting endstop status", "x_min: open", "y_min: TRIGGERED", "ok")
+        )
+        self.assertEqual(initial, {"x_min": False, "y_min": True})
+        self.assertEqual(
+            endstop_transition_lines({}, initial),
+            ("INITIAL x_min OPEN", "INITIAL y_min TRIGGERED"),
+        )
+        hit = {"x_min": True, "y_min": True}
+        self.assertEqual(endstop_transition_lines(initial, hit), ("HIT x_min",))
+        released = {"x_min": False, "y_min": True}
+        self.assertEqual(endstop_transition_lines(hit, released), ("RELEASED x_min",))
 
     def test_invalid_utf8_startup_bytes_do_not_crash(self) -> None:
         fake = FakeSerial([b"\xff\xfe startup\n", b"ok\n"])

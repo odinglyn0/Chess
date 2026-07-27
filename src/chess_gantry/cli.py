@@ -7,12 +7,19 @@ from typing import Any, Mapping, Optional, Sequence
 import json
 import sys
 import asyncio
+from time import sleep
 
 from .config import AppConfig
 from .errors import GantryError, PendingTransactionError, ValidationError
 from .models import BoardState, MoveDelta
 from .persistence import read_json
-from .serial_link import MarlinSerial, discover_serial_ports
+from .serial_link import (
+    DemoMarlinSerial,
+    MarlinSerial,
+    discover_serial_ports,
+    endstop_transition_lines,
+    parse_endstop_states,
+)
 from .service import GantryService
 from .lichess_adapter import stream_event_to_move
 from .lichess_watch import watch_game
@@ -214,6 +221,40 @@ def _parser() -> ArgumentParser:
     )
     diagnose.add_argument("--baudrate", type=int, help="try only this baud rate")
 
+    endstop_watch = commands.add_parser(
+        "endstop-watch",
+        help="poll M119 and print each endstop hit or release transition",
+    )
+    endstop_watch.add_argument(
+        "--interval",
+        type=float,
+        default=0.2,
+        help="seconds between M119 polls (default: 0.2)",
+    )
+    endstop_watch.add_argument(
+        "--samples",
+        type=int,
+        default=0,
+        help="stop after this many samples; zero watches until Ctrl+C",
+    )
+    endstop_watch.add_argument(
+        "--port", help="override serial port; omit to use config/auto-detection"
+    )
+    endstop_watch.add_argument("--baudrate", type=int, help="try only this baud rate")
+    endstop_watch.add_argument(
+        "--demo", action="store_true", help="use simulated open endstops"
+    )
+
+    reference_gantry = commands.add_parser(
+        "reference-gantry",
+        help="require X/Y/Z endstops triggered, then assign the mirrored X/Y/E origin",
+    )
+    reference_gantry.add_argument(
+        "--confirm-at-switches",
+        action="store_true",
+        help="required confirmation that all three carriages are manually held at their endstops",
+    )
+
     web = commands.add_parser("web", help="launch the local browser controller")
     web.add_argument(
         "--host", default="127.0.0.1", help="bind address (default: local only)"
@@ -349,6 +390,48 @@ def _parser() -> ArgumentParser:
         help="simulate acknowledged Marlin streaming without opening a serial port",
     )
 
+    workspace_test = commands.add_parser(
+        "workspace-test",
+        help="traverse a serpentine grid across the configured workspace with the magnet off",
+    )
+    workspace_test.add_argument(
+        "--feed-mm-min",
+        type=float,
+        default=1200.0,
+        help="movement feed (default: 1200)",
+    )
+    workspace_test.add_argument(
+        "--margin-mm", type=float, default=20.0, help="edge margin (default: 20)"
+    )
+    workspace_test.add_argument(
+        "--columns", type=int, default=8, help="grid columns (default: 8)"
+    )
+    workspace_test.add_argument(
+        "--rows", type=int, default=8, help="grid rows (default: 8)"
+    )
+    workspace_test.add_argument(
+        "--dwell-ms", type=int, default=100, help="pause at each point (default: 100)"
+    )
+    workspace_test.add_argument(
+        "--output", "-o", help="write generated workspace G-code to this file"
+    )
+    workspace_test.add_argument(
+        "--confirm-motion", action="store_true", help="stream the test to Marlin"
+    )
+    workspace_test.add_argument(
+        "--confirm-empty-workspace",
+        action="store_true",
+        help="required confirmation that the complete configured workspace is clear",
+    )
+    workspace_test.add_argument(
+        "--confirm-at-switches",
+        action="store_true",
+        help="required confirmation that X/Y/Z endstops are simultaneously held",
+    )
+    workspace_test.add_argument(
+        "--demo", action="store_true", help="simulate Marlin without opening serial"
+    )
+
     commands.add_parser(
         "stop", help="send the configured Marlin emergency-stop command immediately"
     )
@@ -405,11 +488,14 @@ _COMMANDS = frozenset(
         "lichess-follow",
         "ports",
         "diagnose",
+        "endstop-watch",
+        "reference-gantry",
         "web",
         "home",
         "motor-test",
         "magnet-test",
         "board-sweep",
+        "workspace-test",
         "stop",
         "reconcile",
     }
@@ -486,6 +572,55 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
                     print(f"\n> {command}")
                     for line in result.responses:
                         print(line)
+            return 0
+
+        if args.command == "endstop-watch":
+            if args.interval <= 0:
+                parser.error("--interval must be positive")
+            if args.samples < 0:
+                parser.error("--samples cannot be negative")
+            settings = config.serial
+            if args.port:
+                settings = replace(settings, port=args.port)
+            if args.baudrate is not None:
+                if args.baudrate <= 0:
+                    parser.error("--baudrate must be positive")
+                settings = replace(
+                    settings,
+                    baudrate=args.baudrate,
+                    fallback_baudrates=(),
+                )
+            link_type = DemoMarlinSerial if args.demo else MarlinSerial
+            previous: dict[str, bool] = {}
+            sample = 0
+            with link_type(settings) as link:
+                print(
+                    f"Watching endstops on {link.active_port} at "
+                    f"{link.active_baudrate} baud; press Ctrl+C to stop.",
+                    flush=True,
+                )
+                while args.samples == 0 or sample < args.samples:
+                    result = link.send_command("M119", timeout_s=10.0)
+                    current = parse_endstop_states(result.responses)
+                    if not current:
+                        raise ValidationError(
+                            "M119 did not return any parseable endstop states"
+                        )
+                    for line in endstop_transition_lines(previous, current):
+                        print(line, flush=True)
+                    previous = current
+                    sample += 1
+                    if args.samples == 0 or sample < args.samples:
+                        sleep(args.interval)
+            return 0
+
+        if args.command == "reference-gantry":
+            if not args.confirm_at_switches:
+                parser.error("reference-gantry requires --confirm-at-switches")
+            service = _service(args, config)
+            program = service.reference_gantry()
+            print("All X/Y/Z endstops are triggered; assigned X=max, Y=0, E=0.")
+            print("\n".join(program))
             return 0
 
         if args.command == "web":
@@ -704,8 +839,6 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
                 print("\n".join(program))
                 return 0
             if args.demo:
-                from .serial_link import DemoMarlinSerial
-
                 link = DemoMarlinSerial(config.serial)
                 with link:
                     link.send_program(config.safety.preflight_commands)
@@ -733,8 +866,6 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
                 print("\n".join(program))
                 return 0
             if args.demo:
-                from .serial_link import DemoMarlinSerial
-
                 link = DemoMarlinSerial(config.serial)
                 with link:
                     link.send_program(config.safety.preflight_commands)
@@ -751,8 +882,6 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
             if not args.confirm_motion:
                 print("; DRY RUN ONLY: no serial port was opened")
             elif args.demo:
-                from .serial_link import DemoMarlinSerial
-
                 link = DemoMarlinSerial(config.serial)
                 with link:
                     link.send_program(config.safety.preflight_commands)
@@ -775,6 +904,48 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
                 output.parent.mkdir(parents=True, exist_ok=True)
                 output.write_text(text, encoding="ascii")
                 print(f"; wrote board sweep G-code to {output}")
+            else:
+                print(text, end="")
+            return 0
+
+        if args.command == "workspace-test":
+            program = service.workspace_test_program(
+                args.feed_mm_min,
+                args.margin_mm,
+                args.columns,
+                args.rows,
+                args.dwell_ms,
+            )
+            if not args.confirm_motion:
+                print("; DRY RUN ONLY: no serial port was opened")
+            elif args.demo:
+                link = DemoMarlinSerial(config.serial)
+                with link:
+                    link.send_program(program)
+                print("; DEMO ONLY: no serial port was opened")
+            else:
+                if not args.confirm_empty_workspace:
+                    parser.error(
+                        "physical workspace-test requires --confirm-empty-workspace"
+                    )
+                if not args.confirm_at_switches:
+                    parser.error(
+                        "physical workspace-test requires --confirm-at-switches"
+                    )
+                program = service.workspace_test(
+                    args.feed_mm_min,
+                    args.margin_mm,
+                    args.columns,
+                    args.rows,
+                    args.dwell_ms,
+                )
+                print("; physical workspace test completed successfully")
+            text = "\n".join(program) + "\n"
+            if args.output:
+                output = Path(args.output)
+                output.parent.mkdir(parents=True, exist_ok=True)
+                output.write_text(text, encoding="ascii")
+                print(f"; wrote workspace test G-code to {output}")
             else:
                 print(text, end="")
             return 0

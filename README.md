@@ -220,6 +220,80 @@ uv run chess-gantry --config config.json ports
 uv run chess-gantry --config config.json diagnose
 ```
 
+### Watch Endstop Switches
+
+Keep the motors stationary and run:
+
+```bash
+uv run chess-gantry --config config.json endstop-watch
+```
+
+The command polls Marlin `M119` every 200 ms and prints the initial state plus
+every transition immediately. Press and release each switch by hand. Example:
+
+```text
+Watching endstops on /dev/ttyUSB0 at 115200 baud; press Ctrl+C to stop.
+INITIAL x_min OPEN
+INITIAL y_min OPEN
+HIT x_min
+RELEASED x_min
+HIT y_min
+RELEASED y_min
+```
+
+Stop with `Ctrl+C`. To poll more slowly:
+
+```bash
+uv run chess-gantry --config config.json endstop-watch --interval 0.5
+```
+
+To take exactly ten samples and exit:
+
+```bash
+uv run chess-gantry --config config.json endstop-watch --samples 10
+```
+
+Run a serial-free parser check with simulated open switches:
+
+```bash
+uv run chess-gantry --config config.demo.json endstop-watch \
+  --demo --samples 3 --interval 0.05
+```
+
+For independent X/Y gantry alignment, one switch must report for each motor
+side. Both expected switches should be `TRIGGERED` when the mechanism is
+physically square at the homing end. A single switch total cannot prove that
+two independently driven sides are aligned.
+
+On this machine, `z_min` is mechanically attached to the inner gantry carriage
+whose motor is driven through Marlin `E`. Therefore the complete manual
+reference consists of:
+
+```text
+x_min TRIGGERED -> first outer gantry motor at its end
+y_min TRIGGERED -> second outer gantry motor at its end
+z_min TRIGGERED -> inner E-driven carriage at its end
+```
+
+Manually hold all three carriages against their switches, verify all three with
+`endstop-watch`, then assign the mirrored software reference without moving:
+
+```bash
+uv run chess-gantry --config config.json reference-gantry \
+  --confirm-at-switches
+```
+
+The command refuses unless Marlin reports `x_min`, `y_min`, and `z_min` as
+`TRIGGERED`. If all three are active, it assigns `X=workspace max`, `Y=0`, and
+`E=0`. Physical testing showed that moving away from the switches requires
+Marlin X to decrease while Y increases; the software applies that reversed
+outer-axis mapping globally. It does not drive toward the switches.
+
+This watcher is a stationary wiring and switch test. Do not use host-side
+`M119` polling to stop moving motors: USB latency is not deterministic. Real
+homing and endstop stopping must be configured and executed inside Marlin
+firmware, followed by host-side verification with `M119` and `M114`.
+
 ### Movement Only
 
 Print a short test:
@@ -290,6 +364,65 @@ This mode picks up at the origin, holds through the two outbound movement legs,
 releases at the destination, and returns to the origin with the magnet off.
 
 ## Full-Board Sweep
+
+### Full Workspace Movement Test
+
+Use this test before relying on the chess-square geometry. It traverses an 8 x
+8 serpentine grid over the configured 350 x 350 mm usable workspace with a 20
+mm edge margin, pauses at every point, and returns to the three-switch
+reference. The electromagnet remains off.
+
+Generate and inspect the G-code without connecting:
+
+```bash
+uv run chess-gantry --config config.json workspace-test \
+  --feed-mm-min 1200 \
+  --margin-mm 20 \
+  --columns 8 \
+  --rows 8 \
+  --dwell-ms 100 \
+  --output data/workspace-test.gcode
+```
+
+Simulate it:
+
+```bash
+uv run chess-gantry --config config.demo.json workspace-test \
+  --feed-mm-min 1200 \
+  --margin-mm 20 \
+  --columns 8 \
+  --rows 8 \
+  --dwell-ms 100 \
+  --confirm-motion --demo
+```
+
+For physical execution:
+
+1. Remove every piece and obstruction from the complete configured workspace.
+2. Manually place both outer sides and the inner carriage against their X, Y,
+   and Z switches.
+3. Verify all three show `TRIGGERED` with `endstop-watch`.
+4. Keep the emergency power cutoff ready.
+5. Run:
+
+```bash
+uv run chess-gantry --config config.json workspace-test \
+  --feed-mm-min 1200 \
+  --margin-mm 20 \
+  --columns 8 \
+  --rows 8 \
+  --dwell-ms 100 \
+  --confirm-motion \
+  --confirm-empty-workspace \
+  --confirm-at-switches
+```
+
+Immediately before movement, the command queries `M119` and refuses to continue
+unless `x_min`, `y_min`, and `z_min` are all triggered. This is a movement test,
+not firmware homing: it does not drive toward switches and cannot realign a
+gantry that starts away from its verified mechanical reference.
+
+### Chess-Square Sweep
 
 Generate a serpentine sweep over all 64 square centers without connecting:
 

@@ -47,7 +47,7 @@ class GCodeGenerator:
         mirrored = (
             self.config.workspace.min_y_mm + self.config.workspace.max_y_mm - position
         )
-        return position, mirrored
+        return mirrored, position
 
     def generate(self, transfers: Sequence[PieceTransfer]) -> GCodeProgram:
         if not transfers:

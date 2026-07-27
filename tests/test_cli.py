@@ -72,6 +72,38 @@ class RunCommandTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("G21", buffer.getvalue())
 
+    def test_endstop_watch_demo_prints_initial_states(self) -> None:
+        buffer = StringIO()
+        with contextlib.redirect_stdout(buffer):
+            code = run(self.args("endstop-watch", "--demo", "--samples", "1"))
+        self.assertEqual(code, 0)
+        output = buffer.getvalue()
+        self.assertIn("Watching endstops on DEMO", output)
+        self.assertIn("INITIAL x_min OPEN", output)
+        self.assertIn("INITIAL y_min OPEN", output)
+
+    def test_workspace_test_dry_run_generates_full_grid(self) -> None:
+        buffer = StringIO()
+        with contextlib.redirect_stdout(buffer):
+            code = run(
+                self.args(
+                    "workspace-test",
+                    "--feed-mm-min",
+                    "1200",
+                    "--margin-mm",
+                    "20",
+                    "--columns",
+                    "8",
+                    "--rows",
+                    "8",
+                )
+            )
+        self.assertEqual(code, 0)
+        output = buffer.getvalue()
+        self.assertIn("DRY RUN ONLY", output)
+        self.assertEqual(output.count("G1 "), 65)
+        self.assertNotIn("M106", output)
+
     def test_motor_test_without_confirmation_is_gcode_only(self) -> None:
         buffer = StringIO()
         with contextlib.redirect_stdout(buffer):
@@ -79,7 +111,7 @@ class RunCommandTests(unittest.TestCase):
         self.assertEqual(code, 0)
         output = buffer.getvalue()
         self.assertIn("DRY RUN ONLY", output)
-        self.assertIn("G92 X0 Y350 E0", output)
+        self.assertIn("G92 X350 Y0 E0", output)
         self.assertNotIn("G28", output)
         self.assertIn("M82", output)
         self.assertIn("M302 P1", output)
@@ -88,9 +120,9 @@ class RunCommandTests(unittest.TestCase):
         self.assertIn("M201 X500 Y500 E300", output)
         self.assertIn("M205 X5 Y5 E5", output)
         self.assertIn("G1 E20 F600", output)
-        self.assertIn("G1 X20 Y330 F600", output)
+        self.assertIn("G1 X330 Y20 F600", output)
         self.assertIn("G1 E0 F600", output)
-        self.assertIn("G1 X0 Y350 F600", output)
+        self.assertIn("G1 X350 Y0 F600", output)
         self.assertIn("M302 P0", output)
 
     def test_motor_test_accepts_safe_distance_and_feed(self) -> None:
@@ -108,7 +140,7 @@ class RunCommandTests(unittest.TestCase):
         self.assertEqual(code, 0)
         output = buffer.getvalue()
         self.assertIn("G1 E10 F300", output)
-        self.assertIn("G1 X10 Y340 F300", output)
+        self.assertIn("G1 X340 Y10 F300", output)
 
     def test_motor_test_with_magnet_prints_fixed_fan_one_gcode(self) -> None:
         buffer = StringIO()
@@ -129,7 +161,7 @@ class RunCommandTests(unittest.TestCase):
         self.assertEqual(output.count("M106 P1 S255"), 1)
         self.assertEqual(output.count("G4 P300"), 2)
         self.assertIn("M106 P1 S255\nG4 P300\nG1 E20 F1200", output)
-        self.assertIn("G1 X20 Y330 F1200\nM400\nM107 P0\nM107 P1", output)
+        self.assertIn("G1 X330 Y20 F1200\nM400\nM107 P0\nM107 P1", output)
 
     def test_physical_motor_test_with_magnet_requires_confirmation(self) -> None:
         errors = StringIO()
@@ -203,9 +235,9 @@ class RunCommandTests(unittest.TestCase):
         output = buffer.getvalue()
         self.assertIn("DRY RUN ONLY", output)
         self.assertEqual(output.count("G0 ") + output.count("G1 "), 64)
-        self.assertIn("G0 X10 Y340 E10 F1800", output)
-        self.assertIn("G1 X10 Y340 E150 F1800", output)
-        self.assertIn("G1 X30 Y320 E150 F1800", output)
+        self.assertIn("G0 X340 Y10 E10 F1800", output)
+        self.assertIn("G1 X340 Y10 E150 F1800", output)
+        self.assertIn("G1 X320 Y30 E150 F1800", output)
         self.assertEqual(output.count("M106 P0 S255"), 64)
         self.assertEqual(output.count("M106 P1 S255"), 64)
         self.assertGreater(output.rfind("M107 P1"), output.rfind("M106 P1 S255"))

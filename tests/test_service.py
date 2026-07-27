@@ -10,6 +10,7 @@ from chess_gantry.config import AppConfig
 from chess_gantry.errors import ConfigurationError, SerialProtocolError
 from chess_gantry.models import BoardState, GridPosition, MoveDelta
 from chess_gantry.persistence import atomic_write_json
+from chess_gantry.serial_link import CommandResult
 from chess_gantry.service import GantryService
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -28,12 +29,17 @@ def test_config(*, calibrated: bool = True, capture: bool = True) -> AppConfig:
 
 
 class FakeLink:
-    def __init__(self, fail: bool = False) -> None:
+    def __init__(self, fail: bool = False, endstops=None) -> None:
         self.fail = fail
         self.connected = True
         self.programs = []
         self.best_effort_programs = []
         self.stopped = False
+        self.endstops = endstops or {
+            "x_min": True,
+            "y_min": True,
+            "z_min": True,
+        }
 
     def __enter__(self):
         return self
@@ -47,6 +53,15 @@ class FakeLink:
         if self.fail:
             raise SerialProtocolError("simulated serial failure")
         return ()
+
+    def send_command(self, command, timeout_s=None):
+        if command == "M119":
+            responses = tuple(
+                f"{name}: {'TRIGGERED' if triggered else 'open'}"
+                for name, triggered in self.endstops.items()
+            )
+            return CommandResult(command, (*responses, "ok"))
+        return CommandResult(command, ("ok",))
 
     def best_effort(self, commands):
         self.best_effort_programs.append(tuple(commands))
@@ -107,8 +122,65 @@ class ServiceTests(unittest.TestCase):
             self.assertIn("M107 P1", commands)
             self.assertLess(
                 commands.index("M106 P1 S255"),
-                commands.index("G1 X70 Y280 E90 F3000"),
+                commands.index("G1 X280 Y70 E90 F3000"),
             )
+
+    def test_reference_gantry_requires_all_three_endstops(self) -> None:
+        with TemporaryDirectory() as directory:
+            temp = Path(directory)
+            state_path, journal_path, audit_path = self.paths(temp)
+            atomic_write_json(state_path, self.minimal_state().to_dict())
+            fake = FakeLink(endstops={"x_min": True, "y_min": True, "z_min": False})
+            service = GantryService(
+                test_config(),
+                state_path,
+                journal_path,
+                audit_path,
+                link_factory=lambda settings: fake,
+            )
+            with self.assertRaisesRegex(ConfigurationError, "z_min"):
+                service.reference_gantry()
+            self.assertEqual(fake.programs, [])
+
+    def test_reference_gantry_assigns_mirrored_xye_origin(self) -> None:
+        with TemporaryDirectory() as directory:
+            temp = Path(directory)
+            state_path, journal_path, audit_path = self.paths(temp)
+            atomic_write_json(state_path, self.minimal_state().to_dict())
+            fake = FakeLink()
+            service = GantryService(
+                test_config(),
+                state_path,
+                journal_path,
+                audit_path,
+                link_factory=lambda settings: fake,
+            )
+            program = service.reference_gantry()
+            self.assertIn("G92 X350 Y0 E0", program)
+            self.assertEqual(fake.programs, [program])
+
+    def test_workspace_test_visits_grid_and_returns_to_reference(self) -> None:
+        with TemporaryDirectory() as directory:
+            temp = Path(directory)
+            state_path, journal_path, audit_path = self.paths(temp)
+            atomic_write_json(state_path, self.minimal_state().to_dict())
+            fake = FakeLink()
+            service = GantryService(
+                test_config(),
+                state_path,
+                journal_path,
+                audit_path,
+                link_factory=lambda settings: fake,
+            )
+            program = service.workspace_test(1200.0, 20.0, 8, 8, 100)
+            moves = tuple(command for command in program if command.startswith("G1 "))
+            self.assertEqual(len(moves), 65)
+            self.assertEqual(moves[0], "G1 X330 Y20 E20 F1200")
+            self.assertEqual(moves[7], "G1 X330 Y20 E330 F1200")
+            self.assertEqual(moves[8], "G1 X285.714 Y64.286 E330 F1200")
+            self.assertEqual(moves[-1], "G1 X350 Y0 E0 F1200")
+            self.assertFalse(any(command.startswith("M106") for command in program))
+            self.assertEqual(len(fake.programs), 2)
 
     def test_capture_generates_two_transfers_and_updates_expected_state(self) -> None:
         with TemporaryDirectory() as directory:
@@ -269,13 +341,13 @@ class ServiceTests(unittest.TestCase):
             self.assertIn("M203 X200 Y200 E50", program)
             self.assertIn("M201 X500 Y500 E300", program)
             self.assertIn("M205 X5 Y5 E5", program)
-            self.assertIn("G92 X0 Y350 E0", program)
+            self.assertIn("G92 X350 Y0 E0", program)
             self.assertFalse(any(command.startswith("G28") for command in program))
             self.assertFalse(any(" Z" in command for command in program))
             self.assertIn("G1 E20 F600", program)
-            self.assertIn("G1 X20 Y330 F600", program)
+            self.assertIn("G1 X330 Y20 F600", program)
             self.assertIn("G1 E0 F600", program)
-            self.assertIn("G1 X0 Y350 F600", program)
+            self.assertIn("G1 X350 Y0 F600", program)
             self.assertEqual(program[-3:], ("M302 P0", "M211 S1", "M84"))
             self.assertEqual(program[-1], "M84")
             self.assertEqual(service.store.load().revision, 0)
@@ -328,7 +400,7 @@ class ServiceTests(unittest.TestCase):
                 ("M106 P1 S255", "G4 P300", "G1 E20 F1200", "M400"),
             )
             self.assertLess(
-                program.index("G1 X20 Y330 F1200"), program.index("M107 P1", first_on)
+                program.index("G1 X330 Y20 F1200"), program.index("M107 P1", first_on)
             )
             self.assertEqual(program[-4:], ("M107 P1", "M302 P0", "M211 S1", "M84"))
             self.assertEqual(fake.programs, [program])
@@ -431,11 +503,11 @@ class ServiceTests(unittest.TestCase):
                 command for command in program if command.startswith(("G0 ", "G1 "))
             )
             self.assertEqual(len(moves), 64)
-            self.assertEqual(moves[0], "G0 X10 Y340 E10 F1800")
-            self.assertEqual(moves[7], "G1 X10 Y340 E150 F1800")
-            self.assertEqual(moves[8], "G1 X30 Y320 E150 F1800")
-            self.assertEqual(moves[15], "G1 X30 Y320 E10 F1800")
-            self.assertEqual(moves[-1], "G1 X150 Y200 E10 F1800")
+            self.assertEqual(moves[0], "G0 X340 Y10 E10 F1800")
+            self.assertEqual(moves[7], "G1 X340 Y10 E150 F1800")
+            self.assertEqual(moves[8], "G1 X320 Y30 E150 F1800")
+            self.assertEqual(moves[15], "G1 X320 Y30 E10 F1800")
+            self.assertEqual(moves[-1], "G1 X200 Y150 E10 F1800")
             on_index = program.index("M106 P1 S255")
             final_off = len(program) - 1 - program[::-1].index("M107 P1")
             self.assertEqual(program.count("M106 P0 S255"), 64)

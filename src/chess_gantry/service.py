@@ -36,7 +36,7 @@ from .models import (
 )
 from .path_planning import plan_path
 from .persistence import AuditLog, BoardStore, JournalStore
-from .serial_link import MarlinSerial
+from .serial_link import MarlinSerial, parse_endstop_states
 
 
 @dataclass(frozen=True)
@@ -300,6 +300,174 @@ class GantryService:
         with link:
             self.home_with_link(link)
 
+    def reference_gantry_with_link(self, link: Any) -> Tuple[str, ...]:
+        if not getattr(link, "connected", False):
+            raise ConfigurationError(
+                "cannot reference gantry: the supplied Marlin link is not connected"
+            )
+        result = link.send_command("M119", timeout_s=10.0)
+        states = parse_endstop_states(result.responses)
+        required = ("x_min", "y_min", "z_min")
+        missing = [name for name in required if name not in states]
+        open_switches = [name for name in required if not states.get(name, False)]
+        if missing:
+            raise ConfigurationError(
+                "cannot reference gantry: M119 did not report " + ", ".join(missing)
+            )
+        if open_switches:
+            raise ConfigurationError(
+                "cannot reference gantry: these switches are not triggered: "
+                + ", ".join(open_switches)
+            )
+        mirror_origin = self.config.workspace.min_y_mm + self.config.workspace.max_y_mm
+        program = (
+            *self.config.magnet.off_commands,
+            "G90",
+            "M82",
+            "M302 P1",
+            (
+                f"G92 X{mirror_origin - self.config.workspace.min_y_mm:g} "
+                f"Y{self.config.workspace.min_y_mm:g} "
+                f"E{self.config.workspace.min_x_mm:g}"
+            ),
+            "M400",
+        )
+        link.send_program(program)
+        return program
+
+    def reference_gantry(self) -> Tuple[str, ...]:
+        link = self._link_factory(self.config.serial)
+        with link:
+            return self.reference_gantry_with_link(link)
+
+    def workspace_test_program(
+        self,
+        feed_mm_min: float = 1200.0,
+        margin_mm: float = 20.0,
+        columns: int = 8,
+        rows: int = 8,
+        dwell_ms: int = 100,
+    ) -> Tuple[str, ...]:
+        if not math.isfinite(feed_mm_min) or feed_mm_min <= 0:
+            raise ConfigurationError(
+                "workspace-test feed rate must be finite and greater than zero"
+            )
+        if feed_mm_min > self.config.motion.travel_feed_mm_min:
+            raise ConfigurationError(
+                "workspace-test feed rate cannot exceed motion.travel_feed_mm_min "
+                f"({self.config.motion.travel_feed_mm_min:g} mm/min)"
+            )
+        if not math.isfinite(margin_mm) or margin_mm < 0:
+            raise ConfigurationError(
+                "workspace-test margin must be finite and non-negative"
+            )
+        if columns < 2 or rows < 2:
+            raise ConfigurationError(
+                "workspace-test requires at least two columns and two rows"
+            )
+        if dwell_ms < 0 or dwell_ms > 5000:
+            raise ConfigurationError(
+                "workspace-test dwell must be between zero and 5000 ms"
+            )
+        min_x = self.config.workspace.min_x_mm + margin_mm
+        max_x = self.config.workspace.max_x_mm - margin_mm
+        min_y = self.config.workspace.min_y_mm + margin_mm
+        max_y = self.config.workspace.max_y_mm - margin_mm
+        if min_x >= max_x or min_y >= max_y:
+            raise ConfigurationError(
+                "workspace-test margin leaves no usable movement area"
+            )
+        x_values = tuple(
+            min_x + (max_x - min_x) * index / (columns - 1) for index in range(columns)
+        )
+        y_values = tuple(
+            min_y + (max_y - min_y) * index / (rows - 1) for index in range(rows)
+        )
+        points = []
+        for row, y in enumerate(y_values):
+            values = x_values if row % 2 == 0 else tuple(reversed(x_values))
+            points.extend(MachinePoint(x, y) for x in values)
+        mirror_origin = self.config.workspace.min_y_mm + self.config.workspace.max_y_mm
+
+        def number(value: float) -> str:
+            return f"{value:.3f}".rstrip("0").rstrip(".")
+
+        def move(point: MachinePoint) -> str:
+            return (
+                f"G1 X{number(mirror_origin - point.y)} Y{number(point.y)} "
+                f"E{number(point.x)} F{number(feed_mm_min)}"
+            )
+
+        program = [
+            "G21",
+            "G90",
+            "M82",
+            "M302 P1",
+            *self.config.magnet.off_commands,
+            "M92 X80 Y80 E80",
+            "M203 X200 Y200 E50",
+            "M201 X500 Y500 E300",
+            "M205 X5 Y5 E5",
+            "M211 S0",
+            (
+                f"G92 X{mirror_origin - self.config.workspace.min_y_mm:g} "
+                f"Y{self.config.workspace.min_y_mm:g} "
+                f"E{self.config.workspace.min_x_mm:g}"
+            ),
+            "M400",
+        ]
+        for point in points:
+            program.extend((move(point), "M400"))
+            if dwell_ms:
+                program.append(f"G4 P{dwell_ms}")
+        program.extend(
+            (
+                f"G1 X{mirror_origin - self.config.workspace.min_y_mm:g} "
+                f"Y{self.config.workspace.min_y_mm:g} "
+                f"E{self.config.workspace.min_x_mm:g} F{feed_mm_min:g}",
+                "M400",
+                *self.config.magnet.off_commands,
+                "M302 P0",
+                "M211 S1",
+                "M84",
+            )
+        )
+        return tuple(program)
+
+    def workspace_test(
+        self,
+        feed_mm_min: float = 1200.0,
+        margin_mm: float = 20.0,
+        columns: int = 8,
+        rows: int = 8,
+        dwell_ms: int = 100,
+    ) -> Tuple[str, ...]:
+        self._require_execution_unlocked()
+        program = self.workspace_test_program(
+            feed_mm_min, margin_mm, columns, rows, dwell_ms
+        )
+        link = self._link_factory(self.config.serial)
+        with link:
+            try:
+                self.reference_gantry_with_link(link)
+                link.send_program(program)
+            except Exception:
+                link.best_effort(
+                    (*self.config.magnet.off_commands, "M302 P0", "M211 S1", "M84")
+                )
+                raise
+        self.audit.append(
+            {
+                "status": "workspace_test_completed",
+                "feed_mm_min": feed_mm_min,
+                "margin_mm": margin_mm,
+                "columns": columns,
+                "rows": rows,
+                "commands": list(program),
+            }
+        )
+        return program
+
     def motor_test_program(
         self,
         distance_mm: float = 20.0,
@@ -357,14 +525,14 @@ class GantryService:
             "M201 X500 Y500 E300",
             "M205 X5 Y5 E5",
             "M211 S0",
-            f"G92 X{origin.y:g} Y{mirror_origin - origin.y:g} E{origin.x:g}",
+            f"G92 X{mirror_origin - origin.y:g} Y{origin.y:g} E{origin.x:g}",
             "M400",
         ]
         moves = (
             f"G1 E{inner_target.x:g} F{feed_mm_min:g}",
-            f"G1 X{outer_target.y:g} Y{mirror_target:g} F{feed_mm_min:g}",
+            f"G1 X{mirror_target:g} Y{outer_target.y:g} F{feed_mm_min:g}",
             f"G1 E{origin.x:g} F{feed_mm_min:g}",
-            f"G1 X{origin.y:g} Y{mirror_origin - origin.y:g} F{feed_mm_min:g}",
+            f"G1 X{mirror_origin - origin.y:g} Y{origin.y:g} F{feed_mm_min:g}",
         )
         if magnet_on:
             program.extend(self.config.magnet.on_commands)
@@ -484,7 +652,7 @@ class GantryService:
 
         def movement(command: str, point: MachinePoint) -> str:
             return (
-                f"{command} X{point.y:g} Y{mirror_origin - point.y:g} "
+                f"{command} X{mirror_origin - point.y:g} Y{point.y:g} "
                 f"E{point.x:g} F{feed_mm_min:g}"
             )
 
@@ -500,8 +668,8 @@ class GantryService:
             "M205 X5 Y5 E5",
             "M211 S0",
             (
-                f"G92 X{self.config.workspace.min_y_mm:g} "
-                f"Y{self.config.workspace.max_y_mm:g} "
+                f"G92 X{self.config.workspace.max_y_mm:g} "
+                f"Y{self.config.workspace.min_y_mm:g} "
                 f"E{self.config.workspace.min_x_mm:g}"
             ),
             movement("G0", positions[0]),

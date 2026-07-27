@@ -4,11 +4,12 @@ from dataclasses import replace
 import math
 import re
 import threading
-from typing import Any, Callable, Mapping, Optional
+from typing import Any, Callable, List, Mapping, Optional, Sequence, Tuple
 
 from .config import AppConfig, SerialSettings
 from .errors import (
     ConfigurationError,
+    GantryError,
     PendingTransactionError,
     SerialProtocolError,
     ValidationError,
@@ -26,6 +27,51 @@ _INNER_POSITION_RE = re.compile(
     r"\bZ:\s*(-?\d+(?:\.\d+)?)",
     re.IGNORECASE,
 )
+
+MAX_RAW_COMMAND_CHARS = 256
+MAX_RAW_PROGRAM_COMMANDS = 200
+_REFERENCE_PREFIXES = ("G28", "G92")
+
+
+def normalize_raw_command(command: Any) -> str:
+    if not isinstance(command, str):
+        raise ValidationError("a raw G-code command must be a string")
+    if "\n" in command or "\r" in command:
+        raise ValidationError("a raw G-code command cannot contain a newline")
+    stripped = command.split(";", 1)[0].strip()
+    if not stripped:
+        raise ValidationError("a raw G-code command cannot be empty")
+    if len(stripped) > MAX_RAW_COMMAND_CHARS:
+        raise ValidationError(
+            f"a raw G-code command cannot exceed {MAX_RAW_COMMAND_CHARS} characters"
+        )
+    try:
+        stripped.encode("ascii")
+    except UnicodeEncodeError as exc:
+        raise ValidationError("a raw G-code command must be ASCII") from exc
+    return stripped
+
+
+def split_raw_program(source: Any) -> Tuple[str, ...]:
+    if isinstance(source, str):
+        candidates: List[Any] = list(source.splitlines())
+    elif isinstance(source, Sequence):
+        candidates = list(source)
+    else:
+        raise ValidationError("raw G-code must be a string or a list of strings")
+
+    commands: List[str] = []
+    for candidate in candidates:
+        if isinstance(candidate, str) and not candidate.split(";", 1)[0].strip():
+            continue
+        commands.append(normalize_raw_command(candidate))
+    if not commands:
+        raise ValidationError("no G-code commands were supplied")
+    if len(commands) > MAX_RAW_PROGRAM_COMMANDS:
+        raise ValidationError(
+            f"a raw G-code batch cannot exceed {MAX_RAW_PROGRAM_COMMANDS} commands"
+        )
+    return tuple(commands)
 
 
 class GantryController:
@@ -171,6 +217,65 @@ class GantryController:
         with self._operation_lock:
             result = self._require_link().send_command("M119", timeout_s=10.0)
             return result.responses
+
+    def _resolve_raw_timeout(self, timeout_s: Optional[float]) -> Optional[float]:
+        if timeout_s is None:
+            return None
+        if isinstance(timeout_s, bool) or not isinstance(timeout_s, (int, float)):
+            raise ValidationError("the command timeout must be a number")
+        value = float(timeout_s)
+        if not math.isfinite(value) or value <= 0:
+            raise ValidationError("the command timeout must be greater than zero")
+        limit = self.config.serial.command_timeout_s
+        if value > limit:
+            raise ValidationError(
+                f"the command timeout cannot exceed serial.command_timeout_s ({limit:g} s)"
+            )
+        return value
+
+    def send_raw_program(
+        self,
+        source: Any,
+        *,
+        timeout_s: Optional[float] = None,
+        stop_on_error: bool = True,
+    ) -> tuple[dict[str, Any], ...]:
+        commands = split_raw_program(source)
+        timeout = self._resolve_raw_timeout(timeout_s)
+        blocked = self.config.safety.emergency_stop_command.split(";", 1)[0].strip()
+        for command in commands:
+            if command.upper() == blocked.upper():
+                raise ValidationError(
+                    f"{command} halts the controller and needs a power cycle; "
+                    "use the emergency stop control instead"
+                )
+
+        results: List[dict[str, Any]] = []
+        with self._operation_lock:
+            link = self._require_link()
+            for command in commands:
+                try:
+                    result = link.send_command(command, timeout_s=timeout)
+                except GantryError as exc:
+                    self._last_error = str(exc)
+                    results.append(
+                        {"command": command, "responses": [], "error": str(exc)}
+                    )
+                    if stop_on_error:
+                        break
+                    continue
+                self._update_position(result.responses)
+                if command.upper().startswith(_REFERENCE_PREFIXES):
+                    self._homed = True
+                self._last_error = None
+                results.append(
+                    {
+                        "command": command,
+                        "responses": list(result.responses),
+                        "error": None,
+                    }
+                )
+        return tuple(results)
 
     def home_xy(self) -> dict[str, Any]:
         with self._operation_lock:

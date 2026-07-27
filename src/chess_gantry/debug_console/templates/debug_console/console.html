@@ -1,0 +1,685 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Chess Gantry Raw G-code Console</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b0e14;
+        --card: #151a24;
+        --card2: #1d2431;
+        --line: #30394a;
+        --text: #eef3ff;
+        --muted: #9eabc2;
+        --accent: #67e8b5;
+        --danger: #ff6b7a;
+        --warn: #f4c66d;
+        font-family: Inter, system-ui, sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+      }
+      main {
+        width: min(1180px, calc(100% - 30px));
+        margin: auto;
+        padding: 30px 0 60px;
+      }
+      header {
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+        align-items: flex-start;
+        margin-bottom: 20px;
+      }
+      h1 {
+        margin: 0;
+        font-size: clamp(1.8rem, 4vw, 2.8rem);
+        letter-spacing: -0.045em;
+      }
+      h2 {
+        font-size: 1.05rem;
+        margin: 0 0 14px;
+      }
+      p {
+        color: var(--muted);
+        line-height: 1.55;
+      }
+      .subtitle {
+        max-width: 760px;
+        margin: 8px 0 0;
+      }
+      .pill {
+        border: 1px solid var(--line);
+        background: var(--card);
+        border-radius: 999px;
+        padding: 9px 12px;
+        white-space: nowrap;
+        color: var(--muted);
+      }
+      .pill.good {
+        color: var(--accent);
+      }
+      .pill.bad {
+        color: var(--danger);
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 20px;
+        background: var(--card);
+      }
+      .wide {
+        grid-column: 1 / -1;
+      }
+      .fields {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 11px;
+      }
+      .three {
+        grid-template-columns: 1fr 1fr 1fr;
+      }
+      label {
+        display: block;
+        font-size: 0.8rem;
+        color: var(--muted);
+        margin-bottom: 6px;
+      }
+      input,
+      select,
+      textarea {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--card2);
+        color: var(--text);
+        padding: 11px 12px;
+        font: inherit;
+        outline: none;
+      }
+      textarea {
+        min-height: 150px;
+        resize: vertical;
+        font:
+          13px/1.5 ui-monospace,
+          monospace;
+      }
+      #single {
+        font:
+          13px/1.5 ui-monospace,
+          monospace;
+      }
+      input:focus,
+      select:focus,
+      textarea:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(103, 232, 181, 0.12);
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 9px;
+        margin-top: 14px;
+      }
+      button {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--card2);
+        color: var(--text);
+        padding: 10px 14px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.38;
+        cursor: not-allowed;
+      }
+      .primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #07130f;
+      }
+      .danger {
+        background: #421b24;
+        border-color: #7d3040;
+        color: #ffdce2;
+      }
+      .quick button {
+        font-weight: 500;
+        font-family: ui-monospace, monospace;
+      }
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 9px;
+      }
+      .metric {
+        border: 1px solid var(--line);
+        background: var(--card2);
+        border-radius: 11px;
+        padding: 12px;
+      }
+      .metric span {
+        display: block;
+        color: var(--muted);
+        font-size: 0.74rem;
+        margin-bottom: 4px;
+      }
+      .metric strong {
+        font-size: 0.98rem;
+        overflow-wrap: anywhere;
+      }
+      .notice {
+        border-left: 3px solid var(--warn);
+        background: #292318;
+        color: #f2dba9;
+        padding: 10px 12px;
+        margin-top: 14px;
+        font-size: 0.84rem;
+        line-height: 1.45;
+      }
+      pre {
+        margin: 0;
+        min-height: 140px;
+        max-height: 360px;
+        overflow: auto;
+        border: 1px solid var(--line);
+        border-radius: 11px;
+        background: #080b10;
+        padding: 12px;
+        color: #bcc7dc;
+        white-space: pre-wrap;
+        font:
+          12px/1.55 ui-monospace,
+          monospace;
+      }
+      .small {
+        font-size: 0.8rem;
+        color: var(--muted);
+      }
+      .check {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        margin-top: 12px;
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+      .check input {
+        width: auto;
+      }
+      @media (max-width: 820px) {
+        header {
+          display: block;
+        }
+        .pill {
+          display: inline-block;
+          margin-top: 14px;
+        }
+        .grid,
+        .fields,
+        .three,
+        .metrics {
+          grid-template-columns: 1fr;
+        }
+        .wide {
+          grid-column: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <h1>Raw G-code Debug Console</h1>
+          <p class="subtitle">
+            Shared access to the Marlin serial link owned by this host. Every command and response
+            is broadcast to the activity feed below so everyone on the network sees the same
+            session.
+          </p>
+        </div>
+        <div id="pill" class="pill">Token required</div>
+      </header>
+
+      <section class="grid">
+        <div class="card">
+          <h2>1. Session</h2>
+          <div class="fields">
+            <div>
+              <label for="token">Access token</label>
+              <input id="token" type="password" autocomplete="off" spellcheck="false" />
+            </div>
+            <div>
+              <label for="clientName">Your name in the feed</label>
+              <input id="clientName" type="text" autocomplete="off" />
+            </div>
+          </div>
+          <div class="actions">
+            <button id="unlock" type="button" class="primary">Use this token</button>
+            <button id="forget" type="button">Forget token</button>
+          </div>
+          <p id="sessionState" class="small">
+            The operator running this console prints the token in their terminal.
+          </p>
+        </div>
+
+        <div class="card">
+          <h2>2. Serial link</h2>
+          <div class="fields">
+            <div>
+              <label for="port">USB port</label>
+              <select id="port">
+                <option value="">Auto-detect</option>
+              </select>
+            </div>
+            <div>
+              <label for="baud">Baud</label>
+              <select id="baud">
+                <option value="">Config default</option>
+                <option>115200</option>
+                <option>250000</option>
+              </select>
+            </div>
+          </div>
+          <div class="actions">
+            <button id="connect" type="button" class="primary">Connect</button>
+            <button id="refresh" type="button">Refresh ports</button>
+            <button id="disconnect" type="button">Disconnect</button>
+            <button id="stop" type="button" class="danger">
+              Send {{ profile.emergency_stop_command }}
+            </button>
+          </div>
+          <p id="firmware" class="small">No controller identified.</p>
+        </div>
+
+        <div class="card wide">
+          <h2>3. Machine state</h2>
+          <div class="metrics">
+            <div class="metric"><span>Port</span><strong id="mPort">—</strong></div>
+            <div class="metric"><span>Baud</span><strong id="mBaud">—</strong></div>
+            <div class="metric"><span>Inner Z</span><strong id="mX">—</strong></div>
+            <div class="metric"><span>Outer position</span><strong id="mY">—</strong></div>
+            <div class="metric"><span>Referenced</span><strong id="mHomed">No</strong></div>
+            <div class="metric"><span>Last error</span><strong id="mError">none</strong></div>
+          </div>
+          {% if demo %}
+          <div class="notice">
+            Demo mode is active. Commands are answered by a simulated Marlin controller and no
+            hardware will move.
+          </div>
+          {% else %}
+          <div class="notice">
+            Raw G-code is sent straight to the machine with no workspace or magnet checks. Confirm
+            the gantry is clear before every motion command.
+          </div>
+          {% endif %}
+        </div>
+
+        <div class="card wide">
+          <h2>4. Send G-code</h2>
+          <div class="fields three">
+            <div>
+              <label for="single">Single command</label>
+              <input
+                id="single"
+                type="text"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="M114"
+              />
+            </div>
+            <div>
+              <label for="timeout">Acknowledgement timeout (s)</label>
+              <input
+                id="timeout"
+                type="number"
+                step="1"
+                min="1"
+                max="{{ limits.max_timeout_s }}"
+                value="{{ limits.default_timeout_s }}"
+              />
+            </div>
+            <div>
+              <label for="stopOnError">On a rejected command</label>
+              <select id="stopOnError">
+                <option value="true">Stop the batch</option>
+                <option value="false">Keep going</option>
+              </select>
+            </div>
+          </div>
+          <div class="actions">
+            <button id="send" type="button" class="primary">Send command</button>
+          </div>
+          <div class="actions quick">
+            {% for item in profile.quick_commands %}
+            <button
+              type="button"
+              class="quick-command"
+              data-command="{{ item.command }}"
+              title="{{ item.description }}"
+            >
+              {{ item.command }}
+            </button>
+            {% endfor %}
+            <button id="magnetOn" type="button">magnet on</button>
+            <button id="magnetOff" type="button">magnet off</button>
+          </div>
+          <div style="margin-top: 16px">
+            <label for="batch"
+              >Batch (one command per line, up to {{ limits.max_batch_commands }})</label
+            >
+            <textarea id="batch" spellcheck="false"></textarea>
+          </div>
+          <div class="actions">
+            <button id="sendBatch" type="button" class="primary">Send batch</button>
+            <button id="clearBatch" type="button">Clear</button>
+          </div>
+          <p class="small">
+            Up and down arrows in the single command field walk your local history. Comments after a
+            semicolon are stripped before sending.
+          </p>
+        </div>
+
+        <div class="card wide">
+          <h2>Shared activity</h2>
+          <pre id="feed" aria-live="polite" aria-label="Shared activity feed">
+Waiting for a token.</pre>
+          <p id="clients" class="small"></p>
+        </div>
+      </section>
+    </main>
+
+    {{ profile.magnet_on_commands|json_script:"magnet-on-data" }} {{
+    profile.magnet_off_commands|json_script:"magnet-off-data" }} {{
+    token_header|json_script:"token-header-data" }}
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const TOKEN_HEADER = JSON.parse($("token-header-data").textContent);
+      const STOP_COMMAND = "{{ profile.emergency_stop_command|escapejs }}";
+      const STORAGE_TOKEN = "chessGantryDebugToken";
+      const STORAGE_NAME = "chessGantryDebugName";
+      const magnetOn = JSON.parse($("magnet-on-data").textContent);
+      const magnetOff = JSON.parse($("magnet-off-data").textContent);
+      const history = [];
+      let historyIndex = 0;
+      let lastSequence = 0;
+      let status = {};
+      let busy = false;
+      let authorized = false;
+
+      function token() {
+        return $("token").value.trim();
+      }
+
+      function clientName() {
+        return $("clientName").value.trim();
+      }
+
+      function headers() {
+        const value = { "Content-Type": "application/json" };
+        value[TOKEN_HEADER] = token();
+        return value;
+      }
+
+      function feedLine(text) {
+        const feed = $("feed");
+        feed.textContent = `${feed.textContent}\n${text}`;
+        feed.scrollTop = feed.scrollHeight;
+      }
+
+      async function api(path, body) {
+        const options = { headers: headers() };
+        if (body !== undefined) {
+          options.method = "POST";
+          options.body = JSON.stringify({ client: clientName(), ...body });
+        }
+        const response = await fetch(path, options);
+        let payload = {};
+        try {
+          payload = await response.json();
+        } catch (error) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        if (payload.status) render(payload.status);
+        if (!response.ok || payload.ok === false) {
+          if (response.status === 401) {
+            authorized = false;
+            $("sessionState").textContent =
+              "That token was rejected. Ask the operator for the current one.";
+          }
+          throw new Error(payload.error || `HTTP ${response.status}`);
+        }
+        return payload;
+      }
+
+      function render(next) {
+        status = next || {};
+        const connected = !!status.connected;
+        const pill = $("pill");
+        if (!authorized) {
+          pill.className = "pill";
+          pill.textContent = "Token required";
+        } else if (connected) {
+          pill.className = "pill good";
+          pill.textContent = `${status.port} · ${status.baudrate}`;
+        } else {
+          pill.className = status.last_error ? "pill bad" : "pill";
+          pill.textContent = "Disconnected";
+        }
+        $("firmware").textContent =
+          status.firmware || status.last_error || "No controller identified.";
+        $("mPort").textContent = status.port || "—";
+        $("mBaud").textContent = status.baudrate || "—";
+        const position = status.position_mm || {};
+        $("mX").textContent = position.x == null ? "—" : `${position.x.toFixed(2)} mm`;
+        $("mY").textContent = position.y == null ? "—" : `${position.y.toFixed(2)} mm`;
+        $("mHomed").textContent = status.homed ? "Yes" : "No";
+        $("mError").textContent = status.last_error || "none";
+
+        const blocked = busy || !authorized;
+        $("connect").disabled = blocked || connected;
+        $("disconnect").disabled = blocked || !connected;
+        $("refresh").disabled = blocked;
+        $("stop").disabled = blocked || !connected;
+        $("send").disabled = blocked || !connected;
+        $("sendBatch").disabled = blocked || !connected;
+        $("magnetOn").disabled = blocked || !connected;
+        $("magnetOff").disabled = blocked || !connected;
+        for (const button of document.querySelectorAll(".quick-command")) {
+          button.disabled = blocked || !connected;
+        }
+      }
+
+      async function action(label, run) {
+        if (busy) return;
+        busy = true;
+        render(status);
+        try {
+          return await run();
+        } catch (error) {
+          feedLine(`local error during ${label}: ${error.message}`);
+        } finally {
+          busy = false;
+          render(status);
+        }
+      }
+
+      function timeoutValue() {
+        const value = Number($("timeout").value);
+        return Number.isFinite(value) && value > 0 ? value : undefined;
+      }
+
+      function stopOnError() {
+        return $("stopOnError").value === "true";
+      }
+
+      async function sendCommands(commands) {
+        return action("send", async () => {
+          const payload = await api("/api/gcode", {
+            commands,
+            timeout_s: timeoutValue(),
+            stop_on_error: stopOnError(),
+          });
+          await pollFeed();
+          return payload;
+        });
+      }
+
+      async function refreshPorts() {
+        return action("port scan", async () => {
+          const previous = $("port").value;
+          const payload = await api("/api/ports");
+          const select = $("port");
+          select.innerHTML = '<option value="">Auto-detect</option>';
+          for (const item of payload.ports) {
+            const option = document.createElement("option");
+            option.value = item.device;
+            option.textContent = `${item.device} — ${item.description}${
+              item.likely_printer ? " *" : ""
+            }`;
+            select.appendChild(option);
+          }
+          if ([...select.options].some((item) => item.value === previous)) {
+            select.value = previous;
+          }
+          feedLine(`local: found ${payload.ports.length} serial port(s)`);
+          return payload;
+        });
+      }
+
+      function describe(event) {
+        const stamp = new Date(event.timestamp).toLocaleTimeString();
+        const head = `[${stamp}] ${event.client} — ${event.kind}: ${event.message}`;
+        if (!event.detail.length) return head;
+        return `${head}\n${event.detail.map((line) => `    ${line}`).join("\n")}`;
+      }
+
+      async function pollFeed() {
+        if (!authorized) return;
+        try {
+          const payload = await api(`/api/log?after=${lastSequence}`);
+          if (payload.events.length) {
+            for (const event of payload.events) feedLine(describe(event));
+          }
+          lastSequence = payload.latest_sequence;
+          if (payload.clients.length) {
+            $("clients").textContent = `Recent participants: ${payload.clients.join(", ")}`;
+          }
+        } catch (error) {
+          if (authorized) feedLine(`local: feed paused (${error.message})`);
+        }
+      }
+
+      async function unlock() {
+        if (!token()) {
+          $("sessionState").textContent = "Paste the token printed by the operator.";
+          return;
+        }
+        try {
+          const payload = await api("/api/status");
+          authorized = true;
+          sessionStorage.setItem(STORAGE_TOKEN, token());
+          sessionStorage.setItem(STORAGE_NAME, clientName());
+          $("sessionState").textContent =
+            `Token accepted. Batch limit ${payload.status.limits.max_batch_commands} commands, timeout ceiling ${payload.status.limits.max_timeout_s} s.`;
+          $("feed").textContent = "Session opened.";
+          lastSequence = 0;
+          render(payload.status);
+          await refreshPorts();
+          await pollFeed();
+        } catch (error) {
+          authorized = false;
+          render(status);
+          feedLine(`local: ${error.message}`);
+        }
+      }
+
+      $("unlock").onclick = unlock;
+      $("forget").onclick = () => {
+        sessionStorage.removeItem(STORAGE_TOKEN);
+        $("token").value = "";
+        authorized = false;
+        $("sessionState").textContent = "Token cleared from this browser.";
+        render({});
+      };
+      $("refresh").onclick = refreshPorts;
+      $("connect").onclick = () =>
+        action("connect", () =>
+          api("/api/connect", {
+            port: $("port").value || null,
+            baudrate: $("baud").value ? Number($("baud").value) : null,
+          }).then(pollFeed),
+        );
+      $("disconnect").onclick = () =>
+        action("disconnect", () => api("/api/disconnect", {}).then(pollFeed));
+      $("stop").onclick = () => {
+        if (!confirm(`Send ${STOP_COMMAND}? The controller will need a reset or power cycle.`))
+          return;
+        action("emergency stop", () => api("/api/stop", { confirm: true }).then(pollFeed));
+      };
+      $("send").onclick = () => {
+        const command = $("single").value.trim();
+        if (!command) return;
+        history.push(command);
+        historyIndex = history.length;
+        sendCommands(command);
+      };
+      $("single").addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          $("send").click();
+          return;
+        }
+        if (event.key === "ArrowUp" && historyIndex > 0) {
+          event.preventDefault();
+          historyIndex -= 1;
+          $("single").value = history[historyIndex];
+          return;
+        }
+        if (event.key === "ArrowDown" && historyIndex < history.length) {
+          event.preventDefault();
+          historyIndex += 1;
+          $("single").value = history[historyIndex] || "";
+        }
+      });
+      for (const button of document.querySelectorAll(".quick-command")) {
+        button.onclick = () => sendCommands(button.dataset.command);
+      }
+      $("magnetOn").onclick = () => sendCommands(magnetOn);
+      $("magnetOff").onclick = () => sendCommands(magnetOff);
+      $("sendBatch").onclick = () => {
+        const text = $("batch").value;
+        if (!text.trim()) return;
+        sendCommands(text);
+      };
+      $("clearBatch").onclick = () => {
+        $("batch").value = "";
+      };
+
+      const savedToken = sessionStorage.getItem(STORAGE_TOKEN);
+      const savedName = sessionStorage.getItem(STORAGE_NAME);
+      if (savedName) $("clientName").value = savedName;
+      render({});
+      if (savedToken) {
+        $("token").value = savedToken;
+        unlock();
+      }
+      setInterval(() => {
+        if (!busy && authorized) pollFeed();
+      }, 2000);
+    </script>
+  </body>
+</html>

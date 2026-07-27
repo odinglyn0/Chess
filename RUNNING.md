@@ -146,6 +146,55 @@ uv run chess-gantry --config config.json web
 
 Open <http://127.0.0.1:8000>. Add `--no-browser` for headless startup.
 
+## Shared Raw G-code Debug Console
+
+A Django console for the machine that physically owns the serial link. It shares
+one Marlin connection, streams raw G-code, and broadcasts every command and
+response to all connected clients.
+
+```bash
+uv sync --extra debug-console
+```
+
+Simulated:
+
+```bash
+uv run chess-gantry --config config.demo.json debug-console --demo
+```
+
+Physical, local only:
+
+```bash
+uv run chess-gantry --config config.json debug-console
+```
+
+Physical, reachable by other machines on the network:
+
+```bash
+uv run chess-gantry --config config.json debug-console \
+  --host 0.0.0.0 --allow-network --no-browser
+```
+
+Open <http://127.0.0.1:8300>. The console refuses a non-loopback bind without
+`--allow-network`, and every request needs a shared access token. The token
+comes from `--token`, then `$CHESS_GANTRY_DEBUG_TOKEN`, otherwise a fresh one is
+generated and printed at startup. Browsers paste it into the session panel;
+scripts send it as a header:
+
+```bash
+curl -X POST http://192.168.0.10:8300/api/gcode \
+  -H "X-Gantry-Token: $CHESS_GANTRY_DEBUG_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"commands": ["M114", "M119"], "client": "bench-laptop"}'
+```
+
+Anyone holding the token can move the gantry, so the token is the only thing
+standing between the network and the hardware. Raw commands bypass workspace,
+magnet, and board-state checks. The configured emergency stop command is
+rejected on the raw path; use the dedicated stop control, which closes the link
+and records the reset requirement. Every command, response, and client is
+appended to the audit log.
+
 ## Movement And Magnet Tests
 
 Print only:

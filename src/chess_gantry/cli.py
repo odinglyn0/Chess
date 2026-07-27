@@ -21,6 +21,7 @@ from .serial_link import (
     parse_endstop_states,
 )
 from .service import GantryService
+from .debug_console.runtime import TOKEN_ENVIRONMENT_KEY
 from .lichess_pgn import fetch_pgn, pgn_moves
 from .lichess_follow import follow_game
 from .uci_adapter import uci_to_move
@@ -257,6 +258,37 @@ def _parser() -> ArgumentParser:
         "--allow-network",
         action="store_true",
         help="allow a non-loopback bind; local-only is safer and is the default",
+    )
+
+    console = commands.add_parser(
+        "debug-console",
+        help="serve the Django raw G-code debug console for this host's serial link",
+    )
+    console.add_argument(
+        "--host", default="127.0.0.1", help="bind address (default: local only)"
+    )
+    console.add_argument(
+        "--console-port", type=int, default=8300, help="console port (default: 8300)"
+    )
+    console.add_argument(
+        "--token",
+        help=f"shared access token; defaults to ${TOKEN_ENVIRONMENT_KEY} or a generated one",
+    )
+    console.add_argument(
+        "--command-timeout",
+        type=float,
+        help="default acknowledgement timeout in seconds for a raw command",
+    )
+    console.add_argument(
+        "--no-browser", action="store_true", help="do not open a browser automatically"
+    )
+    console.add_argument(
+        "--demo", action="store_true", help="run with a simulated Marlin controller"
+    )
+    console.add_argument(
+        "--allow-network",
+        action="store_true",
+        help="allow a non-loopback bind so other machines can send raw G-code",
     )
 
     home = commands.add_parser(
@@ -764,6 +796,24 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
                 open_browser=not args.no_browser,
                 demo=args.demo,
                 allow_network=args.allow_network,
+            )
+            return 0
+
+        if args.command == "debug-console":
+            from .debug_console.server import run_debug_console
+
+            run_debug_console(
+                config=config,
+                state_path=args.state,
+                journal_path=args.journal,
+                audit_path=args.audit,
+                host=args.host,
+                port=args.console_port,
+                token=args.token,
+                open_browser=not args.no_browser,
+                demo=args.demo,
+                allow_network=args.allow_network,
+                default_timeout_s=args.command_timeout,
             )
             return 0
 

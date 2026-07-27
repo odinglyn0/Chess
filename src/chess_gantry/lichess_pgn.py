@@ -57,9 +57,44 @@ def pgn_moves(game_id: str, pgn_text: str, state: BoardState) -> Iterator[MoveDe
     simulated = state
     for ply, move in enumerate(game.mainline_moves(), start=1):
         if board.is_castling(move):
-            raise ValidationError(
-                f"Lichess ply {ply} is castling, which needs a two-transfer workflow"
+            rank = chess.square_rank(move.from_square)
+            kingside = board.is_kingside_castling(move)
+            king_source = GridPosition(chess.square_file(move.from_square), rank)
+            king_destination = GridPosition(6 if kingside else 2, rank)
+            rook_source = GridPosition(7 if kingside else 0, rank)
+            rook_destination = GridPosition(5 if kingside else 3, rank)
+            king = simulated.piece_at(king_source)
+            rook = simulated.piece_at(rook_source)
+            if king is None or rook is None:
+                raise ValidationError(
+                    f"local board is missing the king or rook for Lichess castling ply {ply}"
+                )
+            king_move = MoveDelta.from_mapping(
+                {
+                    "event_id": f"{game_id}.{ply}.king",
+                    "position": king.piece_id,
+                    "px": king_source.x,
+                    "py": king_source.y,
+                    "nx": king_destination.x,
+                    "ny": king_destination.y,
+                }
             )
+            simulated = simulated.applied(king_move, None)
+            yield king_move
+            rook_move = MoveDelta.from_mapping(
+                {
+                    "event_id": f"{game_id}.{ply}.rook",
+                    "position": rook.piece_id,
+                    "px": rook_source.x,
+                    "py": rook_source.y,
+                    "nx": rook_destination.x,
+                    "ny": rook_destination.y,
+                }
+            )
+            simulated = simulated.applied(rook_move, None)
+            yield rook_move
+            board.push(move)
+            continue
         if move.promotion is not None:
             raise ValidationError(
                 f"Lichess ply {ply} is a promotion, which needs physical replacement"

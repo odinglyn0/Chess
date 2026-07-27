@@ -6,13 +6,20 @@ from pathlib import Path
 from typing import Any, Mapping, Optional, Sequence
 import json
 import sys
-import os
+import asyncio
+from time import sleep
 
 from .config import AppConfig
 from .errors import GantryError, PendingTransactionError, ValidationError
 from .models import BoardState, MoveDelta
 from .persistence import read_json
-from .serial_link import MarlinSerial, discover_serial_ports
+from .serial_link import (
+    DemoMarlinSerial,
+    MarlinSerial,
+    discover_serial_ports,
+    endstop_transition_lines,
+    parse_endstop_states,
+)
 from .service import GantryService
 from .lichess_pgn import fetch_pgn, pgn_moves
 from .lichess_follow import follow_game
@@ -37,24 +44,6 @@ def _parser() -> ArgumentParser:
     parser.add_argument(
         "--audit", default="data/audit.jsonl", help="append-only audit log"
     )
-    parser.add_argument(
-        "--upstash-url",
-        default=os.environ.get("UPSTASH_REDIS_REST_URL"),
-        help="store per-game state in Upstash (or set UPSTASH_REDIS_REST_URL)",
-    )
-    parser.add_argument(
-        "--game-id",
-        dest="storage_game_id",
-        default=os.environ.get("GAME_ID"),
-        help="Upstash game namespace for non-Lichess commands",
-    )
-    parser.add_argument(
-        "--completed-game-ttl",
-        type=int,
-        default=int(os.environ.get("COMPLETED_GAME_TTL_SECONDS", "86400")),
-        help="seconds to retain Upstash data after game_over (default: 86400)",
-    )
-
     commands = parser.add_subparsers(dest="command", required=True)
 
     plan = commands.add_parser(
@@ -110,6 +99,15 @@ def _parser() -> ArgumentParser:
     )
 
     commands.add_parser("show-state", help="print the current board state")
+    reset_state = commands.add_parser(
+        "reset-state",
+        help="reset tracked state to the standard starting position and clear any journal",
+    )
+    reset_state.add_argument(
+        "--confirm-standard-position",
+        action="store_true",
+        help="required confirmation that all physical pieces are in their standard starting squares",
+    )
     uci = commands.add_parser(
         "uci-to-json",
         help="convert a legal UCI move such as e2e4 to gantry move-delta JSON",
@@ -190,6 +188,58 @@ def _parser() -> ArgumentParser:
     )
     diagnose.add_argument("--baudrate", type=int, help="try only this baud rate")
 
+    endstop_watch = commands.add_parser(
+        "endstop-watch",
+        help="poll M119 and print each endstop hit or release transition",
+    )
+    endstop_watch.add_argument(
+        "--interval",
+        type=float,
+        default=0.2,
+        help="seconds between M119 polls (default: 0.2)",
+    )
+    endstop_watch.add_argument(
+        "--samples",
+        type=int,
+        default=0,
+        help="stop after this many samples; zero watches until Ctrl+C",
+    )
+    endstop_watch.add_argument(
+        "--port", help="override serial port; omit to use config/auto-detection"
+    )
+    endstop_watch.add_argument("--baudrate", type=int, help="try only this baud rate")
+    endstop_watch.add_argument(
+        "--demo", action="store_true", help="use simulated open endstops"
+    )
+
+    reference_gantry = commands.add_parser(
+        "reference-gantry",
+        help="require X/Y/Z endstops triggered, then assign the mirrored X/Y/Z origin",
+    )
+    reference_gantry.add_argument(
+        "--confirm-at-switches",
+        action="store_true",
+        help="required confirmation that all three carriages are manually held at their endstops",
+    )
+
+    home_gantry = commands.add_parser(
+        "home-gantry",
+        help="run Marlin G28 X Y Z, verify the result, and save a homing record",
+    )
+    home_gantry.add_argument(
+        "--record",
+        default="data/gantry_home.json",
+        help="JSON homing record path (default: data/gantry_home.json)",
+    )
+    home_gantry.add_argument(
+        "--confirm-motion", action="store_true", help="required before homing movement"
+    )
+    home_gantry.add_argument(
+        "--confirm-clear-path",
+        action="store_true",
+        help="required confirmation that all three paths to the switches are clear",
+    )
+
     web = commands.add_parser("web", help="launch the local browser controller")
     web.add_argument(
         "--host", default="127.0.0.1", help="bind address (default: local only)"
@@ -211,7 +261,7 @@ def _parser() -> ArgumentParser:
 
     home = commands.add_parser(
         "home",
-        help="initialize coupled outer X/Y and independent inner E coordinates without homing",
+        help="run configured homing for outer X/Y and inner Z gantry axes",
     )
     home.add_argument(
         "--confirm-motion", action="store_true", help="required before physical motion"
@@ -219,7 +269,7 @@ def _parser() -> ArgumentParser:
 
     motor_test = commands.add_parser(
         "motor-test",
-        help="print outer X/Y plus inner E sample G-code; add --confirm-motion to send it to Marlin",
+        help="print outer X/Y plus inner Z sample G-code; add --confirm-motion to send it to Marlin",
     )
     motor_test.add_argument(
         "--confirm-motion",
@@ -227,9 +277,268 @@ def _parser() -> ArgumentParser:
         help="home and send the displayed test program to physical hardware",
     )
     motor_test.add_argument(
+        "--distance-mm",
+        type=float,
+        default=20.0,
+        help="distance to move each axis before returning (default: 20)",
+    )
+    motor_test.add_argument(
+        "--feed-mm-min",
+        type=float,
+        default=600.0,
+        help="test movement feed rate in mm/min (default: 600)",
+    )
+    motor_test.add_argument(
+        "--magnet-on",
+        action="store_true",
+        help="pick up at the origin, hold during the outbound move, and release before returning",
+    )
+    motor_test.add_argument(
+        "--confirm-magnet",
+        action="store_true",
+        help="required for physical motor tests with the electromagnet energized",
+    )
+    motor_test.add_argument(
+        "--presentation-loops",
+        type=int,
+        default=0,
+        help="repeat the four-leg path while continuously refreshing full magnet power",
+    )
+    motor_test.add_argument(
         "--demo",
         action="store_true",
         help="simulate Marlin instead of opening the serial port",
+    )
+
+    piece_demo = commands.add_parser(
+        "piece-demo",
+        help="reference all three endstops, pick up one piece, move it, release it, and return",
+    )
+    piece_demo.add_argument(
+        "--distance-mm",
+        type=float,
+        default=20.0,
+        help="inner and outer movement distance (default: 20)",
+    )
+    piece_demo.add_argument(
+        "--feed-mm-min",
+        type=float,
+        default=1200.0,
+        help="movement feed rate (default: 1200)",
+    )
+    piece_demo.add_argument(
+        "--output", "-o", help="write generated piece-demo G-code to this file"
+    )
+    piece_demo.add_argument(
+        "--confirm-motion", action="store_true", help="stream the test to Marlin"
+    )
+    piece_demo.add_argument(
+        "--confirm-at-switches",
+        action="store_true",
+        help="required confirmation that X/Y/Z endstops are simultaneously held",
+    )
+    piece_demo.add_argument(
+        "--confirm-piece",
+        action="store_true",
+        help="required confirmation that one piece is under the magnet and the path is clear",
+    )
+    piece_demo.add_argument(
+        "--confirm-magnet",
+        action="store_true",
+        help="required confirmation that the magnet driver is safe to energize",
+    )
+    piece_demo.add_argument(
+        "--demo", action="store_true", help="simulate Marlin without opening serial"
+    )
+
+    magnet_test = commands.add_parser(
+        "magnet-test",
+        help="pulse the configured electromagnet output; dry-run unless motion is confirmed",
+    )
+    magnet_test.add_argument(
+        "--duration-s",
+        type=float,
+        default=1.0,
+        help="energized duration in seconds, maximum 5 (default: 1)",
+    )
+    magnet_test.add_argument(
+        "--confirm-motion",
+        action="store_true",
+        help="required before energizing the physical electromagnet",
+    )
+    magnet_test.add_argument(
+        "--demo",
+        action="store_true",
+        help="simulate Marlin instead of opening the serial port",
+    )
+
+    circle_demo = commands.add_parser(
+        "circle-demo",
+        help="home, energize the magnet, and trace a circular gantry path",
+    )
+    circle_demo.add_argument(
+        "--diameter-mm",
+        type=float,
+        default=200.0,
+        help="circle diameter in millimetres (default: 200)",
+    )
+    circle_demo.add_argument(
+        "--feed-mm-min",
+        type=float,
+        default=1800.0,
+        help="circle feed rate in mm/min (default: 1800)",
+    )
+    circle_demo.add_argument(
+        "--segments",
+        type=int,
+        default=72,
+        help="linear segments used for the circle (default: 72)",
+    )
+    circle_demo.add_argument(
+        "--output", "-o", help="write generated circle G-code to this file"
+    )
+    circle_demo.add_argument(
+        "--confirm-motion", action="store_true", help="stream the test to Marlin"
+    )
+    circle_demo.add_argument(
+        "--confirm-clear-workspace",
+        action="store_true",
+        help="required confirmation that the full 200 mm circle path is clear",
+    )
+    circle_demo.add_argument(
+        "--confirm-magnet",
+        action="store_true",
+        help="required confirmation that the magnet driver is safe to energize",
+    )
+    circle_demo.add_argument(
+        "--demo", action="store_true", help="simulate Marlin without opening serial"
+    )
+
+    perimeter_demo = commands.add_parser(
+        "perimeter-demo",
+        help="home and trace the configured rectangular workspace perimeter",
+    )
+    perimeter_demo.add_argument(
+        "--margin-mm",
+        type=float,
+        default=20.0,
+        help="inset from each workspace edge (default: 20)",
+    )
+    perimeter_demo.add_argument(
+        "--feed-mm-min",
+        type=float,
+        default=1800.0,
+        help="perimeter feed rate in mm/min (default: 1800)",
+    )
+    perimeter_demo.add_argument(
+        "--magnet-on",
+        action="store_true",
+        help="energize the magnet while tracing the four perimeter edges",
+    )
+    perimeter_demo.add_argument(
+        "--output", "-o", help="write generated perimeter G-code to this file"
+    )
+    perimeter_demo.add_argument(
+        "--confirm-motion", action="store_true", help="stream the test to Marlin"
+    )
+    perimeter_demo.add_argument(
+        "--confirm-clear-workspace",
+        action="store_true",
+        help="required confirmation that the complete rectangular path is clear",
+    )
+    perimeter_demo.add_argument(
+        "--confirm-magnet",
+        action="store_true",
+        help="required for a physical perimeter with the magnet energized",
+    )
+    perimeter_demo.add_argument(
+        "--demo", action="store_true", help="simulate Marlin without opening serial"
+    )
+
+    board_sweep = commands.add_parser(
+        "board-sweep",
+        help="visit every board square in a serpentine path; dry-run by default",
+    )
+    board_sweep.add_argument(
+        "--feed-mm-min",
+        type=float,
+        default=1800.0,
+        help="sweep feed rate in mm/min (default: 1800)",
+    )
+    board_sweep.add_argument(
+        "--magnet-on",
+        action="store_true",
+        help="pulse the configured electromagnet at every square",
+    )
+    board_sweep.add_argument(
+        "--output", "-o", help="write the generated sweep G-code to this file"
+    )
+    board_sweep.add_argument(
+        "--confirm-motion",
+        action="store_true",
+        help="send the sweep to Marlin instead of printing a dry run",
+    )
+    board_sweep.add_argument(
+        "--confirm-empty-board",
+        action="store_true",
+        help="required for physical execution after removing all pieces and obstructions",
+    )
+    board_sweep.add_argument(
+        "--confirm-origin",
+        action="store_true",
+        help="required confirmation that the gantry is positioned at the configured coordinate origin",
+    )
+    board_sweep.add_argument(
+        "--confirm-magnet",
+        action="store_true",
+        help="required for a physical sweep with the electromagnet energized",
+    )
+    board_sweep.add_argument(
+        "--demo",
+        action="store_true",
+        help="simulate acknowledged Marlin streaming without opening a serial port",
+    )
+
+    workspace_test = commands.add_parser(
+        "workspace-test",
+        help="traverse a serpentine grid across the configured workspace with the magnet off",
+    )
+    workspace_test.add_argument(
+        "--feed-mm-min",
+        type=float,
+        default=1200.0,
+        help="movement feed (default: 1200)",
+    )
+    workspace_test.add_argument(
+        "--margin-mm", type=float, default=20.0, help="edge margin (default: 20)"
+    )
+    workspace_test.add_argument(
+        "--columns", type=int, default=8, help="grid columns (default: 8)"
+    )
+    workspace_test.add_argument(
+        "--rows", type=int, default=8, help="grid rows (default: 8)"
+    )
+    workspace_test.add_argument(
+        "--dwell-ms", type=int, default=100, help="pause at each point (default: 100)"
+    )
+    workspace_test.add_argument(
+        "--output", "-o", help="write generated workspace G-code to this file"
+    )
+    workspace_test.add_argument(
+        "--confirm-motion", action="store_true", help="stream the test to Marlin"
+    )
+    workspace_test.add_argument(
+        "--confirm-empty-workspace",
+        action="store_true",
+        help="required confirmation that the complete configured workspace is clear",
+    )
+    workspace_test.add_argument(
+        "--confirm-at-switches",
+        action="store_true",
+        help="required confirmation that X/Y/Z endstops are simultaneously held",
+    )
+    workspace_test.add_argument(
+        "--demo", action="store_true", help="simulate Marlin without opening serial"
     )
 
     commands.add_parser(
@@ -265,21 +574,6 @@ def _load_move(path: Path, config: AppConfig) -> MoveDelta:
 
 
 def _service(args: Namespace, config: AppConfig) -> GantryService:
-    upstash_token = os.environ.get("UPSTASH_REDIS_REST_TOKEN")
-    if args.upstash_url or upstash_token:
-        game_id = getattr(args, "game_id", None) or args.storage_game_id
-        if not game_id:
-            raise ValidationError(
-                "Upstash storage requires --game-id "
-                "(Lichess commands use their positional game id)"
-            )
-        return GantryService.for_upstash(
-            config,
-            game_id,
-            upstash_url=args.upstash_url,
-            upstash_token=upstash_token,
-            completed_ttl_s=args.completed_game_ttl,
-        )
     return GantryService(config, args.state, args.journal, args.audit)
 
 
@@ -295,14 +589,24 @@ _COMMANDS = frozenset(
         "run",
         "init-state",
         "show-state",
+        "reset-state",
         "uci-to-json",
         "lichess-pgn",
         "lichess-follow",
         "ports",
         "diagnose",
+        "endstop-watch",
+        "reference-gantry",
+        "home-gantry",
         "web",
         "home",
         "motor-test",
+        "piece-demo",
+        "magnet-test",
+        "circle-demo",
+        "perimeter-demo",
+        "board-sweep",
+        "workspace-test",
         "stop",
         "reconcile",
     }
@@ -315,9 +619,6 @@ _OPTION_VALUE_FLAGS = frozenset(
         "--state",
         "--journal",
         "--audit",
-        "--upstash-url",
-        "--game-id",
-        "--completed-game-ttl",
         "--port",
         "--output",
         "-o",
@@ -384,6 +685,66 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
                         print(line)
             return 0
 
+        if args.command == "endstop-watch":
+            if args.interval <= 0:
+                parser.error("--interval must be positive")
+            if args.samples < 0:
+                parser.error("--samples cannot be negative")
+            settings = config.serial
+            if args.port:
+                settings = replace(settings, port=args.port)
+            if args.baudrate is not None:
+                if args.baudrate <= 0:
+                    parser.error("--baudrate must be positive")
+                settings = replace(
+                    settings,
+                    baudrate=args.baudrate,
+                    fallback_baudrates=(),
+                )
+            link_type = DemoMarlinSerial if args.demo else MarlinSerial
+            previous: dict[str, bool] = {}
+            sample = 0
+            with link_type(settings) as link:
+                print(
+                    f"Watching endstops on {link.active_port} at "
+                    f"{link.active_baudrate} baud; press Ctrl+C to stop.",
+                    flush=True,
+                )
+                while args.samples == 0 or sample < args.samples:
+                    result = link.send_command("M119", timeout_s=10.0)
+                    current = parse_endstop_states(result.responses)
+                    if not current:
+                        raise ValidationError(
+                            "M119 did not return any parseable endstop states"
+                        )
+                    for line in endstop_transition_lines(previous, current):
+                        print(line, flush=True)
+                    previous = current
+                    sample += 1
+                    if args.samples == 0 or sample < args.samples:
+                        sleep(args.interval)
+            return 0
+
+        if args.command == "reference-gantry":
+            if not args.confirm_at_switches:
+                parser.error("reference-gantry requires --confirm-at-switches")
+            service = _service(args, config)
+            program = service.reference_gantry()
+            print("All X/Y/Z endstops are triggered; assigned X=max, Y=0, E=0.")
+            print("\n".join(program))
+            return 0
+
+        if args.command == "home-gantry":
+            if not args.confirm_motion:
+                parser.error("home-gantry requires --confirm-motion")
+            if not args.confirm_clear_path:
+                parser.error("home-gantry requires --confirm-clear-path")
+            service = _service(args, config)
+            record = service.home_gantry(Path(args.record))
+            _print_json(record)
+            print(f"Saved gantry homing record to {args.record}")
+            return 0
+
         if args.command == "web":
             from .web_app import run_web_server
 
@@ -397,10 +758,6 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
                 open_browser=not args.no_browser,
                 demo=args.demo,
                 allow_network=args.allow_network,
-                upstash_url=args.upstash_url,
-                upstash_token=os.environ.get("UPSTASH_REDIS_REST_TOKEN"),
-                game_id=args.storage_game_id,
-                completed_game_ttl_s=args.completed_game_ttl,
             )
             return 0
 
@@ -438,6 +795,18 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
 
         if args.command == "show-state":
             _print_json(service.store.load().to_dict())
+            return 0
+
+        if args.command == "reset-state":
+            if not args.confirm_standard_position:
+                parser.error(
+                    "reset-state requires --confirm-standard-position after arranging the physical board"
+                )
+            state = service.reset_state()
+            print(
+                "Board state reset to the standard starting position at "
+                f"revision {state.revision}; pending journal cleared."
+            )
             return 0
 
         if args.command == "uci-to-json":
@@ -536,24 +905,223 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
             return 0
 
         if args.command == "motor-test":
-            program = service.motor_test_program()
+            program = service.motor_test_program(
+                args.distance_mm,
+                args.feed_mm_min,
+                args.magnet_on,
+                args.presentation_loops,
+            )
             if not args.confirm_motion:
                 print("; DRY RUN ONLY: no serial port was opened")
-                print("; outer X and Y are coupled; inner E moves independently")
+                print("; outer X and Y are coupled; inner Z moves independently")
                 print("\n".join(program))
                 return 0
             if args.demo:
-                from .serial_link import DemoMarlinSerial
-
                 link = DemoMarlinSerial(config.serial)
                 with link:
                     link.send_program(config.safety.preflight_commands)
                     link.send_program(program)
                 print("; DEMO ONLY: no serial port was opened")
             else:
-                program = service.motor_test()
-            print("; fixed outer X/Y and inner E motor test sent successfully")
+                if args.magnet_on and not args.confirm_magnet:
+                    parser.error(
+                        "physical motor-test --magnet-on requires --confirm-magnet"
+                    )
+                program = service.motor_test(
+                    args.distance_mm,
+                    args.feed_mm_min,
+                    args.magnet_on,
+                    args.presentation_loops,
+                )
+            print("; outer X/Y and inner Z motor test sent successfully")
             print("\n".join(program))
+            return 0
+
+        if args.command == "piece-demo":
+            program = service.piece_demo_program(args.distance_mm, args.feed_mm_min)
+            if not args.confirm_motion:
+                print("; DRY RUN ONLY: no serial port was opened")
+            elif args.demo:
+                link = DemoMarlinSerial(config.serial)
+                with link:
+                    link.send_program(program)
+                print("; DEMO ONLY: no serial port was opened")
+            else:
+                if not args.confirm_at_switches:
+                    parser.error("physical piece-demo requires --confirm-at-switches")
+                if not args.confirm_piece:
+                    parser.error("physical piece-demo requires --confirm-piece")
+                if not args.confirm_magnet:
+                    parser.error("physical piece-demo requires --confirm-magnet")
+                program = service.piece_demo(args.distance_mm, args.feed_mm_min)
+                print("; physical piece demo completed successfully")
+            text = "\n".join(program) + "\n"
+            if args.output:
+                output = Path(args.output)
+                output.parent.mkdir(parents=True, exist_ok=True)
+                output.write_text(text, encoding="ascii")
+                print(f"; wrote piece-demo G-code to {output}")
+            else:
+                print(text, end="")
+            return 0
+
+        if args.command == "magnet-test":
+            program = service.magnet_test_program(args.duration_s)
+            if not args.confirm_motion:
+                print("; DRY RUN ONLY: no serial port was opened")
+                print("\n".join(program))
+                return 0
+            if args.demo:
+                link = DemoMarlinSerial(config.serial)
+                with link:
+                    link.send_program(config.safety.preflight_commands)
+                    link.send_program(program)
+                print("; DEMO ONLY: no serial port was opened")
+            else:
+                program = service.magnet_test(args.duration_s)
+            print("; configured electromagnet test completed successfully")
+            print("\n".join(program))
+            return 0
+
+        if args.command == "circle-demo":
+            program = service.circle_demo_program(
+                args.diameter_mm, args.feed_mm_min, args.segments
+            )
+            if not args.confirm_motion:
+                print("; DRY RUN ONLY: no serial port was opened")
+            elif args.demo:
+                link = DemoMarlinSerial(config.serial)
+                with link:
+                    link.send_program(config.safety.preflight_commands)
+                    link.send_program(program)
+                print("; DEMO ONLY: no serial port was opened")
+            else:
+                if not args.confirm_clear_workspace:
+                    parser.error(
+                        "physical circle-demo requires --confirm-clear-workspace"
+                    )
+                if not args.confirm_magnet:
+                    parser.error("physical circle-demo requires --confirm-magnet")
+                program = service.circle_demo(
+                    args.diameter_mm, args.feed_mm_min, args.segments
+                )
+                print("; physical circle demo completed successfully")
+            text = "\n".join(program) + "\n"
+            if args.output:
+                output = Path(args.output)
+                output.parent.mkdir(parents=True, exist_ok=True)
+                output.write_text(text, encoding="ascii")
+                print(f"; wrote circle-demo G-code to {output}")
+            else:
+                print(text, end="")
+            return 0
+
+        if args.command == "perimeter-demo":
+            program = service.perimeter_demo_program(
+                args.margin_mm, args.feed_mm_min, args.magnet_on
+            )
+            if not args.confirm_motion:
+                print("; DRY RUN ONLY: no serial port was opened")
+            elif args.demo:
+                link = DemoMarlinSerial(config.serial)
+                with link:
+                    link.send_program(config.safety.preflight_commands)
+                    link.send_program(program)
+                print("; DEMO ONLY: no serial port was opened")
+            else:
+                if not args.confirm_clear_workspace:
+                    parser.error(
+                        "physical perimeter-demo requires --confirm-clear-workspace"
+                    )
+                if args.magnet_on and not args.confirm_magnet:
+                    parser.error(
+                        "physical perimeter-demo --magnet-on requires --confirm-magnet"
+                    )
+                program = service.perimeter_demo(
+                    args.margin_mm, args.feed_mm_min, args.magnet_on
+                )
+                print("; physical perimeter demo completed successfully")
+            text = "\n".join(program) + "\n"
+            if args.output:
+                output = Path(args.output)
+                output.parent.mkdir(parents=True, exist_ok=True)
+                output.write_text(text, encoding="ascii")
+                print(f"; wrote perimeter-demo G-code to {output}")
+            else:
+                print(text, end="")
+            return 0
+
+        if args.command == "board-sweep":
+            program = service.board_sweep_program(args.feed_mm_min, args.magnet_on)
+            if not args.confirm_motion:
+                print("; DRY RUN ONLY: no serial port was opened")
+            elif args.demo:
+                link = DemoMarlinSerial(config.serial)
+                with link:
+                    link.send_program(config.safety.preflight_commands)
+                    link.send_program(program)
+                print("; DEMO ONLY: no serial port was opened")
+            else:
+                if not args.confirm_empty_board:
+                    parser.error("physical board-sweep requires --confirm-empty-board")
+                if not args.confirm_origin:
+                    parser.error("physical board-sweep requires --confirm-origin")
+                if args.magnet_on and not args.confirm_magnet:
+                    parser.error(
+                        "physical board-sweep --magnet-on requires --confirm-magnet"
+                    )
+                program = service.board_sweep(args.feed_mm_min, args.magnet_on)
+                print("; physical board sweep completed successfully")
+            text = "\n".join(program) + "\n"
+            if args.output:
+                output = Path(args.output)
+                output.parent.mkdir(parents=True, exist_ok=True)
+                output.write_text(text, encoding="ascii")
+                print(f"; wrote board sweep G-code to {output}")
+            else:
+                print(text, end="")
+            return 0
+
+        if args.command == "workspace-test":
+            program = service.workspace_test_program(
+                args.feed_mm_min,
+                args.margin_mm,
+                args.columns,
+                args.rows,
+                args.dwell_ms,
+            )
+            if not args.confirm_motion:
+                print("; DRY RUN ONLY: no serial port was opened")
+            elif args.demo:
+                link = DemoMarlinSerial(config.serial)
+                with link:
+                    link.send_program(program)
+                print("; DEMO ONLY: no serial port was opened")
+            else:
+                if not args.confirm_empty_workspace:
+                    parser.error(
+                        "physical workspace-test requires --confirm-empty-workspace"
+                    )
+                if not args.confirm_at_switches:
+                    parser.error(
+                        "physical workspace-test requires --confirm-at-switches"
+                    )
+                program = service.workspace_test(
+                    args.feed_mm_min,
+                    args.margin_mm,
+                    args.columns,
+                    args.rows,
+                    args.dwell_ms,
+                )
+                print("; physical workspace test completed successfully")
+            text = "\n".join(program) + "\n"
+            if args.output:
+                output = Path(args.output)
+                output.parent.mkdir(parents=True, exist_ok=True)
+                output.write_text(text, encoding="ascii")
+                print(f"; wrote workspace test G-code to {output}")
+            else:
+                print(text, end="")
             return 0
 
         if args.command == "stop":

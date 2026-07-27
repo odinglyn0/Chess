@@ -12,7 +12,6 @@ dependencies = [
   "pyserial>=3.5,<4",
   "chess>=1.11.2,<2",
   "berserk>=0.13.2,<1",
-  "upstash-redis>=1,<2",
 ]
 
 [project.scripts]
@@ -31,8 +30,10 @@ dev = ["black>=25.9,<26"]
 target-version = ["py39"]
 extend-exclude = '''
 /(
-  \.venv
+  \.kilo
+  | \.venv
   | build
+  | chicken
   | dist
   | data
 )/

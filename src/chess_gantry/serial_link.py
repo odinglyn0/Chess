@@ -114,6 +114,34 @@ def list_serial_ports() -> Tuple[Tuple[str, str], ...]:
     return tuple((item.device, item.description) for item in discover_serial_ports())
 
 
+def parse_endstop_states(lines: Sequence[str]) -> dict[str, bool]:
+    states: dict[str, bool] = {}
+    for line in lines:
+        match = re.fullmatch(
+            r"\s*([A-Za-z][A-Za-z0-9_]*)\s*:\s*(open|triggered)\s*",
+            line,
+            flags=re.IGNORECASE,
+        )
+        if match:
+            states[match.group(1).lower()] = match.group(2).lower() == "triggered"
+    return states
+
+
+def endstop_transition_lines(
+    previous: dict[str, bool], current: dict[str, bool]
+) -> Tuple[str, ...]:
+    lines = []
+    for name in sorted(current):
+        triggered = current[name]
+        if name not in previous:
+            state = "TRIGGERED" if triggered else "OPEN"
+            lines.append(f"INITIAL {name} {state}")
+        elif previous[name] != triggered:
+            event = "HIT" if triggered else "RELEASED"
+            lines.append(f"{event} {name}")
+    return tuple(lines)
+
+
 class MarlinSerial:
     def __init__(
         self,
@@ -430,7 +458,7 @@ class DemoMarlinSerial:
         self._connected = False
         self._x = 0.0
         self._y = 0.0
-        self._e = 0.0
+        self._z = 0.0
         self.commands: List[str] = []
 
     @property
@@ -480,22 +508,28 @@ class DemoMarlinSerial:
         upper = stripped.upper()
         if upper.startswith("G28"):
             self._x = 0.0
-            self._y = 0.0
-            self._e = 0.0
+            self._y = 350.0
+            self._z = 350.0
         elif upper.startswith(("G0 ", "G1 ")):
             match = self.POSITION_RE.search(upper)
             if match:
                 self._x = float(match.group(1))
                 self._y = float(match.group(2))
-                if match.group(4) is not None:
-                    self._e = float(match.group(4))
+                if match.group(3) is not None:
+                    self._z = float(match.group(3))
         if upper == "M115":
             responses = ("FIRMWARE_NAME:Marlin DEMO", "ok")
         elif upper == "M119":
-            responses = ("Reporting endstop status", "x_min: open", "y_min: open", "ok")
+            responses = (
+                "Reporting endstop status",
+                "x_min: TRIGGERED",
+                "y_max: TRIGGERED",
+                "z_max: TRIGGERED",
+                "ok",
+            )
         elif upper == "M114":
             responses = (
-                f"X:{self._x:.3f} Y:{self._y:.3f} Z:0.000 E:{self._e:.3f}",
+                f"X:{self._x:.3f} Y:{self._y:.3f} Z:{self._z:.3f} E:0.000",
                 "ok",
             )
         else:

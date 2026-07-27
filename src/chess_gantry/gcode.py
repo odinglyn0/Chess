@@ -47,7 +47,7 @@ class GCodeGenerator:
         mirrored = (
             self.config.workspace.min_y_mm + self.config.workspace.max_y_mm - position
         )
-        return position, mirrored
+        return mirrored, position
 
     def generate(self, transfers: Sequence[PieceTransfer]) -> GCodeProgram:
         if not transfers:
@@ -57,12 +57,10 @@ class GCodeGenerator:
             "; chess-gantry generated program",
             "G21 ; millimetres",
             "G90 ; absolute positioning",
-            "M82 ; absolute E positioning for the second outer-gantry motor",
-            "M302 P1 ; allow cold E-axis gantry movement",
-            "M92 X80 Y80 E80 ; matching motor calibration",
-            "M203 X200 Y200 E50 ; fast outer X/Y, controlled inner E",
-            "M201 X500 Y500 E300 ; outer and inner acceleration limits",
-            "M205 X5 Y5 E5 ; matching jerk limits",
+            "M92 X80 Y80 Z80 ; matching gantry motor calibration",
+            "M203 X200 Y200 Z50 ; fast outer X/Y, controlled inner Z",
+            "M201 X500 Y500 Z300 ; outer and inner acceleration limits",
+            "M205 X5 Y5 Z5 ; matching jerk limits",
             "M211 S0 ; measured 350 mm gantry exceeds stale firmware limits",
             "; force magnet off before travel",
             *self.config.magnet.off_commands,
@@ -78,7 +76,7 @@ class GCodeGenerator:
                     (
                         f"G0 X{_format_number(start_x)} "
                         f"Y{_format_number(start_y)} "
-                        f"E{_format_number(transfer.start.x)} "
+                        f"Z{_format_number(transfer.start.x)} "
                         f"F{_format_number(self.config.motion.travel_feed_mm_min)}"
                     ),
                     "M400 ; arrive before energising magnet",
@@ -90,7 +88,7 @@ class GCodeGenerator:
                 outer_x, outer_y = self._outer_axes(waypoint.y)
                 lines.append(
                     f"G1 X{_format_number(outer_x)} Y{_format_number(outer_y)} "
-                    f"E{_format_number(waypoint.x)} "
+                    f"Z{_format_number(waypoint.x)} "
                     f"F{_format_number(self.config.motion.drag_feed_mm_min)}"
                 )
             lines.extend(
@@ -112,7 +110,7 @@ class GCodeGenerator:
                     *self.config.magnet.off_commands,
                     (
                         f"G0 X{_format_number(park_x)} Y{_format_number(park_y)} "
-                        f"E{_format_number(park.x)} "
+                        f"Z{_format_number(park.x)} "
                         f"F{_format_number(self.config.motion.travel_feed_mm_min)}"
                     ),
                     "M400",
@@ -125,7 +123,6 @@ class GCodeGenerator:
                 "; final fail-safe magnet off and restore cold-extrusion protection",
                 *self.config.magnet.off_commands,
                 "M400",
-                "M302 P0",
                 "M211 S1",
             ]
         )

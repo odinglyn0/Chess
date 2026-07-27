@@ -316,10 +316,12 @@ class MagnetSettings:
         _unknown(raw, {"on_commands", "off_commands"}, "magnet")
         return cls(
             on_commands=_commands(
-                raw.get("on_commands", ["M106 P1 S153"]), "magnet.on_commands"
+                raw.get("on_commands", ["M106 P0 S255"]),
+                "magnet.on_commands",
             ),
             off_commands=_commands(
-                raw.get("off_commands", ["M107 P1"]), "magnet.off_commands"
+                raw.get("off_commands", ["M107 P0"]),
+                "magnet.off_commands",
             ),
         )
 
@@ -440,15 +442,11 @@ class SafetySettings:
                 raw.get(
                     "home_commands",
                     [
-                        "M107 P1",
-                        "M82",
-                        "M302 P1",
-                        "M92 X80 Y80 E80",
-                        "M203 X50 Y50 E50",
-                        "M201 X500 Y500 E500",
-                        "M205 X5 Y5 E5",
-                        "G92 X0 Y170 E0",
-                        "M302 P0",
+                        "M92 X80 Y80 Z80",
+                        "M203 X50 Y50 Z50",
+                        "M201 X500 Y500 Z500",
+                        "M205 X5 Y5 Z5",
+                        "G28 X Y Z",
                         "M400",
                     ],
                 ),

@@ -1,0 +1,15 @@
+services:
+  lichess-stream:
+    build:
+      context: .
+      dockerfile: services/lichess_stream/Dockerfile.gantry
+    image: chess-lichess-stream:0.1.0
+    ports:
+      - "127.0.0.1:8010:8000"
+    environment:
+      CHESS_STREAM_HOST: "0.0.0.0"
+      CHESS_STREAM_PORT: "8000"
+      CHESS_STREAM_LOG_LEVEL: "info"
+      CHESS_STREAM_LICHESS_BASE_URL: "https://lichess.org"
+      CHESS_STREAM_LICHESS_TOKEN: "${LICHESS_TOKEN:-}"
+    restart: unless-stopped

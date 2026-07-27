@@ -52,6 +52,24 @@ class LichessPgnTests(unittest.TestCase):
         self.assertTrue(_game_is_finished('[Result "1-0"]\n\n1. e4 1-0'))
         self.assertFalse(_game_is_finished('[Result "*"]\n\n1. e4 *'))
 
+    def test_castling_becomes_ordered_king_and_rook_transfers(self) -> None:
+        state = BoardState.standard()
+        moves = list(
+            pgn_moves(
+                "castle1",
+                "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. O-O *",
+                state,
+            )
+        )
+        self.assertEqual(moves[-2].event_id, "castle1.7.king")
+        self.assertEqual(moves[-2].piece_id, "white_king_e")
+        self.assertEqual(moves[-2].previous, GridPosition(4, 0))
+        self.assertEqual(moves[-2].new, GridPosition(6, 0))
+        self.assertEqual(moves[-1].event_id, "castle1.7.rook")
+        self.assertEqual(moves[-1].piece_id, "white_rook_h")
+        self.assertEqual(moves[-1].previous, GridPosition(7, 0))
+        self.assertEqual(moves[-1].new, GridPosition(5, 0))
+
 
 if __name__ == "__main__":
     unittest.main()

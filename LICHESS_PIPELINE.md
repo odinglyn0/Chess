@@ -102,7 +102,12 @@ has acknowledged. It requires `safety.calibrated: true`. It uses `M82`,
 `M302 P1`, and `G92` to define the E motor as the absolute second outer axis,
 issues no `G28`, and restores cold-extrusion protection with `M302 P0`.
 
-## Supported moves
+With the gantry manually placed and squared at a safe starting position, the
+motor test uses `M82`, `M302 P1`, and `G92 X0 Y350 E350` to define the E motor as
+the absolute second outer axis. It issues no `G28`, restores cold-extrusion
+protection with `M302 P0`, and does not call the homing workflow.
+
+## Supported upstream events
 
 Normal moves, ordinary captures, and en passant translate directly. Castling
 and promotion are rejected rather than moving pieces incorrectly: castling

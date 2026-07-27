@@ -23,7 +23,7 @@ _POSITION_RE = re.compile(
     re.IGNORECASE,
 )
 _INNER_POSITION_RE = re.compile(
-    r"\bE:\s*(-?\d+(?:\.\d+)?)",
+    r"\bZ:\s*(-?\d+(?:\.\d+)?)",
     re.IGNORECASE,
 )
 
@@ -223,7 +223,10 @@ class GantryController:
                     "G21",
                     "G90",
                     *self.config.magnet.off_commands,
-                    f"G1 X{y_mm:.3f} Y{y_mm:.3f} E{x_mm:.3f} F{feed_mm_min:.0f}",
+                    (
+                        f"G1 X{self.config.workspace.min_y_mm + self.config.workspace.max_y_mm - y_mm:.3f} "
+                        f"Y{y_mm:.3f} Z{x_mm:.3f} F{feed_mm_min:.0f}"
+                    ),
                     "M400",
                 )
             )

@@ -9,9 +9,12 @@ from typing import Dict, Iterable, Iterator, List, Tuple
 
 EXCLUDED_PARTS = {
     ".git",
+    ".kilo",
+    ".kiro",
     ".venv",
     "venv",
     "build",
+    "chicken",
     "dist",
     "data",
     "__pycache__",

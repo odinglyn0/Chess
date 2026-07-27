@@ -16,10 +16,12 @@ class ConfigAndGCodeTests(unittest.TestCase):
     def raw_config(self):
         return json.loads((ROOT / "config.example.json").read_text(encoding="utf-8"))
 
-    def test_example_config_is_hardware_locked(self) -> None:
+    def test_example_config_drives_creality_fan_zero(self) -> None:
         config = AppConfig.from_mapping(self.raw_config())
-        self.assertFalse(config.safety.calibrated)
+        self.assertTrue(config.safety.calibrated)
         self.assertFalse(config.safety.home_before_execute)
+        self.assertEqual(config.magnet.on_commands, ("M106 P0 S255",))
+        self.assertEqual(config.magnet.off_commands, ("M107 P0",))
 
     def test_rejects_capture_slot_outside_workspace(self) -> None:
         raw = self.raw_config()
@@ -57,22 +59,23 @@ class ConfigAndGCodeTests(unittest.TestCase):
             ),
         )
         commands = GCodeGenerator(config).generate([transfer]).commands
-        on_index = commands.index("M106 P1 S153")
-        self.assertIn("M82", commands)
-        self.assertIn("M302 P1", commands)
-        self.assertIn("G0 X10 Y340 E10 F12000", commands)
-        first_drag = commands.index("G1 X15 Y335 E20 F3000")
-        final_drag = commands.index("G1 X30 Y320 E30 F3000")
+        on_index = commands.index("M106 P0 S255")
+        self.assertNotIn("M82", commands)
+        self.assertFalse(any(command.startswith("M302") for command in commands))
+        self.assertIn("G0 X340 Y10 Z10 F12000", commands)
+        first_drag = commands.index("G1 X335 Y15 Z20 F3000")
+        final_drag = commands.index("G1 X320 Y30 Z30 F3000")
         off_after_drag = next(
             index
             for index in range(final_drag + 1, len(commands))
-            if commands[index] == "M107 P1"
+            if commands[index] == "M107 P0"
         )
         self.assertEqual(commands[on_index - 1], "M400")
         self.assertLess(on_index, first_drag)
         self.assertEqual(commands[off_after_drag - 1], "M400")
-        self.assertEqual(commands[-2:], ("M302 P0", "M211 S1"))
-        self.assertFalse(any(" Z" in command for command in commands))
+        self.assertEqual(commands[-1], "M211 S1")
+        self.assertTrue(any(" Z" in command for command in commands))
+        self.assertFalse(any(" E" in command for command in commands))
         for command in commands:
             if command.startswith(("G0 ", "G1 ")) and " Y" in command:
                 x_word = next(word for word in command.split() if word.startswith("X"))

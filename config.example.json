@@ -87,6 +87,9 @@
   "safety": {
     "calibrated": true,
     "home_before_execute": false,
+    "home_x_direction": -1,
+    "home_y_direction": 1,
+    "home_e_direction": 1,
     "home_commands": [
       "M107 P0",
       "M107 P1",
@@ -96,7 +99,7 @@
       "M203 X200 Y200 E50",
       "M201 X500 Y500 E300",
       "M205 X5 Y5 E5",
-      "G92 X0 Y350 E0",
+      "G92 X0 Y350 E350",
       "M302 P0",
       "M400"
     ],

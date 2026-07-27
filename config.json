@@ -88,7 +88,10 @@
   "safety": {
     "calibrated": true,
     "home_before_execute": false,
-    "home_commands": ["M107 P0", "M107 P1", "G92 X350 Y0 E0", "M400"],
+    "home_x_direction": -1,
+    "home_y_direction": 1,
+    "home_e_direction": 1,
+    "home_commands": ["M107 P0", "M107 P1", "G92 X0 Y350 E350", "M400"],
     "preflight_commands": ["M115"],
     "emergency_stop_command": "M112"
   }

@@ -164,7 +164,7 @@ class ServiceTests(unittest.TestCase):
                 link_factory=lambda settings: fake,
             )
             program = service.reference_gantry()
-            self.assertIn("G92 X350 Y0 E0", program)
+            self.assertIn("G92 X0 Y350 E350", program)
             self.assertEqual(fake.programs, [program])
 
     def test_home_gantry_stops_each_axis_and_saves_record(self) -> None:
@@ -198,20 +198,44 @@ class ServiceTests(unittest.TestCase):
             self.assertEqual(
                 moves,
                 [
-                    "G1 X0.5 Y-0.5 E-0.5 F300",
-                    "G1 Y-0.5 E-0.5 F300",
-                    "G1 E-0.5 F300",
+                    "G1 X-0.5 Y0.5 E0.5 F300",
+                    "G1 Y0.5 E0.5 F300",
+                    "G1 E0.5 F300",
                 ],
             )
-            self.assertEqual(record["reference"], {"x": 350.0, "y": 0.0, "e": 0.0})
+            self.assertEqual(record["reference"], {"x": 0.0, "y": 350.0, "e": 350.0})
             self.assertEqual(
                 record["travelled_mm"],
                 {"x_min": 0.5, "y_min": 1.0, "z_min": 1.5},
             )
             self.assertEqual(read_json(record_path)["switches"]["z_min"], "TRIGGERED")
             self.assertIn(
-                ("G90", "M82", "G92 X350 Y0 E0", "M400", "M302 P0", "M211 S1"),
+                ("G90", "M82", "G92 X0 Y350 E350", "M400", "M302 P0", "M211 S1"),
                 fake.programs,
+            )
+
+    def test_home_gantry_uses_workspace_span_for_default_maximum(self) -> None:
+        with TemporaryDirectory() as directory:
+            temp = Path(directory)
+            state_path, journal_path, audit_path = self.paths(temp)
+            atomic_write_json(state_path, self.minimal_state().to_dict())
+            fake = FakeLink(
+                endstop_sequence=[
+                    {"x_min": False, "y_min": False, "z_min": False},
+                    {"x_min": True, "y_min": True, "z_min": True},
+                ]
+            )
+            service = GantryService(
+                test_config(),
+                state_path,
+                journal_path,
+                audit_path,
+                link_factory=lambda settings: fake,
+            )
+            record = service.home_gantry(temp / "gantry_home.json")
+            self.assertEqual(
+                record["travelled_mm"],
+                {"x_min": 0.5, "y_min": 0.5, "z_min": 0.5},
             )
 
     def test_home_gantry_aborts_after_bounded_travel(self) -> None:
@@ -255,7 +279,7 @@ class ServiceTests(unittest.TestCase):
             self.assertEqual(moves[0], "G1 X330 Y20 E20 F1200")
             self.assertEqual(moves[7], "G1 X330 Y20 E330 F1200")
             self.assertEqual(moves[8], "G1 X285.714 Y64.286 E330 F1200")
-            self.assertEqual(moves[-1], "G1 X350 Y0 E0 F1200")
+            self.assertEqual(moves[-1], "G1 X0 Y350 E350 F1200")
             self.assertFalse(any(command.startswith("M106") for command in program))
             self.assertEqual(len(fake.programs), 2)
 
@@ -418,13 +442,13 @@ class ServiceTests(unittest.TestCase):
             self.assertIn("M203 X200 Y200 E50", program)
             self.assertIn("M201 X500 Y500 E300", program)
             self.assertIn("M205 X5 Y5 E5", program)
-            self.assertIn("G92 X350 Y0 E0", program)
+            self.assertIn("G92 X0 Y350 E350", program)
             self.assertFalse(any(command.startswith("G28") for command in program))
             self.assertFalse(any(" Z" in command for command in program))
-            self.assertIn("G1 E20 F600", program)
-            self.assertIn("G1 X330 Y20 F600", program)
-            self.assertIn("G1 E0 F600", program)
-            self.assertIn("G1 X350 Y0 F600", program)
+            self.assertIn("G1 E330 F600", program)
+            self.assertIn("G1 X20 Y330 F600", program)
+            self.assertIn("G1 E350 F600", program)
+            self.assertIn("G1 X0 Y350 F600", program)
             self.assertEqual(program[-3:], ("M302 P0", "M211 S1", "M84"))
             self.assertEqual(program[-1], "M84")
             self.assertEqual(service.store.load().revision, 0)
@@ -474,10 +498,10 @@ class ServiceTests(unittest.TestCase):
             first_on = program.index("M106 P1 S255")
             self.assertEqual(
                 program[first_on : first_on + 4],
-                ("M106 P1 S255", "G4 P300", "G1 E20 F1200", "M400"),
+                ("M106 P1 S255", "G4 P300", "G1 E330 F1200", "M400"),
             )
             self.assertLess(
-                program.index("G1 X330 Y20 F1200"), program.index("M107 P1", first_on)
+                program.index("G1 X20 Y330 F1200"), program.index("M107 P1", first_on)
             )
             self.assertEqual(program[-4:], ("M107 P1", "M302 P0", "M211 S1", "M84"))
             self.assertEqual(fake.programs, [program])
@@ -543,11 +567,11 @@ class ServiceTests(unittest.TestCase):
             )
             program = service.piece_demo(20.0, 1200.0)
             on_index = program.index("M106 P0 S255")
-            inner_out = program.index("G1 E20 F1200")
-            outer_out = program.index("G1 X330 Y20 F1200")
+            inner_out = program.index("G1 E330 F1200")
+            outer_out = program.index("G1 X20 Y330 F1200")
             release = program.index("M107 P0", on_index)
-            inner_return = program.index("G1 E0 F1200")
-            outer_return = program.index("G1 X350 Y0 F1200")
+            inner_return = program.index("G1 E350 F1200")
+            outer_return = program.index("G1 X0 Y350 F1200")
             self.assertLess(on_index, inner_out)
             self.assertLess(inner_out, outer_out)
             self.assertLess(outer_out, release)

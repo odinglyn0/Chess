@@ -145,7 +145,7 @@ that does not include 200 mm of inner E travel and 200 mm of mirrored outer X/Y
 travel in both directions.
 
 With the gantry manually placed and squared at a safe starting position, the
-motor test uses `M82`, `M302 P1`, and `G92 X350 Y0 E0` to define the E motor as
+motor test uses `M82`, `M302 P1`, and `G92 X0 Y350 E350` to define the E motor as
 the absolute second outer axis. It issues no `G28`, restores cold-extrusion
 protection with `M302 P0`, and does not call the homing workflow.
 

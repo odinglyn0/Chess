@@ -132,9 +132,9 @@ class RunCommandTests(unittest.TestCase):
         self.assertIn("DRY RUN ONLY", output)
         self.assertIn("M106 P0 S255", output)
         self.assertIn("M106 P1 S255", output)
-        self.assertIn("G1 E20 F1200", output)
-        self.assertIn("G1 X330 Y20 F1200", output)
-        self.assertIn("G1 X350 Y0 F1200", output)
+        self.assertIn("G1 E330 F1200", output)
+        self.assertIn("G1 X20 Y330 F1200", output)
+        self.assertIn("G1 X0 Y350 F1200", output)
 
     def test_motor_test_without_confirmation_is_gcode_only(self) -> None:
         buffer = StringIO()
@@ -143,7 +143,7 @@ class RunCommandTests(unittest.TestCase):
         self.assertEqual(code, 0)
         output = buffer.getvalue()
         self.assertIn("DRY RUN ONLY", output)
-        self.assertIn("G92 X350 Y0 E0", output)
+        self.assertIn("G92 X0 Y350 E350", output)
         self.assertNotIn("G28", output)
         self.assertIn("M82", output)
         self.assertIn("M302 P1", output)
@@ -151,10 +151,10 @@ class RunCommandTests(unittest.TestCase):
         self.assertIn("M203 X200 Y200 E50", output)
         self.assertIn("M201 X500 Y500 E300", output)
         self.assertIn("M205 X5 Y5 E5", output)
-        self.assertIn("G1 E20 F600", output)
-        self.assertIn("G1 X330 Y20 F600", output)
-        self.assertIn("G1 E0 F600", output)
-        self.assertIn("G1 X350 Y0 F600", output)
+        self.assertIn("G1 E330 F600", output)
+        self.assertIn("G1 X20 Y330 F600", output)
+        self.assertIn("G1 E350 F600", output)
+        self.assertIn("G1 X0 Y350 F600", output)
         self.assertIn("M302 P0", output)
 
     def test_motor_test_accepts_safe_distance_and_feed(self) -> None:
@@ -171,8 +171,8 @@ class RunCommandTests(unittest.TestCase):
             )
         self.assertEqual(code, 0)
         output = buffer.getvalue()
-        self.assertIn("G1 E10 F300", output)
-        self.assertIn("G1 X340 Y10 F300", output)
+        self.assertIn("G1 E340 F300", output)
+        self.assertIn("G1 X10 Y340 F300", output)
 
     def test_motor_test_with_magnet_prints_fixed_fan_one_gcode(self) -> None:
         buffer = StringIO()
@@ -192,8 +192,8 @@ class RunCommandTests(unittest.TestCase):
         self.assertEqual(output.count("M106 P0 S255"), 1)
         self.assertEqual(output.count("M106 P1 S255"), 1)
         self.assertEqual(output.count("G4 P300"), 2)
-        self.assertIn("M106 P1 S255\nG4 P300\nG1 E20 F1200", output)
-        self.assertIn("G1 X330 Y20 F1200\nM400\nM107 P0\nM107 P1", output)
+        self.assertIn("M106 P1 S255\nG4 P300\nG1 E330 F1200", output)
+        self.assertIn("G1 X20 Y330 F1200\nM400\nM107 P0\nM107 P1", output)
 
     def test_physical_motor_test_with_magnet_requires_confirmation(self) -> None:
         errors = StringIO()

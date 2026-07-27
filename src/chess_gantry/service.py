@@ -301,6 +301,29 @@ class GantryService:
         link.send_program(self.config.magnet.off_commands)
         link.send_program(self.config.safety.home_commands)
 
+    def _gantry_home_reference(self) -> Tuple[float, float, float]:
+        workspace = self.config.workspace
+        x = (
+            workspace.min_y_mm
+            if self.config.safety.home_x_direction < 0
+            else workspace.max_y_mm
+        )
+        y = (
+            workspace.min_y_mm
+            if self.config.safety.home_y_direction < 0
+            else workspace.max_y_mm
+        )
+        e = (
+            workspace.min_x_mm
+            if self.config.safety.home_e_direction < 0
+            else workspace.max_x_mm
+        )
+        return x, y, e
+
+    def _gantry_logical_home(self) -> MachinePoint:
+        _, y, e = self._gantry_home_reference()
+        return MachinePoint(e, y)
+
     def home(self) -> None:
         link = self._link_factory(self.config.serial)
         with link:
@@ -325,17 +348,13 @@ class GantryService:
                 "cannot reference gantry: these switches are not triggered: "
                 + ", ".join(open_switches)
             )
-        mirror_origin = self.config.workspace.min_y_mm + self.config.workspace.max_y_mm
+        home_x, home_y, home_e = self._gantry_home_reference()
         program = (
             *self.config.magnet.off_commands,
             "G90",
             "M82",
             "M302 P1",
-            (
-                f"G92 X{mirror_origin - self.config.workspace.min_y_mm:g} "
-                f"Y{self.config.workspace.min_y_mm:g} "
-                f"E{self.config.workspace.min_x_mm:g}"
-            ),
+            (f"G92 X{home_x:g} Y{home_y:g} E{home_e:g}"),
             "M400",
         )
         link.send_program(program)
@@ -364,7 +383,10 @@ class GantryService:
             )
         if max_travel_mm is None:
             max_travel_mm = (
-                max(self.config.workspace.width_mm, self.config.workspace.height_mm)
+                max(
+                    self.config.workspace.max_x_mm - self.config.workspace.min_x_mm,
+                    self.config.workspace.max_y_mm - self.config.workspace.min_y_mm,
+                )
                 + 20.0
             )
         if not math.isfinite(max_travel_mm) or max_travel_mm <= 0:
@@ -404,9 +426,9 @@ class GantryService:
                         break
                     words = []
                     directions = {
-                        "x_min": ("X", 1.0),
-                        "y_min": ("Y", -1.0),
-                        "z_min": ("E", -1.0),
+                        "x_min": ("X", self.config.safety.home_x_direction),
+                        "y_min": ("Y", self.config.safety.home_y_direction),
+                        "z_min": ("E", self.config.safety.home_e_direction),
                     }
                     for name in required:
                         if states[name]:
@@ -421,17 +443,11 @@ class GantryService:
                     link.send_program(
                         (f"G1 {' '.join(words)} F{feed_mm_min:g}", "M400")
                     )
-                mirror_origin = (
-                    self.config.workspace.min_y_mm + self.config.workspace.max_y_mm
-                )
+                home_x, home_y, home_e = self._gantry_home_reference()
                 reference = (
                     "G90",
                     "M82",
-                    (
-                        f"G92 X{mirror_origin - self.config.workspace.min_y_mm:g} "
-                        f"Y{self.config.workspace.min_y_mm:g} "
-                        f"E{self.config.workspace.min_x_mm:g}"
-                    ),
+                    (f"G92 X{home_x:g} Y{home_y:g} E{home_e:g}"),
                     "M400",
                     "M302 P0",
                     "M211 S1",
@@ -455,9 +471,9 @@ class GantryService:
                 "schema_version": 1,
                 "homed_at": utc_now(),
                 "reference": {
-                    "x": mirror_origin - self.config.workspace.min_y_mm,
-                    "y": self.config.workspace.min_y_mm,
-                    "e": self.config.workspace.min_x_mm,
+                    "x": home_x,
+                    "y": home_y,
+                    "e": home_e,
                 },
                 "switches": {name: "TRIGGERED" for name in required},
                 "travelled_mm": travelled,
@@ -519,6 +535,7 @@ class GantryService:
             values = x_values if row % 2 == 0 else tuple(reversed(x_values))
             points.extend(MachinePoint(x, y) for x in values)
         mirror_origin = self.config.workspace.min_y_mm + self.config.workspace.max_y_mm
+        home_x, home_y, home_e = self._gantry_home_reference()
 
         def number(value: float) -> str:
             return f"{value:.3f}".rstrip("0").rstrip(".")
@@ -540,11 +557,7 @@ class GantryService:
             "M201 X500 Y500 E300",
             "M205 X5 Y5 E5",
             "M211 S0",
-            (
-                f"G92 X{mirror_origin - self.config.workspace.min_y_mm:g} "
-                f"Y{self.config.workspace.min_y_mm:g} "
-                f"E{self.config.workspace.min_x_mm:g}"
-            ),
+            f"G92 X{home_x:g} Y{home_y:g} E{home_e:g}",
             "M400",
         ]
         for point in points:
@@ -553,9 +566,7 @@ class GantryService:
                 program.append(f"G4 P{dwell_ms}")
         program.extend(
             (
-                f"G1 X{mirror_origin - self.config.workspace.min_y_mm:g} "
-                f"Y{self.config.workspace.min_y_mm:g} "
-                f"E{self.config.workspace.min_x_mm:g} F{feed_mm_min:g}",
+                f"G1 X{home_x:g} Y{home_y:g} E{home_e:g} F{feed_mm_min:g}",
                 "M400",
                 *self.config.magnet.off_commands,
                 "M302 P0",
@@ -633,17 +644,18 @@ class GantryService:
                 "motor-test pickup movement would energize the electromagnet "
                 "for more than 5 seconds; reduce distance or increase feed rate"
             )
-        origin = MachinePoint(
-            self.config.workspace.min_x_mm, self.config.workspace.min_y_mm
-        )
-        inner_target = MachinePoint(origin.x + distance_mm, origin.y)
-        outer_target = MachinePoint(origin.x, origin.y + distance_mm)
+        origin = self._gantry_logical_home()
+        inner_direction = -1.0 if origin.x == self.config.workspace.max_x_mm else 1.0
+        outer_direction = -1.0 if origin.y == self.config.workspace.max_y_mm else 1.0
+        inner_target = MachinePoint(origin.x + inner_direction * distance_mm, origin.y)
+        outer_target = MachinePoint(origin.x, origin.y + outer_direction * distance_mm)
         for point in (origin, inner_target, outer_target):
             if not self.config.workspace.contains(point):
                 raise ConfigurationError(
                     f"motor-test distance {distance_mm:g} mm exceeds the configured workspace"
                 )
         mirror_origin = self.config.workspace.min_y_mm + self.config.workspace.max_y_mm
+        home_x, home_y, home_e = self._gantry_home_reference()
         mirror_target = mirror_origin - outer_target.y
         program = [
             "G21",
@@ -814,6 +826,7 @@ class GantryService:
                     "board-sweep square center is outside the configured workspace"
                 )
         mirror_origin = self.config.workspace.min_y_mm + self.config.workspace.max_y_mm
+        home_x, home_y, home_e = self._gantry_home_reference()
 
         def movement(command: str, point: MachinePoint) -> str:
             return (
@@ -832,11 +845,7 @@ class GantryService:
             "M201 X500 Y500 E300",
             "M205 X5 Y5 E5",
             "M211 S0",
-            (
-                f"G92 X{self.config.workspace.max_y_mm:g} "
-                f"Y{self.config.workspace.min_y_mm:g} "
-                f"E{self.config.workspace.min_x_mm:g}"
-            ),
+            f"G92 X{home_x:g} Y{home_y:g} E{home_e:g}",
             movement("G0", positions[0]),
             "M400",
         ]

@@ -284,18 +284,25 @@ uv run chess-gantry --config config.json reference-gantry \
 ```
 
 The command refuses unless Marlin reports `x_min`, `y_min`, and `z_min` as
-`TRIGGERED`. If all three are active, it assigns `X=workspace max`, `Y=0`, and
-`E=0`. Physical testing showed that moving away from the switches requires
-Marlin X to decrease while Y increases; the software applies that reversed
-outer-axis mapping globally. It does not drive toward the switches.
+`TRIGGERED`. The switches are physically at the opposite corner from the
+original assumption, so the configured switch reference is `X=0`,
+`Y=workspace max`, and `E=workspace max`. It does not drive toward the switches.
 
 ### Automatic Gantry Homing
 
-Use `home-gantry` when the carriages are away from their switches. It moves the
-Marlin X motor toward `x_min`, Y toward `y_min`, and the inner E-driven carriage
-toward `z_min` in bounded 0.5 mm steps at 300 mm/min. After every completed
-step, it polls `M119`; an axis stops receiving further commands as soon as its
-switch triggers.
+Use `home-gantry` when the carriages are away from their switches. Physical
+testing established these configured directions toward the switches:
+
+```text
+X: -1
+Y: +1
+E: +1
+```
+
+They are stored as `safety.home_x_direction`, `home_y_direction`, and
+`home_e_direction`. The command moves in bounded 0.5 mm steps at 300 mm/min.
+After every completed step, it polls `M119`; an axis stops receiving further
+commands as soon as its switch triggers.
 
 Before running:
 
@@ -323,7 +330,7 @@ switches both magnet outputs off, and disables motors.
 After all three switches trigger, it assigns:
 
 ```gcode
-G92 X350 Y0 E0
+G92 X0 Y350 E350
 ```
 
 It then writes `data/gantry_home.json` atomically. The record contains the UTC
@@ -433,9 +440,9 @@ uv run chess-gantry --config config.json piece-demo \
 ```
 
 The command queries `M119` again and refuses to move unless all three switches
-remain triggered. It then assigns `X350 Y0 E0`, energizes both configured fan
-outputs at full PWM, moves inner `E` 20 mm, moves the aligned outer pair to
-`X330 Y20`, releases the piece, and returns to `X350 Y0 E0` with the magnet off.
+remain triggered. It then assigns `X0 Y350 E350`, energizes both configured fan
+outputs at full PWM, moves inner `E` to 330 mm, moves the aligned outer pair to
+`X20 Y330`, releases the piece, and returns to `X0 Y350 E350` with the magnet off.
 It finishes by disabling the motors and does not modify chess-state JSON.
 
 The test is deliberately limited to a short transfer. Do not increase distance

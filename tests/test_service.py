@@ -638,7 +638,7 @@ class ServiceTests(unittest.TestCase):
             self.assertEqual(
                 moves,
                 (
-                    "G1 X0 Y350 Z350 F3000",
+                    "G1 X0 Y350 Z100 F3000",
                     "G1 X250 Y100 Z100 F3000",
                     "G1 X250 Y100 Z350 F3000",
                     "G1 X0 Y350 Z350 F3000",

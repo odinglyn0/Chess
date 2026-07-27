@@ -293,8 +293,10 @@ class RunCommandTests(unittest.TestCase):
             code = run(
                 self.args(
                     "perimeter-demo",
-                    "--margin-mm",
-                    "20",
+                    "--width-mm",
+                    "250",
+                    "--height-mm",
+                    "250",
                     "--feed-mm-min",
                     "1800",
                 )
@@ -303,9 +305,9 @@ class RunCommandTests(unittest.TestCase):
         output = buffer.getvalue()
         self.assertIn("DRY RUN ONLY", output)
         self.assertIn("G28 X Y Z", output)
-        self.assertEqual(output.count("G1 "), 6)
-        self.assertIn("G1 X20 Y330 Z330 F1800", output)
-        self.assertIn("G1 X330 Y20 Z20 F1800", output)
+        self.assertEqual(output.count("G1 "), 4)
+        self.assertIn("G1 X250 Y100 Z100 F1800", output)
+        self.assertIn("G1 X250 Y100 Z350 F1800", output)
         self.assertIn("G1 X0 Y350 Z350 F1800", output)
         self.assertNotIn("M106", output)
 

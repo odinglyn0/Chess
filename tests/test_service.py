@@ -631,24 +631,21 @@ class ServiceTests(unittest.TestCase):
                 audit_path,
                 link_factory=lambda settings: fake,
             )
-            program = service.perimeter_demo(20.0, 3000.0, magnet_on=True)
+            program = service.perimeter_demo(250.0, 250.0, 3000.0, magnet_on=True)
             moves = tuple(command for command in program if command.startswith("G1 "))
             on_index = program.index("M106 P0 S255")
             off_index = program.index("M107 P0", on_index)
             self.assertEqual(
                 moves,
                 (
-                    "G1 X20 Y330 Z330 F3000",
-                    "G1 X20 Y330 Z20 F3000",
-                    "G1 X330 Y20 Z20 F3000",
-                    "G1 X330 Y20 Z330 F3000",
-                    "G1 X20 Y330 Z330 F3000",
+                    "G1 X0 Y350 Z350 F3000",
+                    "G1 X250 Y100 Z100 F3000",
+                    "G1 X250 Y100 Z350 F3000",
                     "G1 X0 Y350 Z350 F3000",
                 ),
             )
-            self.assertLess(on_index, program.index(moves[1]))
-            self.assertGreater(off_index, program.index(moves[-2]))
-            self.assertLess(off_index, program.index(moves[-1]))
+            self.assertLess(on_index, program.index(moves[0]))
+            self.assertGreater(off_index, program.index(moves[-1]))
             self.assertEqual(program[-1], "M84")
             self.assertEqual(fake.programs[-1], program)
 
@@ -658,10 +655,10 @@ class ServiceTests(unittest.TestCase):
             state_path, journal_path, audit_path = self.paths(temp)
             atomic_write_json(state_path, self.minimal_state().to_dict())
             service = GantryService(test_config(), state_path, journal_path, audit_path)
-            with self.assertRaisesRegex(ConfigurationError, "no usable"):
-                service.perimeter_demo_program(175.0, 1800.0)
+            with self.assertRaisesRegex(ConfigurationError, "width exceeds"):
+                service.perimeter_demo_program(400.0, 250.0, 1800.0)
             with self.assertRaisesRegex(ConfigurationError, "more than 30 seconds"):
-                service.perimeter_demo_program(20.0, 1200.0, magnet_on=True)
+                service.perimeter_demo_program(250.0, 250.0, 1200.0, magnet_on=True)
 
     def test_board_sweep_visits_every_square_and_controls_magnet(self) -> None:
         with TemporaryDirectory() as directory:

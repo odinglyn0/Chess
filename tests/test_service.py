@@ -9,7 +9,7 @@ import unittest
 from chess_gantry.config import AppConfig
 from chess_gantry.errors import ConfigurationError, SerialProtocolError
 from chess_gantry.models import BoardState, GridPosition, MoveDelta
-from chess_gantry.persistence import atomic_write_json
+from chess_gantry.persistence import atomic_write_json, read_json
 from chess_gantry.serial_link import CommandResult
 from chess_gantry.service import GantryService
 
@@ -29,7 +29,9 @@ def test_config(*, calibrated: bool = True, capture: bool = True) -> AppConfig:
 
 
 class FakeLink:
-    def __init__(self, fail: bool = False, endstops=None) -> None:
+    def __init__(
+        self, fail: bool = False, endstops=None, endstop_sequence=None
+    ) -> None:
         self.fail = fail
         self.connected = True
         self.programs = []
@@ -40,6 +42,8 @@ class FakeLink:
             "y_min": True,
             "z_min": True,
         }
+        self.endstop_sequence = list(endstop_sequence or [])
+        self.connection_info = None
 
     def __enter__(self):
         return self
@@ -56,11 +60,15 @@ class FakeLink:
 
     def send_command(self, command, timeout_s=None):
         if command == "M119":
+            if self.endstop_sequence:
+                self.endstops = self.endstop_sequence.pop(0)
             responses = tuple(
                 f"{name}: {'TRIGGERED' if triggered else 'open'}"
                 for name, triggered in self.endstops.items()
             )
             return CommandResult(command, (*responses, "ok"))
+        if command == "M114":
+            return CommandResult(command, ("X:350.00 Y:0.00 Z:0.00 E:0.00", "ok"))
         return CommandResult(command, ("ok",))
 
     def best_effort(self, commands):
@@ -158,6 +166,75 @@ class ServiceTests(unittest.TestCase):
             program = service.reference_gantry()
             self.assertIn("G92 X350 Y0 E0", program)
             self.assertEqual(fake.programs, [program])
+
+    def test_home_gantry_stops_each_axis_and_saves_record(self) -> None:
+        with TemporaryDirectory() as directory:
+            temp = Path(directory)
+            state_path, journal_path, audit_path = self.paths(temp)
+            atomic_write_json(state_path, self.minimal_state().to_dict())
+            fake = FakeLink(
+                endstop_sequence=[
+                    {"x_min": False, "y_min": False, "z_min": False},
+                    {"x_min": True, "y_min": False, "z_min": False},
+                    {"x_min": True, "y_min": True, "z_min": False},
+                    {"x_min": True, "y_min": True, "z_min": True},
+                ]
+            )
+            service = GantryService(
+                test_config(),
+                state_path,
+                journal_path,
+                audit_path,
+                link_factory=lambda settings: fake,
+            )
+            record_path = temp / "gantry_home.json"
+            record = service.home_gantry(record_path, 0.5, 300.0, 10.0)
+            moves = [
+                command
+                for program in fake.programs
+                for command in program
+                if command.startswith("G1 ")
+            ]
+            self.assertEqual(
+                moves,
+                [
+                    "G1 X0.5 Y-0.5 E-0.5 F300",
+                    "G1 Y-0.5 E-0.5 F300",
+                    "G1 E-0.5 F300",
+                ],
+            )
+            self.assertEqual(record["reference"], {"x": 350.0, "y": 0.0, "e": 0.0})
+            self.assertEqual(
+                record["travelled_mm"],
+                {"x_min": 0.5, "y_min": 1.0, "z_min": 1.5},
+            )
+            self.assertEqual(read_json(record_path)["switches"]["z_min"], "TRIGGERED")
+            self.assertIn(
+                ("G90", "M82", "G92 X350 Y0 E0", "M400", "M302 P0", "M211 S1"),
+                fake.programs,
+            )
+
+    def test_home_gantry_aborts_after_bounded_travel(self) -> None:
+        with TemporaryDirectory() as directory:
+            temp = Path(directory)
+            state_path, journal_path, audit_path = self.paths(temp)
+            atomic_write_json(state_path, self.minimal_state().to_dict())
+            fake = FakeLink(endstops={"x_min": False, "y_min": True, "z_min": True})
+            service = GantryService(
+                test_config(),
+                state_path,
+                journal_path,
+                audit_path,
+                link_factory=lambda settings: fake,
+            )
+            record_path = temp / "gantry_home.json"
+            with self.assertRaisesRegex(ConfigurationError, "x_min"):
+                service.home_gantry(record_path, 0.5, 300.0, 1.0)
+            self.assertFalse(record_path.exists())
+            self.assertEqual(
+                fake.best_effort_programs[-1],
+                ("M107 P0", "M107 P1", "G90", "M82", "M302 P0", "M211 S1", "M84"),
+            )
 
     def test_workspace_test_visits_grid_and_returns_to_reference(self) -> None:
         with TemporaryDirectory() as directory:
@@ -433,6 +510,51 @@ class ServiceTests(unittest.TestCase):
                 service.motor_test_program(
                     100.0, 600.0, magnet_on=True, presentation_loops=2
                 )
+
+    def test_piece_demo_requires_three_endstops_before_movement(self) -> None:
+        with TemporaryDirectory() as directory:
+            temp = Path(directory)
+            state_path, journal_path, audit_path = self.paths(temp)
+            atomic_write_json(state_path, self.minimal_state().to_dict())
+            fake = FakeLink(endstops={"x_min": True, "y_min": False, "z_min": True})
+            service = GantryService(
+                test_config(),
+                state_path,
+                journal_path,
+                audit_path,
+                link_factory=lambda settings: fake,
+            )
+            with self.assertRaisesRegex(ConfigurationError, "y_min"):
+                service.piece_demo(20.0, 1200.0)
+            self.assertEqual(fake.programs, [])
+
+    def test_piece_demo_holds_magnet_outbound_then_releases_and_returns(self) -> None:
+        with TemporaryDirectory() as directory:
+            temp = Path(directory)
+            state_path, journal_path, audit_path = self.paths(temp)
+            atomic_write_json(state_path, self.minimal_state().to_dict())
+            fake = FakeLink()
+            service = GantryService(
+                test_config(),
+                state_path,
+                journal_path,
+                audit_path,
+                link_factory=lambda settings: fake,
+            )
+            program = service.piece_demo(20.0, 1200.0)
+            on_index = program.index("M106 P0 S255")
+            inner_out = program.index("G1 E20 F1200")
+            outer_out = program.index("G1 X330 Y20 F1200")
+            release = program.index("M107 P0", on_index)
+            inner_return = program.index("G1 E0 F1200")
+            outer_return = program.index("G1 X350 Y0 F1200")
+            self.assertLess(on_index, inner_out)
+            self.assertLess(inner_out, outer_out)
+            self.assertLess(outer_out, release)
+            self.assertLess(release, inner_return)
+            self.assertLess(inner_return, outer_return)
+            self.assertEqual(len(fake.programs), 2)
+            self.assertEqual(service.store.load().revision, 0)
 
     def test_magnet_test_uses_both_configured_fan_indices(self) -> None:
         with TemporaryDirectory() as directory:

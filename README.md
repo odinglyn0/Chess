@@ -289,6 +289,52 @@ The command refuses unless Marlin reports `x_min`, `y_min`, and `z_min` as
 Marlin X to decrease while Y increases; the software applies that reversed
 outer-axis mapping globally. It does not drive toward the switches.
 
+### Automatic Gantry Homing
+
+Use `home-gantry` when the carriages are away from their switches. It moves the
+Marlin X motor toward `x_min`, Y toward `y_min`, and the inner E-driven carriage
+toward `z_min` in bounded 0.5 mm steps at 300 mm/min. After every completed
+step, it polls `M119`; an axis stops receiving further commands as soon as its
+switch triggers.
+
+Before running:
+
+- clear all three paths to the switches
+- keep the emergency power cutoff ready
+- verify pressing each switch produces the expected `HIT` in `endstop-watch`
+- make sure no belt, carriage, cable, or piece can snag during homing
+
+Then run:
+
+```bash
+uv run chess-gantry --config config.json home-gantry \
+  --step-mm 0.5 \
+  --feed-mm-min 300 \
+  --record data/gantry_home.json \
+  --confirm-motion \
+  --confirm-clear-path
+```
+
+Homing enables Marlin endstop monitoring with `M120`, uses relative movements,
+and aborts if any switch does not trigger within the configured workspace plus
+20 mm. On failure it restores absolute modes, re-enables software endstops,
+switches both magnet outputs off, and disables motors.
+
+After all three switches trigger, it assigns:
+
+```gcode
+G92 X350 Y0 E0
+```
+
+It then writes `data/gantry_home.json` atomically. The record contains the UTC
+time, serial connection, assigned reference, switch states, measured travel to
+each switch, homing settings, and final `M114` response.
+
+The record is evidence of the last successful homing operation; it cannot prove
+that the gantry has not been manually moved or lost steps afterward. Home again
+after power loss, motor disable, collision, manual movement, or controller
+reset.
+
 This watcher is a stationary wiring and switch test. Do not use host-side
 `M119` polling to stop moving motors: USB latency is not deterministic. Real
 homing and endstop stopping must be configured and executed inside Marlin
@@ -344,6 +390,59 @@ and sends both outputs off afterward. Magnet-only pulses are limited to five
 seconds.
 
 ### Pickup, Move, Release, Return
+
+The dedicated `piece-demo` combines all three endstops, gantry movement, and
+the electromagnet in one guarded test. It requires `x_min`, `y_min`, and
+`z_min` to be triggered immediately before movement.
+
+Print the exact test without connecting:
+
+```bash
+uv run chess-gantry --config config.json piece-demo \
+  --distance-mm 20 --feed-mm-min 1200 \
+  --output data/piece-demo.gcode
+```
+
+Simulate the complete command stream:
+
+```bash
+uv run chess-gantry --config config.demo.json piece-demo \
+  --distance-mm 20 --feed-mm-min 1200 \
+  --confirm-motion --demo
+```
+
+For the physical test:
+
+1. Correct the electromagnet driver if direct coil load still resets the Ender
+   controller.
+2. Clear a 20 mm by 20 mm path away from the switches.
+3. Manually place both outer sides and the inner E-driven carriage on their
+   X/Y/Z switches.
+4. Put one piece directly beneath the magnet at that reference position.
+5. Verify all three switches are `TRIGGERED` with `endstop-watch`.
+6. Keep an independent emergency cutoff ready.
+7. Run:
+
+```bash
+uv run chess-gantry --config config.json piece-demo \
+  --distance-mm 20 --feed-mm-min 1200 \
+  --confirm-motion \
+  --confirm-at-switches \
+  --confirm-piece \
+  --confirm-magnet
+```
+
+The command queries `M119` again and refuses to move unless all three switches
+remain triggered. It then assigns `X350 Y0 E0`, energizes both configured fan
+outputs at full PWM, moves inner `E` 20 mm, moves the aligned outer pair to
+`X330 Y20`, releases the piece, and returns to `X350 Y0 E0` with the magnet off.
+It finishes by disabling the motors and does not modify chess-state JSON.
+
+The test is deliberately limited to a short transfer. Do not increase distance
+or duration until the 20 mm test works without controller resets, missed steps,
+or loss of magnet holding force.
+
+### Generic Motor Test
 
 Print the sequence:
 
@@ -634,6 +733,16 @@ Only after calibration and the hardware test ladder pass:
 ```bash
 ./scripts/lichess_game.sh reset
 ./scripts/lichess_game.sh play
+```
+
+`play` runs `home-gantry` first and saves a game-specific record at
+`data/lichess/6RkOwfp1/gantry_home.json`. The Lichess follower starts only if all
+three switches trigger and homing completes successfully.
+
+Home separately before the game with:
+
+```bash
+./scripts/lichess_game.sh home
 ```
 
 Leave `play` running. It mirrors both players' new moves and commits JSON state

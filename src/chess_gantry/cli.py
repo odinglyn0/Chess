@@ -255,6 +255,35 @@ def _parser() -> ArgumentParser:
         help="required confirmation that all three carriages are manually held at their endstops",
     )
 
+    home_gantry = commands.add_parser(
+        "home-gantry",
+        help="move X/Y/E toward their X/Y/Z switches, assign the reference, and save JSON",
+    )
+    home_gantry.add_argument(
+        "--step-mm", type=float, default=0.5, help="maximum homing step (default: 0.5)"
+    )
+    home_gantry.add_argument(
+        "--feed-mm-min", type=float, default=300.0, help="homing feed (default: 300)"
+    )
+    home_gantry.add_argument(
+        "--max-travel-mm",
+        type=float,
+        help="maximum travel per switch before aborting (default: workspace + 20)",
+    )
+    home_gantry.add_argument(
+        "--record",
+        default="data/gantry_home.json",
+        help="JSON homing record path (default: data/gantry_home.json)",
+    )
+    home_gantry.add_argument(
+        "--confirm-motion", action="store_true", help="required before homing movement"
+    )
+    home_gantry.add_argument(
+        "--confirm-clear-path",
+        action="store_true",
+        help="required confirmation that all three paths to the switches are clear",
+    )
+
     web = commands.add_parser("web", help="launch the local browser controller")
     web.add_argument(
         "--host", default="127.0.0.1", help="bind address (default: local only)"
@@ -323,6 +352,47 @@ def _parser() -> ArgumentParser:
         "--demo",
         action="store_true",
         help="simulate Marlin instead of opening the serial port",
+    )
+
+    piece_demo = commands.add_parser(
+        "piece-demo",
+        help="reference all three endstops, pick up one piece, move it, release it, and return",
+    )
+    piece_demo.add_argument(
+        "--distance-mm",
+        type=float,
+        default=20.0,
+        help="inner and outer movement distance (default: 20)",
+    )
+    piece_demo.add_argument(
+        "--feed-mm-min",
+        type=float,
+        default=1200.0,
+        help="movement feed rate (default: 1200)",
+    )
+    piece_demo.add_argument(
+        "--output", "-o", help="write generated piece-demo G-code to this file"
+    )
+    piece_demo.add_argument(
+        "--confirm-motion", action="store_true", help="stream the test to Marlin"
+    )
+    piece_demo.add_argument(
+        "--confirm-at-switches",
+        action="store_true",
+        help="required confirmation that X/Y/Z endstops are simultaneously held",
+    )
+    piece_demo.add_argument(
+        "--confirm-piece",
+        action="store_true",
+        help="required confirmation that one piece is under the magnet and the path is clear",
+    )
+    piece_demo.add_argument(
+        "--confirm-magnet",
+        action="store_true",
+        help="required confirmation that the magnet driver is safe to energize",
+    )
+    piece_demo.add_argument(
+        "--demo", action="store_true", help="simulate Marlin without opening serial"
     )
 
     magnet_test = commands.add_parser(
@@ -490,9 +560,11 @@ _COMMANDS = frozenset(
         "diagnose",
         "endstop-watch",
         "reference-gantry",
+        "home-gantry",
         "web",
         "home",
         "motor-test",
+        "piece-demo",
         "magnet-test",
         "board-sweep",
         "workspace-test",
@@ -621,6 +693,22 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
             program = service.reference_gantry()
             print("All X/Y/Z endstops are triggered; assigned X=max, Y=0, E=0.")
             print("\n".join(program))
+            return 0
+
+        if args.command == "home-gantry":
+            if not args.confirm_motion:
+                parser.error("home-gantry requires --confirm-motion")
+            if not args.confirm_clear_path:
+                parser.error("home-gantry requires --confirm-clear-path")
+            service = _service(args, config)
+            record = service.home_gantry(
+                Path(args.record),
+                args.step_mm,
+                args.feed_mm_min,
+                args.max_travel_mm,
+            )
+            _print_json(record)
+            print(f"Saved gantry homing record to {args.record}")
             return 0
 
         if args.command == "web":
@@ -857,6 +945,34 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
                 )
             print("; outer X/Y and inner E motor test sent successfully")
             print("\n".join(program))
+            return 0
+
+        if args.command == "piece-demo":
+            program = service.piece_demo_program(args.distance_mm, args.feed_mm_min)
+            if not args.confirm_motion:
+                print("; DRY RUN ONLY: no serial port was opened")
+            elif args.demo:
+                link = DemoMarlinSerial(config.serial)
+                with link:
+                    link.send_program(program)
+                print("; DEMO ONLY: no serial port was opened")
+            else:
+                if not args.confirm_at_switches:
+                    parser.error("physical piece-demo requires --confirm-at-switches")
+                if not args.confirm_piece:
+                    parser.error("physical piece-demo requires --confirm-piece")
+                if not args.confirm_magnet:
+                    parser.error("physical piece-demo requires --confirm-magnet")
+                program = service.piece_demo(args.distance_mm, args.feed_mm_min)
+                print("; physical piece demo completed successfully")
+            text = "\n".join(program) + "\n"
+            if args.output:
+                output = Path(args.output)
+                output.parent.mkdir(parents=True, exist_ok=True)
+                output.write_text(text, encoding="ascii")
+                print(f"; wrote piece-demo G-code to {output}")
+            else:
+                print(text, end="")
             return 0
 
         if args.command == "magnet-test":

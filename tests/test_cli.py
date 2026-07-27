@@ -104,6 +104,38 @@ class RunCommandTests(unittest.TestCase):
         self.assertEqual(output.count("G1 "), 65)
         self.assertNotIn("M106", output)
 
+    def test_home_gantry_requires_both_physical_confirmations(self) -> None:
+        errors = StringIO()
+        with contextlib.redirect_stderr(errors), self.assertRaises(SystemExit):
+            run(self.args("home-gantry"))
+        self.assertIn("--confirm-motion", errors.getvalue())
+
+        errors = StringIO()
+        with contextlib.redirect_stderr(errors), self.assertRaises(SystemExit):
+            run(self.args("home-gantry", "--confirm-motion"))
+        self.assertIn("--confirm-clear-path", errors.getvalue())
+
+    def test_piece_demo_dry_run_prints_pickup_transfer_and_return(self) -> None:
+        buffer = StringIO()
+        with contextlib.redirect_stdout(buffer):
+            code = run(
+                self.args(
+                    "piece-demo",
+                    "--distance-mm",
+                    "20",
+                    "--feed-mm-min",
+                    "1200",
+                )
+            )
+        self.assertEqual(code, 0)
+        output = buffer.getvalue()
+        self.assertIn("DRY RUN ONLY", output)
+        self.assertIn("M106 P0 S255", output)
+        self.assertIn("M106 P1 S255", output)
+        self.assertIn("G1 E20 F1200", output)
+        self.assertIn("G1 X330 Y20 F1200", output)
+        self.assertIn("G1 X350 Y0 F1200", output)
+
     def test_motor_test_without_confirmation_is_gcode_only(self) -> None:
         buffer = StringIO()
         with contextlib.redirect_stdout(buffer):

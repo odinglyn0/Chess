@@ -480,16 +480,21 @@ the magnet off and disable the motors.
 
 ### 8b. Trace The Board Perimeter
 
-`perimeter-demo` homes first, moves to the nearest corner of an inset rectangle,
-traces all four edges, closes the rectangle, returns to `X0 Y350 Z350`, and
-disables the motors. The recommended first run uses a 20 mm safety inset, giving
-a 310 x 310 mm perimeter inside the configured 350 x 350 mm workspace.
+`perimeter-demo` homes first and treats the home point as the first corner. It
+traces a 250 x 250 mm rectangle inward from home, closes the rectangle at
+`X0 Y350 Z350`, and disables the motors. The physical sequence is:
+
+```text
+X0 Y350 Z350 -> X0 Y350 Z100 -> X250 Y100 Z100
+              -> X250 Y100 Z350 -> X0 Y350 Z350
+```
 
 Generate and inspect it without connecting:
 
 ```bash
 uv run chess-gantry --config config.json perimeter-demo \
-  --margin-mm 20 \
+  --width-mm 250 \
+  --height-mm 250 \
   --feed-mm-min 1800 \
   --output data/perimeter-demo.gcode
 ```
@@ -498,40 +503,33 @@ Simulate it:
 
 ```bash
 uv run chess-gantry --config config.demo.json perimeter-demo \
-  --margin-mm 20 \
+  --width-mm 250 \
+  --height-mm 250 \
   --feed-mm-min 1800 \
   --confirm-motion \
   --demo
 ```
 
-Clear the complete rectangle and keep the emergency cutoff ready, then run the
-physical inset perimeter with the magnet off:
+Clear the complete 250 x 250 mm rectangle and keep the emergency cutoff ready,
+then run it physically with the magnet off:
 
 ```bash
 uv run chess-gantry --config config.json perimeter-demo \
-  --margin-mm 20 \
-  --feed-mm-min 1800 \
-  --confirm-motion \
-  --confirm-clear-workspace
-```
-
-After the inset test confirms the real travel limits, trace the exact configured
-350 x 350 mm workspace boundary with:
-
-```bash
-uv run chess-gantry --config config.json perimeter-demo \
-  --margin-mm 0 \
+  --width-mm 250 \
+  --height-mm 250 \
   --feed-mm-min 1800 \
   --confirm-motion \
   --confirm-clear-workspace
 ```
 
 The magnet is off by default. A magnet-on perimeter is allowed only when the
-estimated hold is at most 30 seconds, so the 20 mm inset requires 3,000 mm/min:
+estimated hold is at most 30 seconds, so this 250 x 250 mm perimeter requires
+at least 2,000 mm/min. The documented magnet variant uses 3,000 mm/min:
 
 ```bash
 uv run chess-gantry --config config.json perimeter-demo \
-  --margin-mm 20 \
+  --width-mm 250 \
+  --height-mm 250 \
   --feed-mm-min 3000 \
   --magnet-on \
   --confirm-motion \

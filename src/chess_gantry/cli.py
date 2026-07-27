@@ -247,7 +247,7 @@ def _parser() -> ArgumentParser:
 
     reference_gantry = commands.add_parser(
         "reference-gantry",
-        help="require X/Y/Z endstops triggered, then assign the mirrored X/Y/E origin",
+        help="require X/Y/Z endstops triggered, then assign the mirrored X/Y/Z origin",
     )
     reference_gantry.add_argument(
         "--confirm-at-switches",
@@ -257,7 +257,7 @@ def _parser() -> ArgumentParser:
 
     home_gantry = commands.add_parser(
         "home-gantry",
-        help="move X/Y/E toward their X/Y/Z switches, assign the reference, and save JSON",
+        help="run Marlin G28 X Y Z, verify the result, and save a homing record",
     )
     home_gantry.add_argument(
         "--record",

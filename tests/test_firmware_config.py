@@ -34,6 +34,8 @@ class FirmwareConfigurationTests(unittest.TestCase):
         )
 
     def test_outer_axes_home_together_to_independent_switches(self) -> None:
+        self.assert_define(self.configuration, "INVERT_X_DIR", "false")
+        self.assert_define(self.configuration, "INVERT_Y_DIR", "false")
         self.assert_define(self.configuration, "X_HOME_DIR", "-1")
         self.assert_define(self.configuration, "Y_HOME_DIR", "1")
         self.assertRegex(self.advanced, r"(?m)^\s*#define\s+QUICK_HOME\b")
@@ -44,6 +46,7 @@ class FirmwareConfigurationTests(unittest.TestCase):
     def test_inner_z_axis_uses_physical_e_driver_and_z_switch(self) -> None:
         self.assert_define(self.pins, "Z_STEP_PIN", "PB4")
         self.assert_define(self.pins, "Z_DIR_PIN", "PB3")
+        self.assert_define(self.configuration, "INVERT_Z_DIR", "true")
         self.assert_define(self.configuration, "Z_HOME_DIR", "1")
         self.assert_define(self.configuration, "Z_MAX_POS", "350")
         self.assertNotRegex(self.configuration, r"(?m)^\s*#define\s+BLTOUCH\b")
@@ -62,6 +65,7 @@ class FirmwareConfigurationTests(unittest.TestCase):
         self.assertRegex(
             self.advanced, r"(?m)^\s*#define\s+ENDSTOPS_ALWAYS_ON_DEFAULT\b"
         )
+        self.assertRegex(self.advanced, r"(?m)^\s*#define\s+EMERGENCY_PARSER\b")
 
 
 if __name__ == "__main__":

@@ -83,6 +83,16 @@ sha256sum -c relay-chess-v422-stm32f103ret6.bin.sha256
 cd ..
 ```
 
+The corrected inner-axis-direction binary has SHA-256:
+
+```text
+a6c5a4440b520d13cf4a6c5ba0b18a717502d5b78c7f720ecadebf372c1c540d
+```
+
+Do not flash an earlier binary with a different checksum. Earlier builds either
+drove the motor on the physical E connector away from its Z end switch or used
+the wrong Y-motor polarity.
+
 Rebuild it from source when needed:
 
 ```bash
@@ -96,12 +106,17 @@ Rebuild it from source when needed:
 3. Copy `firmware/relay-chess-v422-stm32f103ret6.bin` to the card root.
 4. Rename the copied file to a short unique name not previously flashed, such
    as `RCG0727.bin`.
-5. Switch the Ender controller off.
-6. Insert the card into the Creality 4.2.2 board.
-7. Keep USB disconnected during flashing.
-8. Switch the controller on and wait at least 30 seconds without interruption.
-9. Switch it off, remove the card, and reconnect USB.
-10. The board may rename the file to `.CUR`; that indicates the bootloader
+5. Run `sync`, then verify that the on-card file is 82,192 bytes and its SHA-256
+   is `a6c5a4440b520d13cf4a6c5ba0b18a717502d5b78c7f720ecadebf372c1c540d`.
+   A zero-byte file will be silently ignored by the bootloader.
+6. Unmount or safely eject the card before removing it. Never unplug the reader
+   immediately after `cp`.
+7. Switch the Ender controller off.
+8. Insert the card into the Creality 4.2.2 board.
+9. Keep USB disconnected during flashing.
+10. Switch the controller on and wait at least 30 seconds without interruption.
+11. Switch it off, remove the card, and reconnect USB.
+12. The board may rename the file to `.CUR`; that indicates the bootloader
     consumed it.
 
 After flashing, initialize the new firmware defaults once:
@@ -145,7 +160,7 @@ uv run python scripts/check_firmware.py \
 It runs `G28 X Y Z` and requires `M114` to finish at:
 
 ```text
-X:0.00 Y:350.00 Z:350.00
+X:2.00 Y:348.00 Z:348.00
 ```
 
 The normal application invokes the same firmware sequence with:
@@ -176,9 +191,18 @@ The pin remap is in
 #define Z_DIR_PIN  PB3
 ```
 
+`INVERT_Z_DIR` is enabled because physical testing showed that the motor on the
+E connector must reverse direction to approach the Z end switch. Do not change
+`Z_HOME_DIR`: the switch remains the logical `Z_MAX` end at coordinate 350.
+
+`INVERT_X_DIR` and `INVERT_Y_DIR` are both disabled. Physical testing showed
+that the two outer gantry motors must use matching electrical direction so both
+sides travel together. Their logical home directions remain intentionally
+different: X homes to `x_min`, while Y homes to `y_max`.
+
 BLTouch and Z-probe homing are disabled. Extruders, hotend sensing, and bed
-temperature sensing are disabled. The firmware build succeeds at 80,760 bytes
-flash and 6,192 bytes RAM.
+temperature sensing are disabled. The firmware build succeeds at 81,648 bytes
+flash and 6,200 bytes RAM.
 
 ### Firmware Homing Sequence
 
@@ -190,10 +214,16 @@ The host sends `G28 X Y Z`. Marlin performs:
 3. Z homing. Logical Z drives the motor physically plugged into E until the
    switch plugged into Z-stop triggers.
 4. A 2 mm post-home backoff on all three axes.
-5. Final logical coordinates `X0 Y350 Z350`.
+5. Final switch coordinates are `X0 Y350 Z350`; after the configured 2 mm
+   safety backoff, `M114` reports `X2 Y348 Z348`.
 
 Endstop stopping occurs inside Marlin's real-time stepper/endstop code, not by
 USB polling.
+
+The firmware enables Marlin's emergency parser. If the post-flash homing test is
+interrupted with `Ctrl+C`, `scripts/check_firmware.py` sends raw `M112` before
+closing the serial port. Reset or power-cycle the controller after any emergency
+stop.
 
 ## Install
 
@@ -209,6 +239,275 @@ The main executable is run through `uv`:
 ```bash
 uv run chess-gantry --help
 ```
+
+## Complete Run Order
+
+Use this section as the normal commissioning and operating checklist. Run each
+stage in order. Do not skip directly to physical chess execution on a newly
+flashed or mechanically changed gantry.
+
+### 1. Run All Non-Motion Checks
+
+These commands do not open the physical serial port:
+
+```bash
+./scripts/check.sh
+npm run check
+./scripts/demo_check.sh
+```
+
+Expected results include:
+
+```text
+Ran 95 tests
+OK
+Steering evaluation passed.
+Demo readiness checks passed. No physical serial port was opened.
+```
+
+Verify the packaged firmware image when firmware files changed:
+
+```bash
+cd firmware
+sha256sum -c relay-chess-v422-stm32f103ret6.bin.sha256
+cd ..
+```
+
+### 2. Power And Connect
+
+1. Clear the gantry and keep the emergency cutoff ready.
+2. Switch on the Ender 24 V supply.
+3. Connect USB.
+4. Verify the serial device and custom firmware:
+
+```bash
+uv run chess-gantry --config config.json ports
+uv run chess-gantry --config config.json diagnose
+uv run python scripts/check_firmware.py
+```
+
+Do not continue unless the firmware identifies as `Relay Chess Gantry` and
+Marlin reports `x_min`, `y_max`, and `z_max`.
+
+### 3. Test Every Endstop Without Motion
+
+```bash
+uv run chess-gantry --config config.json endstop-watch --interval 0.1
+```
+
+Press and release each switch by hand. Confirm all six transitions:
+
+```text
+HIT x_min
+RELEASED x_min
+HIT y_max
+RELEASED y_max
+HIT z_max
+RELEASED z_max
+```
+
+Stop with `Ctrl+C`.
+
+### 4. Test Firmware Homing
+
+Remove all pieces and obstructions from every path. Run:
+
+```bash
+uv run python scripts/check_firmware.py \
+  --home --confirm-clear-path
+```
+
+Expected final position after Marlin's 2 mm safety backoff:
+
+```text
+X:2.00 Y:348.00 Z:348.00
+```
+
+The physical motor plugged into E is logical Z in this firmware. If any axis
+moves away from its switch, use the physical cutoff immediately.
+
+For normal daily startup, use the application homing command instead:
+
+```bash
+uv run chess-gantry --config config.json home-gantry \
+  --record data/gantry_home.json \
+  --confirm-motion --confirm-clear-path
+```
+
+This runs the same Marlin `G28 X Y Z` and records `M119`/`M114` results.
+
+### 5. Test Movement Without The Magnet
+
+Print the G-code first:
+
+```bash
+uv run chess-gantry --config config.json motor-test \
+  --distance-mm 5 --feed-mm-min 300
+```
+
+Then run the short physical test:
+
+```bash
+uv run chess-gantry --config config.json motor-test \
+  --distance-mm 5 --feed-mm-min 300 --confirm-motion
+```
+
+After direction, scale, and return position are correct:
+
+```bash
+uv run chess-gantry --config config.json motor-test \
+  --distance-mm 20 --feed-mm-min 1200 --confirm-motion
+```
+
+### 6. Test The Electromagnet Without Movement
+
+Print the pulse:
+
+```bash
+uv run chess-gantry --config config.json magnet-test --duration-s 1
+```
+
+Run one physical pulse:
+
+```bash
+uv run chess-gantry --config config.json magnet-test \
+  --duration-s 1 --confirm-motion
+```
+
+The firmware uses `M106 P0 S255` for on and `M107 P0` for off.
+
+### 7. Move One Piece
+
+Generate and inspect the exact sequence:
+
+```bash
+uv run chess-gantry --config config.json piece-demo \
+  --distance-mm 20 --feed-mm-min 1200 \
+  --output data/piece-demo.gcode
+```
+
+The guarded physical `piece-demo` requires all three switches to be held at the
+reference at command start. Place the gantry on `x_min`, `y_max`, and `z_max`,
+put one piece under the magnet, clear the 20 mm path, then run:
+
+```bash
+uv run chess-gantry --config config.json piece-demo \
+  --distance-mm 20 --feed-mm-min 1200 \
+  --confirm-motion \
+  --confirm-at-switches \
+  --confirm-piece \
+  --confirm-magnet
+```
+
+For a continuous presentation loop after the short piece test succeeds:
+
+```bash
+uv run chess-gantry --config config.json motor-test \
+  --distance-mm 20 --feed-mm-min 1200 \
+  --magnet-on --presentation-loops 3 \
+  --confirm-motion --confirm-magnet
+```
+
+### 8. Test The Full Workspace
+
+Run this with an empty gantry workspace and the magnet off. Generate the path:
+
+```bash
+uv run chess-gantry --config config.json workspace-test \
+  --feed-mm-min 1200 --margin-mm 20 \
+  --columns 8 --rows 8 --dwell-ms 100 \
+  --output data/workspace-test.gcode
+```
+
+Place all three axes against their switches, verify them with `endstop-watch`,
+then execute:
+
+```bash
+uv run chess-gantry --config config.json workspace-test \
+  --feed-mm-min 1200 --margin-mm 20 \
+  --columns 8 --rows 8 --dwell-ms 100 \
+  --confirm-motion \
+  --confirm-empty-workspace \
+  --confirm-at-switches
+```
+
+### 9. Run The Browser Software
+
+Simulated UI:
+
+```bash
+./scripts/live_demo.sh
+```
+
+Physical UI:
+
+```bash
+uv run chess-gantry --config config.json web
+```
+
+Open <http://127.0.0.1:8000>. Home before executing physical moves.
+
+### 10. Run A Planned Chess Move
+
+The checked-in physical chess-square geometry must be measured before this
+stage. Dry-run the included move:
+
+```bash
+uv run chess-gantry --config config.json \
+  plan examples/move_e2_e4.json --summary-json
+```
+
+After calibration, reset the physical and JSON boards to the standard position,
+home, then execute:
+
+```bash
+uv run chess-gantry --config config.json reset-state \
+  --confirm-standard-position
+
+uv run chess-gantry --config config.json home-gantry \
+  --record data/gantry_home.json \
+  --confirm-motion --confirm-clear-path
+
+uv run chess-gantry --config config.json execute \
+  examples/move_e2_e4.json --confirm-motion
+```
+
+### 11. Run Lichess Game `6RkOwfp1`
+
+Dry-run first:
+
+```bash
+./scripts/lichess_game.sh check
+./scripts/lichess_game.sh dry-run
+```
+
+Stop the follower with `Ctrl+C`, physically restore the standard board, then:
+
+```bash
+./scripts/lichess_game.sh reset
+./scripts/lichess_game.sh play
+```
+
+`play` homes the gantry before starting the physical follower.
+
+### 12. Stop Or Recover
+
+Emergency stop:
+
+```bash
+uv run chess-gantry --config config.json stop
+```
+
+Reset or power-cycle Marlin after `M112`.
+
+Inspect an interrupted move:
+
+```bash
+uv run chess-gantry --config config.json reconcile
+```
+
+Only after physically checking the board, mark it applied or discard it using
+the recovery commands later in this README.
 
 ## Verify Everything
 
@@ -429,7 +728,7 @@ The command refuses unless Marlin reports `x_min`, `y_max`, and `z_max` as
 
 The Ender firmware contains the complete homing sequence. `home-gantry` does
 not choose directions, speeds, distances, backoff, or coordinates. It switches
-both magnet outputs off and sends the commands listed in
+the magnet output off and sends the commands listed in
 `safety.home_commands`. The checked-in physical configuration uses `G28 X Y Z`
 followed by `M400`.
 
@@ -466,7 +765,7 @@ records the raw `M119` endstop report and `M114` coordinates in
 homing path.
 
 If `G28` or either verification command fails, no homing record is written and
-the host attempts to switch both magnet outputs off and disable motors.
+the host attempts to switch the magnet output off and disable motors.
 
 The previous stock firmware entered a BLTouch routine and failed. The custom
 firmware in `chicken` disables BLTouch, remaps the physical E driver to logical
@@ -659,9 +958,9 @@ uv run chess-gantry --config config.json workspace-test \
 ```
 
 Immediately before movement, the command queries `M119` and refuses to continue
-unless `x_min`, `y_max`, and `z_max` are all triggered. This is a movement test,
-not firmware homing: it does not drive toward switches and cannot realign a
-gantry that starts away from its verified mechanical reference.
+unless `x_min`, `y_max`, and `z_max` are all triggered. This command uses a
+manual switch reference and is separate from automatic firmware homing, whose
+configured 2 mm backoff leaves the switches open.
 
 ### Chess-Square Sweep
 
@@ -997,9 +1296,9 @@ full power.
 ### LCD Still Shows Fan 0
 
 Connector labels and Marlin logical indices differ across Ender boards and
-firmware. This project currently sends full PWM to both `P0` and `P1`. Verify
-the actual electrical output with a meter and the board schematic rather than
-relying only on the LCD label.
+firmware. The custom firmware exposes the controllable output as `P0`, so Fan 0
+on the LCD is expected. Verify the electrical output with a meter and the board
+schematic rather than relying only on the connector label.
 
 ### Pending Transaction Error
 
@@ -1010,19 +1309,22 @@ and then explicitly mark it applied or discard it.
 
 The latest completed verification included:
 
-- 77 automated tests passing
+- 95 automated tests passing
 - Python compilation passing
 - Black and Prettier checks passing
 - repository policy checks passing
 - exact presentation G-code ordering tests passing
 - simulated continuous-power presentation streaming passing
-- dual `P0` and `P1` fan command tests passing
+- single `P0` magnet command tests passing
+- custom Marlin 4.2.2 firmware build passing
+- emergency parser and corrected logical-Z direction assertions passing
+- packaged firmware SHA-256 verification passing
 - JSON restart persistence passing
 - public Lichess polling and PGN planning passing
 - browser demo API startup passing
 
-Physical electromagnet reliability is not software-verified because the direct
-load caused a controller or USB reset. Resolve that electrical issue before
-claiming a fully validated physical magnet demo.
+The custom firmware, homing sequence, and bootloader-compatible SD-card process
+have been physically validated. Electromagnet power reliability still depends
+on the external driver, flyback protection, and supply wiring.
 
 Additional direct-command details are available in [RUNNING.md](RUNNING.md).

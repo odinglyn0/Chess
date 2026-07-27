@@ -294,7 +294,7 @@ def _parser() -> ArgumentParser:
 
     home = commands.add_parser(
         "home",
-        help="initialize coupled outer X/Y and independent inner E coordinates without homing",
+        help="run configured homing for outer X/Y and inner Z gantry axes",
     )
     home.add_argument(
         "--confirm-motion", action="store_true", help="required before physical motion"
@@ -302,7 +302,7 @@ def _parser() -> ArgumentParser:
 
     motor_test = commands.add_parser(
         "motor-test",
-        help="print outer X/Y plus inner E sample G-code; add --confirm-motion to send it to Marlin",
+        help="print outer X/Y plus inner Z sample G-code; add --confirm-motion to send it to Marlin",
     )
     motor_test.add_argument(
         "--confirm-motion",
@@ -907,7 +907,7 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
             )
             if not args.confirm_motion:
                 print("; DRY RUN ONLY: no serial port was opened")
-                print("; outer X and Y are coupled; inner E moves independently")
+                print("; outer X and Y are coupled; inner Z moves independently")
                 print("\n".join(program))
                 return 0
             if args.demo:
@@ -927,7 +927,7 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
                     args.magnet_on,
                     args.presentation_loops,
                 )
-            print("; outer X/Y and inner E motor test sent successfully")
+            print("; outer X/Y and inner Z motor test sent successfully")
             print("\n".join(program))
             return 0
 

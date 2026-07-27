@@ -458,7 +458,7 @@ class DemoMarlinSerial:
         self._connected = False
         self._x = 0.0
         self._y = 0.0
-        self._e = 0.0
+        self._z = 0.0
         self.commands: List[str] = []
 
     @property
@@ -508,28 +508,28 @@ class DemoMarlinSerial:
         upper = stripped.upper()
         if upper.startswith("G28"):
             self._x = 0.0
-            self._y = 0.0
-            self._e = 0.0
+            self._y = 350.0
+            self._z = 350.0
         elif upper.startswith(("G0 ", "G1 ")):
             match = self.POSITION_RE.search(upper)
             if match:
                 self._x = float(match.group(1))
                 self._y = float(match.group(2))
-                if match.group(4) is not None:
-                    self._e = float(match.group(4))
+                if match.group(3) is not None:
+                    self._z = float(match.group(3))
         if upper == "M115":
             responses = ("FIRMWARE_NAME:Marlin DEMO", "ok")
         elif upper == "M119":
             responses = (
                 "Reporting endstop status",
-                "x_min: open",
-                "y_min: open",
-                "z_min: open",
+                "x_min: TRIGGERED",
+                "y_max: TRIGGERED",
+                "z_max: TRIGGERED",
                 "ok",
             )
         elif upper == "M114":
             responses = (
-                f"X:{self._x:.3f} Y:{self._y:.3f} Z:0.000 E:{self._e:.3f}",
+                f"X:{self._x:.3f} Y:{self._y:.3f} Z:{self._z:.3f} E:0.000",
                 "ok",
             )
         else:

@@ -250,7 +250,7 @@ class GantryService:
         try:
             link.send_program(plan.program.commands)
         except Exception:
-            link.best_effort((*self.config.magnet.off_commands, "M302 P0", "M211 S1"))
+            link.best_effort((*self.config.magnet.off_commands, "M211 S1"))
             raise
 
     def _complete_transaction(self, plan: MotionPlan) -> MotionPlan:
@@ -321,7 +321,7 @@ class GantryService:
             )
         result = link.send_command("M119", timeout_s=10.0)
         states = parse_endstop_states(result.responses)
-        required = ("x_min", "y_min", "z_min")
+        required = ("x_min", "y_max", "z_max")
         missing = [name for name in required if name not in states]
         open_switches = [name for name in required if not states.get(name, False)]
         if missing:
@@ -337,9 +337,7 @@ class GantryService:
         program = (
             *self.config.magnet.off_commands,
             "G90",
-            "M82",
-            "M302 P1",
-            (f"G92 X{home_x:g} Y{home_y:g} E{home_e:g}"),
+            (f"G92 X{home_x:g} Y{home_y:g} Z{home_e:g}"),
             "M400",
         )
         link.send_program(program)
@@ -445,21 +443,19 @@ class GantryService:
         def move(point: MachinePoint) -> str:
             return (
                 f"G1 X{number(mirror_origin - point.y)} Y{number(point.y)} "
-                f"E{number(point.x)} F{number(feed_mm_min)}"
+                f"Z{number(point.x)} F{number(feed_mm_min)}"
             )
 
         program = [
             "G21",
             "G90",
-            "M82",
-            "M302 P1",
             *self.config.magnet.off_commands,
-            "M92 X80 Y80 E80",
-            "M203 X200 Y200 E50",
-            "M201 X500 Y500 E300",
-            "M205 X5 Y5 E5",
+            "M92 X80 Y80 Z80",
+            "M203 X200 Y200 Z50",
+            "M201 X500 Y500 Z300",
+            "M205 X5 Y5 Z5",
             "M211 S0",
-            f"G92 X{home_x:g} Y{home_y:g} E{home_e:g}",
+            f"G92 X{home_x:g} Y{home_y:g} Z{home_e:g}",
             "M400",
         ]
         for point in points:
@@ -468,10 +464,9 @@ class GantryService:
                 program.append(f"G4 P{dwell_ms}")
         program.extend(
             (
-                f"G1 X{home_x:g} Y{home_y:g} E{home_e:g} F{feed_mm_min:g}",
+                f"G1 X{home_x:g} Y{home_y:g} Z{home_e:g} F{feed_mm_min:g}",
                 "M400",
                 *self.config.magnet.off_commands,
-                "M302 P0",
                 "M211 S1",
                 "M84",
             )
@@ -497,7 +492,7 @@ class GantryService:
                 link.send_program(program)
             except Exception:
                 link.best_effort(
-                    (*self.config.magnet.off_commands, "M302 P0", "M211 S1", "M84")
+                    (*self.config.magnet.off_commands, "M211 S1", "M84")
                 )
                 raise
         self.audit.append(
@@ -562,21 +557,19 @@ class GantryService:
         program = [
             "G21",
             "G90",
-            "M82",
-            "M302 P1",
             *self.config.magnet.off_commands,
-            "M92 X80 Y80 E80",
-            "M203 X200 Y200 E50",
-            "M201 X500 Y500 E300",
-            "M205 X5 Y5 E5",
+            "M92 X80 Y80 Z80",
+            "M203 X200 Y200 Z50",
+            "M201 X500 Y500 Z300",
+            "M205 X5 Y5 Z5",
             "M211 S0",
-            f"G92 X{mirror_origin - origin.y:g} Y{origin.y:g} E{origin.x:g}",
+            f"G92 X{mirror_origin - origin.y:g} Y{origin.y:g} Z{origin.x:g}",
             "M400",
         ]
         moves = (
-            f"G1 E{inner_target.x:g} F{feed_mm_min:g}",
+            f"G1 Z{inner_target.x:g} F{feed_mm_min:g}",
             f"G1 X{mirror_target:g} Y{outer_target.y:g} F{feed_mm_min:g}",
-            f"G1 E{origin.x:g} F{feed_mm_min:g}",
+            f"G1 Z{origin.x:g} F{feed_mm_min:g}",
             f"G1 X{mirror_origin - origin.y:g} Y{origin.y:g} F{feed_mm_min:g}",
         )
         if magnet_on:
@@ -595,7 +588,7 @@ class GantryService:
                     program.extend(self.config.magnet.off_commands)
                     if self.config.motion.magnet_off_dwell_ms:
                         program.append(f"G4 P{self.config.motion.magnet_off_dwell_ms}")
-        program.extend((*self.config.magnet.off_commands, "M302 P0", "M211 S1", "M84"))
+        program.extend((*self.config.magnet.off_commands, "M211 S1", "M84"))
         if any(command.strip().upper().startswith("G28") for command in program):
             raise ConfigurationError("motor-test must never issue a homing command")
         return tuple(program)
@@ -619,7 +612,7 @@ class GantryService:
                 link.send_program(program)
             except Exception:
                 link.best_effort(
-                    (*self.config.magnet.off_commands, "M302 P0", "M211 S1")
+                    (*self.config.magnet.off_commands, "M211 S1")
                 )
                 raise
         self.audit.append(
@@ -653,7 +646,7 @@ class GantryService:
                 link.send_program(program)
             except Exception:
                 link.best_effort(
-                    (*self.config.magnet.off_commands, "M302 P0", "M211 S1", "M84")
+                    (*self.config.magnet.off_commands, "M211 S1", "M84")
                 )
                 raise
         self.audit.append(
@@ -733,21 +726,19 @@ class GantryService:
         def movement(command: str, point: MachinePoint) -> str:
             return (
                 f"{command} X{mirror_origin - point.y:g} Y{point.y:g} "
-                f"E{point.x:g} F{feed_mm_min:g}"
+                f"Z{point.x:g} F{feed_mm_min:g}"
             )
 
         program = [
             "G21",
             "G90",
-            "M82",
-            "M302 P1",
             *self.config.magnet.off_commands,
-            "M92 X80 Y80 E80",
-            "M203 X200 Y200 E50",
-            "M201 X500 Y500 E300",
-            "M205 X5 Y5 E5",
+            "M92 X80 Y80 Z80",
+            "M203 X200 Y200 Z50",
+            "M201 X500 Y500 Z300",
+            "M205 X5 Y5 Z5",
             "M211 S0",
-            f"G92 X{home_x:g} Y{home_y:g} E{home_e:g}",
+            f"G92 X{home_x:g} Y{home_y:g} Z{home_e:g}",
             movement("G0", positions[0]),
             "M400",
         ]
@@ -762,7 +753,7 @@ class GantryService:
             if index + 1 < len(positions):
                 program.extend((movement("G1", positions[index + 1]), "M400"))
         program.extend(self.config.magnet.off_commands)
-        program.extend(("M302 P0", "M211 S1", "M84"))
+        program.extend(("M211 S1", "M84"))
         return tuple(program)
 
     def board_sweep(
@@ -778,7 +769,7 @@ class GantryService:
                 link.send_program(program)
             except Exception:
                 link.best_effort(
-                    (*self.config.magnet.off_commands, "M302 P0", "M211 S1", "M84")
+                    (*self.config.magnet.off_commands, "M211 S1", "M84")
                 )
                 raise
         self.audit.append(

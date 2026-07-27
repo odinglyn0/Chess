@@ -36,8 +36,8 @@
     "park_y_mm": 165.0
   },
   "magnet": {
-    "on_commands": ["M106 P0 S255", "M106 P1 S255"],
-    "off_commands": ["M107 P0", "M107 P1"]
+    "on_commands": ["M106 P0 S255"],
+    "off_commands": ["M107 P0"]
   },
   "planner": {
     "kind": "astar",
@@ -87,7 +87,7 @@
   "safety": {
     "calibrated": true,
     "home_before_execute": false,
-    "home_commands": ["G28", "M400"],
+    "home_commands": ["G28 X Y Z", "M400"],
     "preflight_commands": ["M115"],
     "emergency_stop_command": "M112"
   }

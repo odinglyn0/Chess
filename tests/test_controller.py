@@ -68,8 +68,8 @@ class ControllerTests(unittest.TestCase):
             controller.home_xy()
             status = controller.move_to_mm(x_mm=25.5, y_mm=30.25, feed_mm_min=600)
             self.assertEqual(status["position_mm"], {"x": 25.5, "y": 30.25})
-            self.assertIn("G1 X319.750 Y30.250 E25.500 F600", controller._link.commands)
-            self.assertIn("M302 P0", controller._link.commands)
+            self.assertIn("G1 X319.750 Y30.250 Z25.500 F600", controller._link.commands)
+            self.assertFalse(any(command.startswith("M302") for command in controller._link.commands))
 
     def test_plan_is_read_only_and_execute_commits_through_same_link(self) -> None:
         with TemporaryDirectory() as directory:

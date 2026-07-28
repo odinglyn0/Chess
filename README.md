@@ -140,6 +140,160 @@ npm run check
 ./scripts/demo_check.sh
 ```
 
+## Raspberry Pi 3B+ Deployment
+
+Chess Gantry supports a Raspberry Pi 3 Model B+ running Raspberry Pi OS Lite.
+Use **Raspberry Pi OS Lite 64-bit** when possible. The Pi 3B+ has a 64-bit Arm
+Cortex-A53 processor, and the 64-bit image avoids mixed ARMv7/aarch64 package
+resolution issues.
+
+The normal runtime is lightweight:
+
+- Python 3.9 or newer
+- `pyserial`, `python-chess`, and `berserk`
+- local JSON/JSONL persistence
+- USB serial communication with Marlin
+- built-in HTTP operations dashboard
+- no Redis, database server, desktop environment, or Docker requirement
+
+Node.js is only required for `npm run check`, Prettier, and dashboard operations
+that run repository quality checks. Normal movement, Lichess following, and the
+web server do not depend on Node.js at runtime.
+
+### Install Raspberry Pi Packages
+
+On Raspberry Pi OS Lite:
+
+```bash
+sudo apt update
+sudo apt install -y \
+  git \
+  curl \
+  python3 \
+  python3-venv \
+  nodejs \
+  npm
+```
+
+Install `uv` using its official standalone installer:
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+source "$HOME/.local/bin/env"
+```
+
+Verify the toolchain:
+
+```bash
+uv --version
+python3 --version
+node --version
+npm --version
+```
+
+Clone and install the project:
+
+```bash
+git clone --recurse-submodules https://github.com/odinglyn0/Chess.git
+cd Chess
+uv sync
+npm ci
+./scripts/install_pi.sh
+```
+
+### Serial Permissions
+
+Add the current Pi user to the serial-port group:
+
+```bash
+sudo usermod -aG dialout "$USER"
+sudo reboot
+```
+
+After reboot:
+
+```bash
+cd ~/Chess
+uv run chess-gantry --config config.json ports
+uv run chess-gantry --config config.json diagnose
+```
+
+### Headless Network UI
+
+Raspberry Pi OS Lite has no local desktop or browser. Start the authenticated
+LAN interface on the Pi:
+
+```bash
+cd ~/Chess
+./scripts/run_network_ui.sh
+```
+
+Open the complete token URL printed by the launcher from a phone, tablet, or
+computer on the same trusted network:
+
+```text
+http://192.168.1.50:8000/?token=LONG_RANDOM_TOKEN
+```
+
+All serial commands continue to run on the Pi. The remote browser does not
+access `/dev/ttyUSB0` directly.
+
+For localhost-only headless startup:
+
+```bash
+uv run chess-gantry --config config.json web --no-browser
+```
+
+### Tests On The Pi
+
+Runtime test suite:
+
+```bash
+./scripts/check.sh
+```
+
+Formatting, policy, and Git hygiene checks:
+
+```bash
+npm run check
+```
+
+Complete simulated readiness workflow:
+
+```bash
+./scripts/demo_check.sh
+```
+
+The Pi 3B+ can run the complete suite, but installation and formatting checks
+will be slower than on a desktop. Normal serial control, position polling,
+planning, Lichess following, and the browser dashboard are substantially
+lighter.
+
+Build Marlin firmware on a faster desktop when practical. The Pi only needs the
+host software after the Ender controller has been flashed.
+
+### Pi Power And Networking
+
+Use a stable dedicated Raspberry Pi supply rated for approximately 5 V at 2.5 A
+or better. Do not rely on the Ender controller's USB connection to power the Pi.
+A separate stable supply reduces USB serial disconnects during motor and magnet
+operation.
+
+Ethernet is preferred for the remote operations dashboard, although Wi-Fi is
+supported. Do not expose the plain-HTTP control interface directly to the
+internet.
+
+Recommended deployment:
+
+```text
+Raspberry Pi 3B+
+Raspberry Pi OS Lite 64-bit
+Stable dedicated 5 V supply
+USB connection to the Ender controller
+Ethernet where available
+Dashboard opened from another trusted LAN device
+```
+
 ## Browser Dashboard
 
 Start local physical control:

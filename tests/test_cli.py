@@ -349,8 +349,8 @@ class RunCommandTests(unittest.TestCase):
         output = buffer.getvalue()
         self.assertIn("DRY RUN ONLY", output)
         self.assertEqual(output.count("G1 "), 65)
-        self.assertIn("G1 X3 Y297 Z310 F1800", output)
-        self.assertIn("G1 X283 Y17 Z310 F1800", output)
+        self.assertIn("G1 X2 Y298 Z320 F1800", output)
+        self.assertIn("G1 X282 Y18 Z320 F1800", output)
         self.assertIn("M106 P0 S255", output)
         self.assertIn("G1 X0 Y300 Z330 F1800", output)
 
@@ -387,9 +387,9 @@ class RunCommandTests(unittest.TestCase):
         output = buffer.getvalue()
         self.assertIn("DRY RUN ONLY", output)
         self.assertEqual(output.count("G0 ") + output.count("G1 "), 64)
-        self.assertIn("G0 X283 Y17 Z30 F1800", output)
-        self.assertIn("G1 X283 Y17 Z310 F1800", output)
-        self.assertIn("G1 X243 Y57 Z310 F1800", output)
+        self.assertIn("G0 X282 Y18 Z40 F1800", output)
+        self.assertIn("G1 X282 Y18 Z320 F1800", output)
+        self.assertIn("G1 X242 Y58 Z320 F1800", output)
         self.assertEqual(output.count("M106 P0 S255"), 64)
         self.assertGreater(output.rfind("M107 P0"), output.rfind("M106 P0 S255"))
 

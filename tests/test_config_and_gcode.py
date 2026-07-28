@@ -28,8 +28,8 @@ class ConfigAndGCodeTests(unittest.TestCase):
         self.assertEqual(config.workspace.max_x_mm, 330.0)
         self.assertEqual(config.workspace.max_y_mm, 300.0)
         self.assertEqual(config.board.square_size_mm, 40.0)
-        self.assertEqual(config.board.origin_x_mm, 30.0)
-        self.assertEqual(config.board.origin_y_mm, 17.0)
+        self.assertEqual(config.board.origin_x_mm, 40.0)
+        self.assertEqual(config.board.origin_y_mm, 18.0)
 
     def test_rejects_capture_slot_outside_workspace(self) -> None:
         raw = self.raw_config()

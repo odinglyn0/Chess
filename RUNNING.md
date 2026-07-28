@@ -26,9 +26,9 @@ The `G92` remap converts the installed firmware's backed-off home into the new
 physical coordinates. Host-generated movement is restricted to X/Y `0..300`
 and Z `0..330`.
 
-The 8 x 8 software grid is 300 x 300 mm with 37.5 mm square spacing. Exact
-40 mm squares would require 320 mm outer travel and therefore do not fit the
-selected 300 mm safe envelope.
+The measured square centers use exact 40 mm spacing. Logical centers span inner
+40..320 mm and outer 18..298 mm. The four raw Marlin corner centers are
+`X2 Y298 Z320`, `X282 Y18 Z320`, `X282 Y18 Z40`, and `X2 Y298 Z40`.
 
 ## Install And Verify
 
@@ -277,6 +277,21 @@ uv run chess-gantry --config config.json motor-test \
 uv run chess-gantry --config config.json magnet-test --duration-s 1
 uv run chess-gantry --config config.json board-sweep \
   --feed-mm-min 1800 --magnet-on
+```
+
+Measured square-center traversal:
+
+```bash
+uv run chess-gantry --config config.json square-center-demo \
+  --feed-mm-min 1800 --dwell-ms 150
+```
+
+Physical traversal with the magnet continuously on:
+
+```bash
+uv run chess-gantry --config config.json square-center-demo \
+  --feed-mm-min 1800 --dwell-ms 150 --magnet-on \
+  --confirm-motion --confirm-clear-workspace --confirm-magnet
 ```
 
 Simulated Marlin:

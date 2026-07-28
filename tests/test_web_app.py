@@ -94,7 +94,7 @@ class WebAppTests(unittest.TestCase):
             "ny": 3,
         }
         _, plan = self.request("/api/plan", {"move": move})
-        self.assertIn("G1 X163 Y137 Z190", plan["gcode"])
+        self.assertIn("G1 X162 Y138 Z200", plan["gcode"])
         _, board_before = self.request("/api/board")
         self.assertEqual(board_before["board_state"]["revision"], 0)
 

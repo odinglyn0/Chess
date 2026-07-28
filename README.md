@@ -612,9 +612,66 @@ uv run chess-gantry --config config.demo.json web --demo
 Physical operation cards are disabled at the server layer in `--demo` mode,
 not just hidden in the browser.
 
-The server binds only to `127.0.0.1` by default. Do not use `--allow-network`
-for physical control on an untrusted network because the dashboard deliberately
-has no remote authentication layer.
+The server binds only to `127.0.0.1` by default. Network mode requires both
+`--allow-network` and a strong access token.
+
+### Authenticated Network UI
+
+To let other devices on the same trusted LAN use the UI while commands and
+serial access remain on this computer, run:
+
+```bash
+./scripts/run_network_ui.sh
+```
+
+The launcher:
+
+- generates a new random 256-bit access token for each start
+- binds the server to `0.0.0.0:8000`
+- prints a complete authenticated URL using this computer's LAN address
+- keeps all shell commands and `/dev/ttyUSB0` access on this computer
+
+Open the complete printed URL on another device. It looks like:
+
+```text
+http://192.168.1.50:8000/?token=LONG_RANDOM_TOKEN
+```
+
+The first request stores the token in an `HttpOnly; SameSite=Strict` cookie and
+redirects to `/`, removing the token from the address bar. Every page and API
+request requires the token. Bad or missing tokens receive HTTP 401. Tokens are
+redacted from server request logs.
+
+To use a fixed token and another port:
+
+```bash
+CHESS_GANTRY_WEB_TOKEN="$(uv run python -c 'import secrets; print(secrets.token_urlsafe(32))')" \
+CHESS_GANTRY_WEB_PORT=8080 \
+  ./scripts/run_network_ui.sh
+```
+
+On Fedora, if another device cannot connect, open the selected TCP port for the
+current firewalld zone:
+
+```bash
+sudo firewall-cmd --add-port=8000/tcp
+```
+
+Remove the temporary firewall rule after the session:
+
+```bash
+sudo firewall-cmd --remove-port=8000/tcp
+```
+
+Do not add `--permanent` unless this service should remain exposed after
+reboot. Do not port-forward this service through the router or expose it to the
+internet. Token authentication protects commands but plain HTTP does not encrypt
+the token or traffic; use only a trusted private LAN or place the service behind
+a TLS VPN/reverse proxy.
+
+Stop the server with `Ctrl+C`. Long-running dashboard tasks are terminated on
+server shutdown. Cancelled physical tasks also attempt `M112`, after which the
+controller must be reset and re-homed.
 
 ### 10. Run A Planned Chess Move
 

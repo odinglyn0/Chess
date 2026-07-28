@@ -2,18 +2,21 @@ from __future__ import annotations
 
 from pathlib import Path
 from tempfile import TemporaryDirectory
+import hashlib
 import json
 import threading
 import unittest
+import urllib.error
 import urllib.request
 
 from chess_gantry.config import AppConfig
 from chess_gantry.controller import GantryController
+from chess_gantry.errors import ValidationError
 from chess_gantry.models import BoardState
 from chess_gantry.operations import OperationManager, OperationSpec
 from chess_gantry.persistence import atomic_write_json
 from chess_gantry.service import GantryService
-from chess_gantry.web_app import GantryHTTPServer, RequestHandler
+from chess_gantry.web_app import GantryHTTPServer, RequestHandler, validate_web_access
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -140,6 +143,43 @@ class WebAppTests(unittest.TestCase):
         self.assertIn("Operations dashboard", html)
         self.assertIn('id="taskStop"', html)
         self.assertIn("/api/tasks/start", html)
+
+    def test_network_bind_requires_explicit_flag_and_strong_token(self) -> None:
+        with self.assertRaisesRegex(ValidationError, "--allow-network"):
+            validate_web_access("0.0.0.0", False, "a" * 32)
+        with self.assertRaisesRegex(ValidationError, "at least 24"):
+            validate_web_access("0.0.0.0", True, None)
+        with self.assertRaisesRegex(ValidationError, "at least 24"):
+            validate_web_access("0.0.0.0", True, "short")
+        self.assertTrue(validate_web_access("0.0.0.0", True, "a" * 32))
+        self.assertFalse(validate_web_access("127.0.0.1", False, None))
+
+    def test_authenticated_server_protects_page_and_apis(self) -> None:
+        token = "network-dashboard-test-token-123456"
+        self.server.auth_token_hash = hashlib.sha256(token.encode()).digest()
+        cookie_jar = urllib.request.HTTPCookieProcessor()
+        opener = urllib.request.build_opener(cookie_jar)
+        with self.assertRaises(urllib.error.HTTPError) as unauthorized:
+            opener.open(self.base + "/api/status", timeout=3)
+        self.assertEqual(unauthorized.exception.code, 401)
+        unauthorized.exception.close()
+
+        with self.assertRaises(urllib.error.HTTPError) as bad_token:
+            opener.open(self.base + "/?token=wrong", timeout=3)
+        self.assertEqual(bad_token.exception.code, 401)
+        bad_token.exception.close()
+
+        with opener.open(self.base + f"/?token={token}", timeout=3) as response:
+            html = response.read().decode("utf-8")
+        self.assertIn("Operations dashboard", html)
+        cookie = next(iter(cookie_jar.cookiejar))
+        self.assertEqual(cookie.name, "gantry_session")
+        self.assertTrue(cookie.has_nonstandard_attr("HttpOnly"))
+        self.assertEqual(cookie.get_nonstandard_attr("SameSite"), "Strict")
+
+        with opener.open(self.base + "/api/status", timeout=3) as response:
+            payload = json.loads(response.read())
+        self.assertTrue(payload["ok"])
 
 
 if __name__ == "__main__":

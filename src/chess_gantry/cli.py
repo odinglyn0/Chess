@@ -5,6 +5,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any, Mapping, Optional, Sequence
 import json
+import os
 import sys
 import asyncio
 from time import sleep
@@ -258,6 +259,11 @@ def _parser() -> ArgumentParser:
         "--allow-network",
         action="store_true",
         help="allow a non-loopback bind; local-only is safer and is the default",
+    )
+    web.add_argument(
+        "--auth-token",
+        default=os.environ.get("CHESS_GANTRY_WEB_TOKEN"),
+        help="required access token for network mode (or CHESS_GANTRY_WEB_TOKEN)",
     )
 
     console = commands.add_parser(
@@ -796,6 +802,7 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
                 open_browser=not args.no_browser,
                 demo=args.demo,
                 allow_network=args.allow_network,
+                auth_token=args.auth_token,
             )
             return 0
 

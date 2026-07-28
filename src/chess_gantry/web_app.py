@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import json
+import hashlib
+import hmac
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+import socket
 import threading
 from typing import Any, Mapping, Optional
+from urllib.parse import parse_qs, urlsplit
 import webbrowser
 
 from .config import AppConfig
@@ -13,6 +17,42 @@ from .controller import GantryController
 from .errors import GantryError, ValidationError
 from .operations import OperationManager, operation_catalog
 from .service import GantryService
+
+
+def _lan_address() -> str:
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+            probe.connect(("192.0.2.1", 9))
+            address = probe.getsockname()[0]
+            if address and not address.startswith("127."):
+                return address
+    except OSError:
+        pass
+    try:
+        for item in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            address = item[4][0]
+            if address and not address.startswith("127."):
+                return address
+    except OSError:
+        pass
+    return "127.0.0.1"
+
+
+def validate_web_access(
+    host: str, allow_network: bool, auth_token: Optional[str]
+) -> bool:
+    network_visible = host not in {"127.0.0.1", "localhost", "::1"}
+    if network_visible and not allow_network:
+        raise ValidationError(
+            "refusing a network-visible bind without --allow-network; use 127.0.0.1 for local control"
+        )
+    if network_visible and (auth_token is None or len(auth_token) < 24):
+        raise ValidationError(
+            "network-visible web mode requires --auth-token with at least 24 characters"
+        )
+    if not network_visible and auth_token is not None and len(auth_token) < 24:
+        raise ValidationError("--auth-token must contain at least 24 characters")
+    return network_visible
 
 
 HTML = r"""<!doctype html>
@@ -83,8 +123,67 @@ class RequestHandler(BaseHTTPRequestHandler):
             raise ValidationError("operations dashboard is not configured")
         return manager
 
+    def _authenticated(self) -> bool:
+        token_hash = getattr(self.server, "auth_token_hash", None)
+        if token_hash is None:
+            return True
+        authorization = self.headers.get("Authorization", "")
+        candidate = ""
+        if authorization.startswith("Bearer "):
+            candidate = authorization[7:].strip()
+        if not candidate:
+            cookie = self.headers.get("Cookie", "")
+            for item in cookie.split(";"):
+                name, separator, value = item.strip().partition("=")
+                if separator and name == "gantry_session":
+                    candidate = value
+                    break
+        if not candidate:
+            return False
+        candidate_hash = hashlib.sha256(candidate.encode("utf-8")).digest()
+        return hmac.compare_digest(candidate_hash, token_hash)
+
+    def _send_unauthorized(self) -> None:
+        body = b"Authentication required. Open the complete token URL printed by the server."
+        self.send_response(HTTPStatus.UNAUTHORIZED)
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("WWW-Authenticate", 'Bearer realm="Chess Gantry"')
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _accept_token_url(self) -> bool:
+        token_hash = getattr(self.server, "auth_token_hash", None)
+        if token_hash is None:
+            return False
+        query = parse_qs(urlsplit(self.path).query)
+        values = query.get("token", [])
+        if len(values) != 1:
+            return False
+        token = values[0]
+        candidate_hash = hashlib.sha256(token.encode("utf-8")).digest()
+        if not hmac.compare_digest(candidate_hash, token_hash):
+            return False
+        self.send_response(HTTPStatus.SEE_OTHER)
+        self.send_header("Location", "/")
+        self.send_header(
+            "Set-Cookie",
+            f"gantry_session={token}; Path=/; HttpOnly; SameSite=Strict",
+        )
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        return True
+
     def log_message(self, fmt: str, *args: Any) -> None:
-        print(f"[web] {self.address_string()} - {fmt % args}")
+        message = fmt % args
+        if "?token=" in message:
+            prefix, _, suffix = message.partition("?token=")
+            separator = suffix.find(" ")
+            remainder = suffix[separator:] if separator >= 0 else ""
+            message = prefix + "?token=[REDACTED]" + remainder
+        print(f"[web] {self.address_string()} - {message}")
 
     def _send_json(self, payload: Mapping[str, Any], status: int = 200) -> None:
         body = json.dumps(payload).encode("utf-8")
@@ -121,6 +220,11 @@ class RequestHandler(BaseHTTPRequestHandler):
         return value
 
     def do_GET(self) -> None:
+        if self.path.startswith("/?token=") and self._accept_token_url():
+            return
+        if not self._authenticated():
+            self._send_unauthorized()
+            return
         if self.path == "/" or self.path.startswith("/?"):
             body = HTML.encode("utf-8")
             self.send_response(HTTPStatus.OK)
@@ -161,6 +265,9 @@ class RequestHandler(BaseHTTPRequestHandler):
         self._send_json({"ok": False, "error": "not found"}, HTTPStatus.NOT_FOUND)
 
     def do_POST(self) -> None:
+        if not self._authenticated():
+            self._send_unauthorized()
+            return
         try:
             payload = self._read_json()
             if self.path == "/api/connect":
@@ -287,6 +394,7 @@ class RequestHandler(BaseHTTPRequestHandler):
 class GantryHTTPServer(ThreadingHTTPServer):
     daemon_threads = True
     operation_manager: Optional[OperationManager] = None
+    auth_token_hash: Optional[bytes] = None
 
 
 def run_web_server(
@@ -300,18 +408,18 @@ def run_web_server(
     open_browser: bool = True,
     demo: bool = False,
     allow_network: bool = False,
+    auth_token: Optional[str] = None,
 ) -> None:
     if not 1 <= port <= 65_535:
         raise ValidationError("web port must be between 1 and 65535")
-    if host not in {"127.0.0.1", "localhost", "::1"} and not allow_network:
-        raise ValidationError(
-            "refusing a network-visible bind without --allow-network; use 127.0.0.1 for local control"
-        )
+    network_visible = validate_web_access(host, allow_network, auth_token)
 
     service = GantryService(config, state_path, journal_path, audit_path)
     controller = GantryController(config, service, demo=demo)
     RequestHandler.controller = controller
     server = GantryHTTPServer((host, port), RequestHandler)
+    if auth_token is not None:
+        server.auth_token_hash = hashlib.sha256(auth_token.encode("utf-8")).digest()
     root = Path.cwd().resolve()
     server.operation_manager = OperationManager(
         root,
@@ -325,9 +433,14 @@ def run_web_server(
         ),
         allow_physical=not demo,
     )
-    display_host = "127.0.0.1" if host in {"0.0.0.0", "::"} else host
+    display_host = _lan_address() if host in {"0.0.0.0", "::"} else host
     url = f"http://{display_host}:{port}"
     print(f"Chess Gantry Controller running at {url}")
+    if auth_token is not None:
+        print(f"Authenticated access URL: {url}/?token={auth_token}")
+        print(
+            "Anyone with this URL can run the enabled gantry operations. Keep it private."
+        )
     print("Press Control-C to stop it.")
 
     if open_browser:

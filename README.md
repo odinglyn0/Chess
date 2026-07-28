@@ -1,4 +1,5 @@
 # Chess Gantry
+# A Patch Project by Basil Amin, Ben Hewston, Kelvin Gao and Odin Glynn
 
 Chess Gantry converts chess moves into collision-aware Marlin G-code for a
 magnetic Cartesian gantry. It can:

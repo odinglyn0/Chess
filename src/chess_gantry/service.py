@@ -810,8 +810,8 @@ class GantryService:
 
     def perimeter_demo_program(
         self,
-        width_mm: float = 250.0,
-        height_mm: float = 250.0,
+        width_mm: float = 330.0,
+        height_mm: float = 270.0,
         feed_mm_min: float = 1800.0,
         magnet_on: bool = False,
     ) -> Tuple[str, ...]:
@@ -892,8 +892,8 @@ class GantryService:
 
     def perimeter_demo(
         self,
-        width_mm: float = 250.0,
-        height_mm: float = 250.0,
+        width_mm: float = 330.0,
+        height_mm: float = 270.0,
         feed_mm_min: float = 1800.0,
         magnet_on: bool = False,
     ) -> Tuple[str, ...]:

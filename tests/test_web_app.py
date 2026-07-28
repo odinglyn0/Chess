@@ -10,6 +10,7 @@ import urllib.request
 from chess_gantry.config import AppConfig
 from chess_gantry.controller import GantryController
 from chess_gantry.models import BoardState
+from chess_gantry.operations import OperationManager, OperationSpec
 from chess_gantry.persistence import atomic_write_json
 from chess_gantry.service import GantryService
 from chess_gantry.web_app import GantryHTTPServer, RequestHandler
@@ -46,6 +47,19 @@ class WebAppTests(unittest.TestCase):
         self.controller = GantryController(self.config, service, demo=True)
         RequestHandler.controller = self.controller
         self.server = GantryHTTPServer(("127.0.0.1", 0), RequestHandler)
+        self.server.operation_manager = OperationManager(
+            root,
+            self.controller,
+            (
+                OperationSpec(
+                    "web-test",
+                    "Web test",
+                    "Print one line.",
+                    "Checks",
+                    ("/usr/bin/env", "true"),
+                ),
+            ),
+        )
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
         self.base = f"http://127.0.0.1:{self.server.server_port}"
@@ -77,7 +91,7 @@ class WebAppTests(unittest.TestCase):
             "ny": 3,
         }
         _, plan = self.request("/api/plan", {"move": move})
-        self.assertIn("G1 X280 Y70 Z90", plan["gcode"])
+        self.assertIn("G1 X151.875 Y118.125 Z181.875", plan["gcode"])
         _, board_before = self.request("/api/board")
         self.assertEqual(board_before["board_state"]["revision"], 0)
 
@@ -102,6 +116,30 @@ class WebAppTests(unittest.TestCase):
             {"x_mm": 20, "y_mm": 30, "feed_mm_min": 600, "confirm_motion": True},
         )
         self.assertEqual(moved["status"]["position_mm"], {"x": 20.0, "y": 30.0})
+
+    def test_operations_catalog_and_task_api(self) -> None:
+        _, catalog = self.request("/api/operations")
+        self.assertEqual(catalog["operations"][0]["id"], "web-test")
+        _, started = self.request(
+            "/api/tasks/start",
+            {"operation_id": "web-test", "confirmations": {}},
+        )
+        self.assertIn(started["run"]["state"], {"starting", "running", "completed"})
+        for _ in range(100):
+            _, status = self.request("/api/tasks/status")
+            if status["run"]["state"] == "completed":
+                break
+            threading.Event().wait(0.01)
+        self.assertEqual(status["run"]["state"], "completed")
+        self.assertEqual(status["run"]["returncode"], 0)
+
+    def test_dashboard_page_contains_operations_controls(self) -> None:
+        request = urllib.request.Request(self.base + "/")
+        with urllib.request.urlopen(request, timeout=3) as response:
+            html = response.read().decode("utf-8")
+        self.assertIn("Operations dashboard", html)
+        self.assertIn('id="taskStop"', html)
+        self.assertIn("/api/tasks/start", html)
 
 
 if __name__ == "__main__":

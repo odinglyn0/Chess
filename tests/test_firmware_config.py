@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import json
 import re
 import unittest
 
@@ -48,7 +49,9 @@ class FirmwareConfigurationTests(unittest.TestCase):
         self.assert_define(self.pins, "Z_DIR_PIN", "PB3")
         self.assert_define(self.configuration, "INVERT_Z_DIR", "true")
         self.assert_define(self.configuration, "Z_HOME_DIR", "1")
-        self.assert_define(self.configuration, "Z_MAX_POS", "350")
+        self.assert_define(self.configuration, "X_BED_SIZE", "270")
+        self.assert_define(self.configuration, "Y_BED_SIZE", "270")
+        self.assert_define(self.configuration, "Z_MAX_POS", "330")
         self.assertNotRegex(self.configuration, r"(?m)^\s*#define\s+BLTOUCH\b")
         self.assertNotRegex(
             self.configuration,
@@ -66,6 +69,14 @@ class FirmwareConfigurationTests(unittest.TestCase):
             self.advanced, r"(?m)^\s*#define\s+ENDSTOPS_ALWAYS_ON_DEFAULT\b"
         )
         self.assertRegex(self.advanced, r"(?m)^\s*#define\s+EMERGENCY_PARSER\b")
+
+    def test_host_workspace_matches_firmware_axis_limits(self) -> None:
+        config = json.loads((ROOT / "config.json").read_text(encoding="utf-8"))
+        self.assertEqual(config["workspace"]["max_y_mm"], 270.0)
+        self.assertEqual(config["workspace"]["max_x_mm"], 330.0)
+        self.assert_define(self.configuration, "X_BED_SIZE", "270")
+        self.assert_define(self.configuration, "Y_BED_SIZE", "270")
+        self.assert_define(self.configuration, "Z_MAX_POS", "330")
 
 
 if __name__ == "__main__":

@@ -86,7 +86,7 @@ cd ..
 The corrected inner-axis-direction binary has SHA-256:
 
 ```text
-a6c5a4440b520d13cf4a6c5ba0b18a717502d5b78c7f720ecadebf372c1c540d
+a03c8448a4aa80dab0b14cb31e1938b509760e05ad8012db7977d279111bc861
 ```
 
 Do not flash an earlier binary with a different checksum. Earlier builds either
@@ -107,7 +107,7 @@ Rebuild it from source when needed:
 4. Rename the copied file to a short unique name not previously flashed, such
    as `RCG0727.bin`.
 5. Run `sync`, then verify that the on-card file is 82,192 bytes and its SHA-256
-   is `a6c5a4440b520d13cf4a6c5ba0b18a717502d5b78c7f720ecadebf372c1c540d`.
+   is `a03c8448a4aa80dab0b14cb31e1938b509760e05ad8012db7977d279111bc861`.
    A zero-byte file will be silently ignored by the bootloader.
 6. Unmount or safely eject the card before removing it. Never unplug the reader
    immediately after `cp`.
@@ -160,7 +160,7 @@ uv run python scripts/check_firmware.py \
 It runs `G28 X Y Z` and requires `M114` to finish at:
 
 ```text
-X:2.00 Y:348.00 Z:348.00
+X:2.00 Y:268.00 Z:328.00
 ```
 
 The normal application invokes the same firmware sequence with:
@@ -177,8 +177,8 @@ The custom firmware maps the machine as follows:
 
 ```text
 Physical X driver -> logical X -> X-stop connector -> x_min -> homes to X=0
-Physical Y driver -> logical Y -> Y-stop connector -> y_max -> homes to Y=350
-Physical E driver -> logical Z -> Z-stop connector -> z_max -> homes to Z=350
+Physical Y driver -> logical Y -> Y-stop connector -> y_max -> homes to Y=270
+Physical E driver -> logical Z -> Z-stop connector -> z_max -> homes to Z=330
 Physical Z driver -> unused
 ```
 
@@ -193,7 +193,7 @@ The pin remap is in
 
 `INVERT_Z_DIR` is enabled because physical testing showed that the motor on the
 E connector must reverse direction to approach the Z end switch. Do not change
-`Z_HOME_DIR`: the switch remains the logical `Z_MAX` end at coordinate 350.
+`Z_HOME_DIR`: the switch remains the logical `Z_MAX` end at coordinate 330.
 
 `INVERT_X_DIR` and `INVERT_Y_DIR` are both disabled. Physical testing showed
 that the two outer gantry motors must use matching electrical direction so both
@@ -214,8 +214,8 @@ The host sends `G28 X Y Z`. Marlin performs:
 3. Z homing. Logical Z drives the motor physically plugged into E until the
    switch plugged into Z-stop triggers.
 4. A 2 mm post-home backoff on all three axes.
-5. Final switch coordinates are `X0 Y350 Z350`; after the configured 2 mm
-   safety backoff, `M114` reports `X2 Y348 Z348`.
+5. Final switch coordinates are `X0 Y270 Z330`; after the configured 2 mm
+   safety backoff, `M114` reports `X2 Y268 Z328`.
 
 Endstop stopping occurs inside Marlin's real-time stepper/endstop code, not by
 USB polling.
@@ -320,7 +320,7 @@ uv run python scripts/check_firmware.py \
 Expected final position after Marlin's 2 mm safety backoff:
 
 ```text
-X:2.00 Y:348.00 Z:348.00
+X:2.00 Y:268.00 Z:328.00
 ```
 
 The physical motor plugged into E is logical Z in this firmware. If any axis
@@ -435,7 +435,7 @@ uv run chess-gantry --config config.json workspace-test \
 
 `circle-demo` interprets 20 cm as a 200 mm diameter. It homes with Marlin,
 energizes fan `P0`, approaches a circle centered at logical `(250, 250)`, traces
-72 linear segments, switches the magnet off, returns to `X0 Y350 Z350`, and
+72 linear segments, switches the magnet off, returns to `X0 Y270 Z330`, and
 disables the motors.
 
 Generate and inspect the G-code without connecting:
@@ -481,20 +481,20 @@ the magnet off and disable the motors.
 ### 8b. Trace The Board Perimeter
 
 `perimeter-demo` homes first and treats the home point as the first corner. It
-traces a 250 x 250 mm rectangle inward from home, closes the rectangle at
-`X0 Y350 Z350`, and disables the motors. The physical sequence is:
+traces the complete 330 mm inner by 270 mm outer machine envelope, closes the
+rectangle at `X0 Y270 Z330`, and disables the motors. The physical sequence is:
 
 ```text
-X0 Y350 Z350 -> X0 Y350 Z100 -> X250 Y100 Z100
-              -> X250 Y100 Z350 -> X0 Y350 Z350
+X0 Y270 Z330 -> X0 Y270 Z0 -> X270 Y0 Z0
+              -> X270 Y0 Z330 -> X0 Y270 Z330
 ```
 
 Generate and inspect it without connecting:
 
 ```bash
 uv run chess-gantry --config config.json perimeter-demo \
-  --width-mm 250 \
-  --height-mm 250 \
+  --width-mm 330 \
+  --height-mm 270 \
   --feed-mm-min 1800 \
   --output data/perimeter-demo.gcode
 ```
@@ -503,33 +503,33 @@ Simulate it:
 
 ```bash
 uv run chess-gantry --config config.demo.json perimeter-demo \
-  --width-mm 250 \
-  --height-mm 250 \
+  --width-mm 330 \
+  --height-mm 270 \
   --feed-mm-min 1800 \
   --confirm-motion \
   --demo
 ```
 
-Clear the complete 250 x 250 mm rectangle and keep the emergency cutoff ready,
+Clear the complete 330 x 270 mm rectangle and keep the emergency cutoff ready,
 then run it physically with the magnet off:
 
 ```bash
 uv run chess-gantry --config config.json perimeter-demo \
-  --width-mm 250 \
-  --height-mm 250 \
+  --width-mm 330 \
+  --height-mm 270 \
   --feed-mm-min 1800 \
   --confirm-motion \
   --confirm-clear-workspace
 ```
 
 The magnet is off by default. A magnet-on perimeter is allowed only when the
-estimated hold is at most 30 seconds, so this 250 x 250 mm perimeter requires
+estimated hold is at most 30 seconds, so this 330 x 270 mm perimeter requires
 at least 2,000 mm/min. The documented magnet variant uses 3,000 mm/min:
 
 ```bash
 uv run chess-gantry --config config.json perimeter-demo \
-  --width-mm 250 \
-  --height-mm 250 \
+  --width-mm 330 \
+  --height-mm 270 \
   --feed-mm-min 3000 \
   --magnet-on \
   --confirm-motion \
@@ -552,6 +552,38 @@ uv run chess-gantry --config config.json web
 ```
 
 Open <http://127.0.0.1:8000>. Home before executing physical moves.
+
+The browser now includes an **Operations dashboard** with live task output and
+one-click allowlisted workflows for:
+
+- all tests, formatting checks, and complete demo readiness
+- simulated circle and perimeter demos
+- installed-firmware and endstop checks
+- physical homing and short movement tests
+- magnet pulse, circle, perimeter, workspace-grid, and piece demos
+- board JSON inspection, reset, and pending-move reconciliation
+- Lichess check, dry-run follower, and physical play
+
+Physical task cards display required confirmation checkboxes and a second
+browser confirmation. Only one dashboard task can run at a time. Serial tasks
+disconnect the browser's persistent serial connection before starting so two
+processes cannot own `/dev/ttyUSB0` simultaneously.
+
+The **Stop task** button terminates the complete subprocess tree. For a physical
+task it also attempts `M112`; reset or power-cycle and re-home afterward.
+
+For a UI that cannot run real hardware, launch:
+
+```bash
+uv run chess-gantry --config config.demo.json web --demo
+```
+
+Physical operation cards are disabled at the server layer in `--demo` mode,
+not just hidden in the browser.
+
+The server binds only to `127.0.0.1` by default. Do not use `--allow-network`
+for physical control on an untrusted network because the dashboard deliberately
+has no remote authentication layer.
 
 ### 10. Run A Planned Chess Move
 
@@ -980,9 +1012,9 @@ uv run chess-gantry --config config.json piece-demo \
 ```
 
 The command queries `M119` again and refuses to move unless all three switches
-remain triggered. It then assigns `X0 Y350 Z350`, energizes fan `P0` at full
-PWM, moves inner `Z` to 330 mm, moves the aligned outer pair to `X20 Y330`,
-releases the piece, and returns to `X0 Y350 Z350` with the magnet off.
+remain triggered. It then assigns `X0 Y270 Z330`, energizes fan `P0` at full
+PWM, moves inner `Z` to 310 mm, moves the aligned outer pair to `X20 Y250`,
+releases the piece, and returns to `X0 Y270 Z330` with the magnet off.
 It finishes by disabling the motors and does not modify chess-state JSON.
 
 The test is deliberately limited to a short transfer. Do not increase distance
@@ -1014,7 +1046,7 @@ releases at the destination, and returns to the origin with the magnet off.
 ### Full Workspace Movement Test
 
 Use this test before relying on the chess-square geometry. It traverses an 8 x
-8 serpentine grid over the configured 350 x 350 mm usable workspace with a 20
+8 serpentine grid over the configured 330 x 270 mm usable workspace with a 20
 mm edge margin, pauses at every point, and returns to the three-switch
 reference. The electromagnet remains off.
 
@@ -1108,17 +1140,18 @@ turns them off during travel. The feed cannot exceed
 
 ## Physical Calibration
 
-The panel is 500 x 600 mm, but panel dimensions do not define safe tool-center
-travel.
+The calibrated machine envelope is:
 
-The checked-in physical `config.json` still contains:
-
-```json
-"square_size_mm": 0.05
+```text
+Inner gantry / logical Z width: 330 mm
+Outer paired X/Y gantry height: 270 mm
 ```
 
-That is not a usable physical chess-square pitch. Do not run physical chess
-moves or a full-board sweep until these values are measured and updated:
+Chess squares must remain square, so the 8 x 8 playing grid is 270 x 270 mm,
+using 33.75 mm squares. It is centered across the 330 mm width with 30 mm side
+margins. The `a1` square center is at logical `(46.875, 16.875)`.
+
+If the mechanics change, remeasure and update:
 
 - `workspace.min_x_mm`
 - `workspace.max_x_mm`
@@ -1132,8 +1165,8 @@ moves or a full-board sweep until these values are measured and updated:
 - `safety.home_commands`
 - safe travel and drag feed limits
 
-`config.demo.json` models a simulated 500 x 600 workspace with 50 mm squares.
-Its coordinates are not physical calibration measurements.
+`config.demo.json` uses the same 330 x 270 mm envelope and centered chess-grid
+geometry as the physical configuration.
 
 A value of `safety.calibrated: true` is an operator assertion, not proof that
 the configuration matches the machine.

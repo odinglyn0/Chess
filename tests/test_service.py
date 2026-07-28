@@ -23,8 +23,6 @@ def test_config(*, calibrated: bool = True, capture: bool = True) -> AppConfig:
     raw["safety"]["calibrated"] = calibrated
     raw["safety"]["home_before_execute"] = False
     raw["safety"]["preflight_commands"] = []
-    raw["workspace"]["max_x_mm"] = 350.0
-    raw["workspace"]["max_y_mm"] = 350.0
     return AppConfig.from_mapping(raw)
 
 
@@ -68,7 +66,7 @@ class FakeLink:
             )
             return CommandResult(command, (*responses, "ok"))
         if command == "M114":
-            return CommandResult(command, ("X:0.00 Y:350.00 Z:350.00 E:0.00", "ok"))
+            return CommandResult(command, ("X:0.00 Y:270.00 Z:330.00 E:0.00", "ok"))
         return CommandResult(command, ("ok",))
 
     def best_effort(self, commands):
@@ -130,7 +128,7 @@ class ServiceTests(unittest.TestCase):
             self.assertIn("M107 P0", commands)
             self.assertLess(
                 commands.index("M106 P0 S255"),
-                commands.index("G1 X280 Y70 Z90 F3000"),
+                commands.index("G1 X151.875 Y118.125 Z181.875 F3000"),
             )
 
     def test_reference_gantry_requires_all_three_endstops(self) -> None:
@@ -164,7 +162,7 @@ class ServiceTests(unittest.TestCase):
                 link_factory=lambda settings: fake,
             )
             program = service.reference_gantry()
-            self.assertIn("G92 X0 Y350 Z350", program)
+            self.assertIn("G92 X0 Y270 Z330", program)
             self.assertEqual(fake.programs, [program])
 
     def test_home_gantry_runs_marlin_g28_and_saves_responses(self) -> None:
@@ -186,7 +184,7 @@ class ServiceTests(unittest.TestCase):
             self.assertEqual(record["method"], "marlin_g28")
             saved = read_json(record_path)
             self.assertIn("x_min: TRIGGERED", saved["endstop_response"])
-            self.assertIn("X:0.00 Y:350.00 Z:350.00 E:0.00", saved["position_response"])
+            self.assertIn("X:0.00 Y:270.00 Z:330.00 E:0.00", saved["position_response"])
 
     def test_home_gantry_failure_does_not_save_record(self) -> None:
         with TemporaryDirectory() as directory:
@@ -226,10 +224,10 @@ class ServiceTests(unittest.TestCase):
             program = service.workspace_test(1200.0, 20.0, 8, 8, 100)
             moves = tuple(command for command in program if command.startswith("G1 "))
             self.assertEqual(len(moves), 65)
-            self.assertEqual(moves[0], "G1 X330 Y20 Z20 F1200")
-            self.assertEqual(moves[7], "G1 X330 Y20 Z330 F1200")
-            self.assertEqual(moves[8], "G1 X285.714 Y64.286 Z330 F1200")
-            self.assertEqual(moves[-1], "G1 X0 Y350 Z350 F1200")
+            self.assertEqual(moves[0], "G1 X250 Y20 Z20 F1200")
+            self.assertEqual(moves[7], "G1 X250 Y20 Z310 F1200")
+            self.assertEqual(moves[8], "G1 X217.143 Y52.857 Z310 F1200")
+            self.assertEqual(moves[-1], "G1 X0 Y270 Z330 F1200")
             self.assertFalse(any(command.startswith("M106") for command in program))
             self.assertEqual(len(fake.programs), 2)
 
@@ -282,10 +280,10 @@ class ServiceTests(unittest.TestCase):
             )
             plan = service.plan(move)
             self.assertEqual(plan.transfers[0].purpose, "capture")
-            self.assertEqual(plan.transfers[0].start.x, 70.0)
-            self.assertEqual(plan.transfers[0].start.y, 90.0)
-            self.assertEqual(plan.transfers[1].end.x, 70.0)
-            self.assertEqual(plan.transfers[1].end.y, 110.0)
+            self.assertEqual(plan.transfers[0].start.x, 148.125)
+            self.assertEqual(plan.transfers[0].start.y, 151.875)
+            self.assertEqual(plan.transfers[1].end.x, 148.125)
+            self.assertEqual(plan.transfers[1].end.y, 185.625)
 
     def test_successful_execute_commits_state_and_clears_journal(self) -> None:
         with TemporaryDirectory() as directory:
@@ -392,14 +390,14 @@ class ServiceTests(unittest.TestCase):
             self.assertIn("M203 X200 Y200 Z50", program)
             self.assertIn("M201 X500 Y500 Z300", program)
             self.assertIn("M205 X5 Y5 Z5", program)
-            self.assertIn("G92 X0 Y350 Z350", program)
+            self.assertIn("G92 X0 Y270 Z330", program)
             self.assertFalse(any(command.startswith("G28") for command in program))
             self.assertTrue(any(" Z" in command for command in program))
             self.assertFalse(any(" E" in command for command in program))
+            self.assertIn("G1 Z310 F600", program)
+            self.assertIn("G1 X20 Y250 F600", program)
             self.assertIn("G1 Z330 F600", program)
-            self.assertIn("G1 X20 Y330 F600", program)
-            self.assertIn("G1 Z350 F600", program)
-            self.assertIn("G1 X0 Y350 F600", program)
+            self.assertIn("G1 X0 Y270 F600", program)
             self.assertEqual(program[-2:], ("M211 S1", "M84"))
             self.assertEqual(program[-1], "M84")
             self.assertEqual(service.store.load().revision, 0)
@@ -448,10 +446,10 @@ class ServiceTests(unittest.TestCase):
             first_on = program.index("M106 P0 S255")
             self.assertEqual(
                 program[first_on : first_on + 4],
-                ("M106 P0 S255", "G4 P300", "G1 Z330 F1200", "M400"),
+                ("M106 P0 S255", "G4 P300", "G1 Z310 F1200", "M400"),
             )
             self.assertLess(
-                program.index("G1 X20 Y330 F1200"), program.index("M107 P0", first_on)
+                program.index("G1 X20 Y250 F1200"), program.index("M107 P0", first_on)
             )
             self.assertEqual(program[-3:], ("M107 P0", "M211 S1", "M84"))
             self.assertEqual(fake.programs, [program])
@@ -516,11 +514,11 @@ class ServiceTests(unittest.TestCase):
             )
             program = service.piece_demo(20.0, 1200.0)
             on_index = program.index("M106 P0 S255")
-            inner_out = program.index("G1 Z330 F1200")
-            outer_out = program.index("G1 X20 Y330 F1200")
+            inner_out = program.index("G1 Z310 F1200")
+            outer_out = program.index("G1 X20 Y250 F1200")
             release = program.index("M107 P0", on_index)
-            inner_return = program.index("G1 Z350 F1200")
-            outer_return = program.index("G1 X0 Y350 F1200")
+            inner_return = program.index("G1 Z330 F1200")
+            outer_return = program.index("G1 X0 Y270 F1200")
             self.assertLess(on_index, inner_out)
             self.assertLess(inner_out, outer_out)
             self.assertLess(outer_out, release)
@@ -596,9 +594,9 @@ class ServiceTests(unittest.TestCase):
             on_index = program.index("M106 P0 S255")
             off_index = program.index("M107 P0", on_index)
             self.assertEqual(len(moves), 74)
-            self.assertEqual(moves[0], "G1 X29.289 Y320.711 Z320.711 F1800")
+            self.assertEqual(moves[0], "G1 X29.289 Y240.711 Z300.711 F1800")
             self.assertEqual(moves[-2], moves[0])
-            self.assertEqual(moves[-1], "G1 X0 Y350 Z350 F1800")
+            self.assertEqual(moves[-1], "G1 X0 Y270 Z330 F1800")
             self.assertLess(home_index, on_index)
             self.assertGreater(off_index, program.index(moves[-2]))
             self.assertLess(off_index, program.index(moves[-1]))
@@ -631,17 +629,17 @@ class ServiceTests(unittest.TestCase):
                 audit_path,
                 link_factory=lambda settings: fake,
             )
-            program = service.perimeter_demo(250.0, 250.0, 3000.0, magnet_on=True)
+            program = service.perimeter_demo(330.0, 270.0, 3000.0, magnet_on=True)
             moves = tuple(command for command in program if command.startswith("G1 "))
             on_index = program.index("M106 P0 S255")
             off_index = program.index("M107 P0", on_index)
             self.assertEqual(
                 moves,
                 (
-                    "G1 X0 Y350 Z100 F3000",
-                    "G1 X250 Y100 Z100 F3000",
-                    "G1 X250 Y100 Z350 F3000",
-                    "G1 X0 Y350 Z350 F3000",
+                    "G1 X0 Y270 Z0 F3000",
+                    "G1 X270 Y0 Z0 F3000",
+                    "G1 X270 Y0 Z330 F3000",
+                    "G1 X0 Y270 Z330 F3000",
                 ),
             )
             self.assertLess(on_index, program.index(moves[0]))
@@ -656,9 +654,9 @@ class ServiceTests(unittest.TestCase):
             atomic_write_json(state_path, self.minimal_state().to_dict())
             service = GantryService(test_config(), state_path, journal_path, audit_path)
             with self.assertRaisesRegex(ConfigurationError, "width exceeds"):
-                service.perimeter_demo_program(400.0, 250.0, 1800.0)
+                service.perimeter_demo_program(400.0, 270.0, 1800.0)
             with self.assertRaisesRegex(ConfigurationError, "more than 30 seconds"):
-                service.perimeter_demo_program(250.0, 250.0, 1200.0, magnet_on=True)
+                service.perimeter_demo_program(330.0, 270.0, 1200.0, magnet_on=True)
 
     def test_board_sweep_visits_every_square_and_controls_magnet(self) -> None:
         with TemporaryDirectory() as directory:
@@ -678,11 +676,11 @@ class ServiceTests(unittest.TestCase):
                 command for command in program if command.startswith(("G0 ", "G1 "))
             )
             self.assertEqual(len(moves), 64)
-            self.assertEqual(moves[0], "G0 X340 Y10 Z10 F1800")
-            self.assertEqual(moves[7], "G1 X340 Y10 Z150 F1800")
-            self.assertEqual(moves[8], "G1 X320 Y30 Z150 F1800")
-            self.assertEqual(moves[15], "G1 X320 Y30 Z10 F1800")
-            self.assertEqual(moves[-1], "G1 X200 Y150 Z10 F1800")
+            self.assertEqual(moves[0], "G0 X253.125 Y16.875 Z46.875 F1800")
+            self.assertEqual(moves[7], "G1 X253.125 Y16.875 Z283.125 F1800")
+            self.assertEqual(moves[8], "G1 X219.375 Y50.625 Z283.125 F1800")
+            self.assertEqual(moves[15], "G1 X219.375 Y50.625 Z46.875 F1800")
+            self.assertEqual(moves[-1], "G1 X16.875 Y253.125 Z46.875 F1800")
             on_index = program.index("M106 P0 S255")
             final_off = len(program) - 1 - program[::-1].index("M107 P0")
             self.assertEqual(program.count("M106 P0 S255"), 64)

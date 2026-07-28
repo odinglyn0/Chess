@@ -453,14 +453,14 @@ def _parser() -> ArgumentParser:
     perimeter_demo.add_argument(
         "--width-mm",
         type=float,
-        default=250.0,
-        help="rectangle width from the home corner (default: 250)",
+        default=330.0,
+        help="inner-gantry width from the home corner (default: 330)",
     )
     perimeter_demo.add_argument(
         "--height-mm",
         type=float,
-        default=250.0,
-        help="rectangle height from the home corner (default: 250)",
+        default=270.0,
+        help="outer-gantry height from the home corner (default: 270)",
     )
     perimeter_demo.add_argument(
         "--feed-mm-min",

@@ -65,7 +65,7 @@ def main() -> int:
                 break
         if position is None:
             raise GantryError("M114 did not return parseable X/Y/Z coordinates")
-        expected_position = (2.0, 348.0, 348.0)
+        expected_position = (2.0, 268.0, 328.0)
         if any(
             abs(actual - wanted) > 0.1
             for actual, wanted in zip(position, expected_position)
@@ -75,7 +75,7 @@ def main() -> int:
             )
         print("\n".join(endstops.responses))
         print("\n".join(positions.responses))
-        print("Firmware homing passed: X2 Y348 Z348 after 2 mm backoff.")
+        print("Firmware homing passed: X2 Y268 Z328 after 2 mm backoff.")
     return 0
 
 

@@ -10,7 +10,7 @@ is required for the measured smaller machine envelope:
 
 ```text
 Inner gantry / logical Z width: 330 mm
-Outer paired X/Y gantry height: 270 mm
+Outer paired X/Y gantry height: 300 mm
 ```
 
 Every configured home runs:
@@ -18,13 +18,17 @@ Every configured home runs:
 ```gcode
 G28 X Y Z
 M400
-G92 X2 Y268 Z328
+G92 X2 Y298 Z328
 M400
 ```
 
 The `G92` remap converts the installed firmware's backed-off home into the new
-physical coordinates. Host-generated movement is restricted to X/Y `0..270`
+physical coordinates. Host-generated movement is restricted to X/Y `0..300`
 and Z `0..330`.
+
+The 8 x 8 software grid is 300 x 300 mm with 37.5 mm square spacing. Exact
+40 mm squares would require 320 mm outer travel and therefore do not fit the
+selected 300 mm safe envelope.
 
 ## Install And Verify
 
@@ -168,6 +172,51 @@ uv run chess-gantry --config config.json web
 ```
 
 Open <http://127.0.0.1:8000>. Add `--no-browser` for headless startup.
+
+### Keyboard Jog And Live Position
+
+After connecting and homing, the browser can jog the gantry with:
+
+```text
+Arrow Left / Right -> inner gantry width
+Arrow Up / Down    -> paired outer gantry height
+Escape             -> disarm keyboard movement
+```
+
+Check **Enable arrow-key motion** before using the keyboard. Select a 0.5, 1,
+5, or 10 mm step and a bounded feed rate. Arrow-key events are ignored while a
+form input has focus, while a key is held down, while disconnected/unhomed, or
+while another dashboard task owns the serial port. A single jog is limited to
+20 mm, one logical axis, and the configured 330 x 300 mm workspace.
+
+The **Live Marlin position** box polls `M114` about every 750 ms when connected
+and idle. It displays raw machine coordinates for outer X, outer Y, and inner
+Z. Use **Read M114 now** for an immediate refresh.
+
+### Authenticated LAN Access
+
+```bash
+./scripts/run_network_ui.sh
+```
+
+Open the complete token URL printed by the launcher from another device on the
+same trusted LAN. The first request stores the token in an HttpOnly strict
+cookie. Missing or incorrect tokens receive HTTP 401. All commands and
+`/dev/ttyUSB0` access remain on the gantry computer.
+
+If Fedora blocks port 8000 temporarily allow it with:
+
+```bash
+sudo firewall-cmd --add-port=8000/tcp
+```
+
+Remove the rule after the session:
+
+```bash
+sudo firewall-cmd --remove-port=8000/tcp
+```
+
+Do not expose the plain-HTTP dashboard to the internet.
 
 ## Shared Raw G-code Debug Console
 

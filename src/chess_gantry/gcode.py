@@ -61,7 +61,7 @@ class GCodeGenerator:
             "M203 X200 Y200 Z50 ; fast outer X/Y, controlled inner Z",
             "M201 X500 Y500 Z300 ; outer and inner acceleration limits",
             "M205 X5 Y5 Z5 ; matching jerk limits",
-            "M211 S0 ; use validated 330 x 270 mm gantry coordinates",
+            "M211 S0 ; use validated 330 x 300 mm gantry coordinates",
             "; force magnet off before travel",
             *self.config.magnet.off_commands,
             "M400",

@@ -13,9 +13,9 @@
   "board": {
     "width": 8,
     "height": 8,
-    "square_size_mm": 33.75,
-    "origin_x_mm": 46.875,
-    "origin_y_mm": 16.875,
+    "square_size_mm": 40.0,
+    "origin_x_mm": 30.0,
+    "origin_y_mm": 17.0,
     "flip_x": false,
     "flip_y": false,
     "swap_xy": false
@@ -24,7 +24,7 @@
     "min_x_mm": 0.0,
     "max_x_mm": 330.0,
     "min_y_mm": 0.0,
-    "max_y_mm": 270.0
+    "max_y_mm": 300.0
   },
   "motion": {
     "travel_feed_mm_min": 3000.0,
@@ -33,7 +33,7 @@
     "magnet_off_dwell_ms": 300,
     "park_after_move": true,
     "park_x_mm": 315.0,
-    "park_y_mm": 270.0
+    "park_y_mm": 300.0
   },
   "magnet": {
     "on_commands": ["M106 P0 S255"],
@@ -48,46 +48,13 @@
     "max_expanded_nodes": 100000
   },
   "capture": {
-    "enabled": true,
-    "slots": [
-      [7.5, 16.875],
-      [7.5, 50.625],
-      [7.5, 84.375],
-      [7.5, 118.125],
-      [7.5, 151.875],
-      [7.5, 185.625],
-      [7.5, 219.375],
-      [7.5, 253.125],
-      [22.5, 16.875],
-      [22.5, 50.625],
-      [22.5, 84.375],
-      [22.5, 118.125],
-      [22.5, 151.875],
-      [22.5, 185.625],
-      [22.5, 219.375],
-      [22.5, 253.125],
-      [307.5, 16.875],
-      [307.5, 50.625],
-      [307.5, 84.375],
-      [307.5, 118.125],
-      [307.5, 151.875],
-      [307.5, 185.625],
-      [307.5, 219.375],
-      [307.5, 253.125],
-      [322.5, 16.875],
-      [322.5, 50.625],
-      [322.5, 84.375],
-      [322.5, 118.125],
-      [322.5, 151.875],
-      [322.5, 185.625],
-      [322.5, 219.375],
-      [322.5, 253.125]
-    ]
+    "enabled": false,
+    "slots": []
   },
   "safety": {
     "calibrated": true,
     "home_before_execute": false,
-    "home_commands": ["G28 X Y Z", "M400", "G92 X2 Y268 Z328", "M400"],
+    "home_commands": ["G28 X Y Z", "M400", "G92 X2 Y298 Z328", "M400"],
     "preflight_commands": ["M115"],
     "emergency_stop_command": "M112"
   }

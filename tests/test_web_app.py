@@ -94,7 +94,7 @@ class WebAppTests(unittest.TestCase):
             "ny": 3,
         }
         _, plan = self.request("/api/plan", {"move": move})
-        self.assertIn("G1 X151.875 Y118.125 Z181.875", plan["gcode"])
+        self.assertIn("G1 X163 Y137 Z190", plan["gcode"])
         _, board_before = self.request("/api/board")
         self.assertEqual(board_before["board_state"]["revision"], 0)
 
@@ -120,6 +120,29 @@ class WebAppTests(unittest.TestCase):
         )
         self.assertEqual(moved["status"]["position_mm"], {"x": 20.0, "y": 30.0})
 
+    def test_live_position_and_keyboard_jog_api(self) -> None:
+        self.request("/api/connect", {})
+        self.request("/api/home", {"confirm_motion": True})
+        _, position = self.request("/api/position", {})
+        self.assertEqual(
+            position["status"]["machine_position_mm"],
+            {"x": 2.0, "y": 298.0, "z": 328.0},
+        )
+        _, jogged = self.request(
+            "/api/jog",
+            {
+                "delta_x_mm": -5,
+                "delta_y_mm": 0,
+                "feed_mm_min": 600,
+                "confirm_motion": True,
+            },
+        )
+        self.assertEqual(jogged["status"]["position_mm"], {"x": 323.0, "y": 298.0})
+        self.assertEqual(
+            jogged["status"]["machine_position_mm"],
+            {"x": 2.0, "y": 298.0, "z": 323.0},
+        )
+
     def test_operations_catalog_and_task_api(self) -> None:
         _, catalog = self.request("/api/operations")
         self.assertEqual(catalog["operations"][0]["id"], "web-test")
@@ -143,6 +166,10 @@ class WebAppTests(unittest.TestCase):
         self.assertIn("Operations dashboard", html)
         self.assertIn('id="taskStop"', html)
         self.assertIn("/api/tasks/start", html)
+        self.assertIn('id="keyboardArm"', html)
+        self.assertIn('id="machineZ"', html)
+        self.assertIn("ArrowLeft", html)
+        self.assertIn("/api/jog", html)
 
     def test_network_bind_requires_explicit_flag_and_strong_token(self) -> None:
         with self.assertRaisesRegex(ValidationError, "--allow-network"):

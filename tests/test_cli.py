@@ -133,8 +133,8 @@ class RunCommandTests(unittest.TestCase):
         self.assertIn("DRY RUN ONLY", output)
         self.assertIn("M106 P0 S255", output)
         self.assertIn("G1 Z330 F1200", output)
-        self.assertIn("G1 X20 Y250 F1200", output)
-        self.assertIn("G1 X0 Y270 F1200", output)
+        self.assertIn("G1 X20 Y280 F1200", output)
+        self.assertIn("G1 X0 Y300 F1200", output)
 
     def test_motor_test_without_confirmation_is_gcode_only(self) -> None:
         buffer = StringIO()
@@ -143,7 +143,7 @@ class RunCommandTests(unittest.TestCase):
         self.assertEqual(code, 0)
         output = buffer.getvalue()
         self.assertIn("DRY RUN ONLY", output)
-        self.assertIn("G92 X0 Y270 Z330", output)
+        self.assertIn("G92 X0 Y300 Z330", output)
         self.assertNotIn("G28", output)
         self.assertNotIn("M82", output)
         self.assertNotIn("M302", output)
@@ -152,9 +152,9 @@ class RunCommandTests(unittest.TestCase):
         self.assertIn("M201 X500 Y500 Z300", output)
         self.assertIn("M205 X5 Y5 Z5", output)
         self.assertIn("G1 Z310 F600", output)
-        self.assertIn("G1 X20 Y250 F600", output)
+        self.assertIn("G1 X20 Y280 F600", output)
         self.assertIn("G1 Z330 F600", output)
-        self.assertIn("G1 X0 Y270 F600", output)
+        self.assertIn("G1 X0 Y300 F600", output)
         self.assertNotIn("M302", output)
 
     def test_motor_test_accepts_safe_distance_and_feed(self) -> None:
@@ -172,7 +172,7 @@ class RunCommandTests(unittest.TestCase):
         self.assertEqual(code, 0)
         output = buffer.getvalue()
         self.assertIn("G1 Z320 F300", output)
-        self.assertIn("G1 X10 Y260 F300", output)
+        self.assertIn("G1 X10 Y290 F300", output)
 
     def test_motor_test_with_magnet_prints_fixed_fan_one_gcode(self) -> None:
         buffer = StringIO()
@@ -192,7 +192,7 @@ class RunCommandTests(unittest.TestCase):
         self.assertEqual(output.count("M106 P0 S255"), 1)
         self.assertEqual(output.count("G4 P300"), 2)
         self.assertIn("M106 P0 S255\nG4 P300\nG1 Z310 F1200", output)
-        self.assertIn("G1 X20 Y250 F1200\nM400\nM107 P0", output)
+        self.assertIn("G1 X20 Y280 F1200\nM400\nM107 P0", output)
 
     def test_physical_motor_test_with_magnet_requires_confirmation(self) -> None:
         errors = StringIO()
@@ -268,7 +268,7 @@ class RunCommandTests(unittest.TestCase):
         self.assertIn("G28 X Y Z", output)
         self.assertIn("M106 P0 S255", output)
         self.assertEqual(output.count("G1 "), 74)
-        self.assertIn("G1 X0 Y270 Z330 F1800", output)
+        self.assertIn("G1 X0 Y300 Z330 F1800", output)
 
     def test_physical_circle_demo_requires_both_confirmations(self) -> None:
         errors = StringIO()
@@ -296,7 +296,7 @@ class RunCommandTests(unittest.TestCase):
                     "--width-mm",
                     "330",
                     "--height-mm",
-                    "270",
+                    "300",
                     "--feed-mm-min",
                     "1800",
                 )
@@ -306,10 +306,10 @@ class RunCommandTests(unittest.TestCase):
         self.assertIn("DRY RUN ONLY", output)
         self.assertIn("G28 X Y Z", output)
         self.assertEqual(output.count("G1 "), 4)
-        self.assertIn("G1 X0 Y270 Z0 F1800", output)
-        self.assertIn("G1 X270 Y0 Z0 F1800", output)
-        self.assertIn("G1 X270 Y0 Z330 F1800", output)
-        self.assertIn("G1 X0 Y270 Z330 F1800", output)
+        self.assertIn("G1 X0 Y300 Z0 F1800", output)
+        self.assertIn("G1 X300 Y0 Z0 F1800", output)
+        self.assertIn("G1 X300 Y0 Z330 F1800", output)
+        self.assertIn("G1 X0 Y300 Z330 F1800", output)
         self.assertNotIn("M106", output)
 
     def test_physical_perimeter_demo_requires_confirmations(self) -> None:
@@ -332,6 +332,46 @@ class RunCommandTests(unittest.TestCase):
             )
         self.assertIn("--confirm-magnet", errors.getvalue())
 
+    def test_square_center_demo_dry_run_uses_measured_corner_centers(self) -> None:
+        buffer = StringIO()
+        with contextlib.redirect_stdout(buffer):
+            code = run(
+                self.args(
+                    "square-center-demo",
+                    "--feed-mm-min",
+                    "1800",
+                    "--dwell-ms",
+                    "150",
+                    "--magnet-on",
+                )
+            )
+        self.assertEqual(code, 0)
+        output = buffer.getvalue()
+        self.assertIn("DRY RUN ONLY", output)
+        self.assertEqual(output.count("G1 "), 65)
+        self.assertIn("G1 X3 Y297 Z310 F1800", output)
+        self.assertIn("G1 X283 Y17 Z310 F1800", output)
+        self.assertIn("M106 P0 S255", output)
+        self.assertIn("G1 X0 Y300 Z330 F1800", output)
+
+    def test_physical_square_center_demo_requires_confirmations(self) -> None:
+        errors = StringIO()
+        with contextlib.redirect_stderr(errors), self.assertRaises(SystemExit):
+            run(self.args("square-center-demo", "--confirm-motion"))
+        self.assertIn("--confirm-clear-workspace", errors.getvalue())
+
+        errors = StringIO()
+        with contextlib.redirect_stderr(errors), self.assertRaises(SystemExit):
+            run(
+                self.args(
+                    "square-center-demo",
+                    "--confirm-motion",
+                    "--confirm-clear-workspace",
+                    "--magnet-on",
+                )
+            )
+        self.assertIn("--confirm-magnet", errors.getvalue())
+
     def test_board_sweep_dry_run_visits_all_squares_with_fan_one(self) -> None:
         buffer = StringIO()
         with contextlib.redirect_stdout(buffer):
@@ -347,9 +387,9 @@ class RunCommandTests(unittest.TestCase):
         output = buffer.getvalue()
         self.assertIn("DRY RUN ONLY", output)
         self.assertEqual(output.count("G0 ") + output.count("G1 "), 64)
-        self.assertIn("G0 X253.125 Y16.875 Z46.875 F1800", output)
-        self.assertIn("G1 X253.125 Y16.875 Z283.125 F1800", output)
-        self.assertIn("G1 X219.375 Y50.625 Z283.125 F1800", output)
+        self.assertIn("G0 X283 Y17 Z30 F1800", output)
+        self.assertIn("G1 X283 Y17 Z310 F1800", output)
+        self.assertIn("G1 X243 Y57 Z310 F1800", output)
         self.assertEqual(output.count("M106 P0 S255"), 64)
         self.assertGreater(output.rfind("M107 P0"), output.rfind("M106 P0 S255"))
 

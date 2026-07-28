@@ -74,13 +74,13 @@ class FirmwareConfigurationTests(unittest.TestCase):
         self,
     ) -> None:
         config = json.loads((ROOT / "config.json").read_text(encoding="utf-8"))
-        self.assertEqual(config["workspace"]["max_y_mm"], 270.0)
+        self.assertEqual(config["workspace"]["max_y_mm"], 300.0)
         self.assertEqual(config["workspace"]["max_x_mm"], 330.0)
         self.assertLessEqual(config["workspace"]["max_y_mm"], 350.0)
         self.assertLessEqual(config["workspace"]["max_x_mm"], 350.0)
         self.assertEqual(
             config["safety"]["home_commands"],
-            ["G28 X Y Z", "M400", "G92 X2 Y268 Z328", "M400"],
+            ["G28 X Y Z", "M400", "G92 X2 Y298 Z328", "M400"],
         )
 
 

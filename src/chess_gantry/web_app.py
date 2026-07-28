@@ -65,15 +65,15 @@ HTML = r"""<!doctype html>
 :root{color-scheme:dark;--bg:#0b0e14;--card:#151a24;--card2:#1d2431;--line:#30394a;--text:#eef3ff;--muted:#9eabc2;--accent:#67e8b5;--danger:#ff6b7a;--warn:#f4c66d;font-family:Inter,system-ui,sans-serif}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top left,#16213b,transparent 32rem),var(--bg);color:var(--text)}main{width:min(1120px,calc(100% - 30px));margin:auto;padding:34px 0 60px}header{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;margin-bottom:22px}h1{margin:0;font-size:clamp(2rem,5vw,3.2rem);letter-spacing:-.045em}h2{font-size:1.05rem;margin:0 0 16px}p{color:var(--muted);line-height:1.55}.subtitle{max-width:720px;margin:8px 0 0}.pill{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:9px 12px;white-space:nowrap;color:var(--muted)}.pill.good{color:var(--accent)}.pill.bad{color:var(--danger)}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.card{border:1px solid var(--line);border-radius:17px;padding:20px;background:rgba(21,26,36,.96);box-shadow:0 20px 55px rgba(0,0,0,.18)}.wide{grid-column:1/-1}.fields{display:grid;grid-template-columns:1fr 1fr;gap:11px}.three{grid-template-columns:1fr 1fr 1fr}label{display:block;font-size:.8rem;color:var(--muted);margin-bottom:6px}input,select,textarea{width:100%;border:1px solid var(--line);border-radius:10px;background:var(--card2);color:var(--text);padding:11px 12px;font:inherit;outline:none}textarea{min-height:190px;resize:vertical;font:13px/1.5 ui-monospace,monospace}input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(103,232,181,.12)}.actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:14px}button{border:1px solid var(--line);border-radius:10px;background:var(--card2);color:var(--text);padding:10px 14px;font-weight:700;cursor:pointer}button:hover:not(:disabled){border-color:#64718f;transform:translateY(-1px)}button:disabled{opacity:.38;cursor:not-allowed}.primary{background:var(--accent);border-color:var(--accent);color:#07130f}.danger{background:#421b24;border-color:#7d3040;color:#ffdce2}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}.metric{border:1px solid var(--line);background:var(--card2);border-radius:11px;padding:12px}.metric span{display:block;color:var(--muted);font-size:.74rem;margin-bottom:4px}.metric strong{font-size:1.05rem}.notice{border-left:3px solid var(--warn);background:#292318;color:#f2dba9;padding:10px 12px;margin-top:14px;font-size:.84rem;line-height:1.45}.safe{border-left-color:var(--accent);background:#162a24;color:#c9f7e4}pre{margin:0;min-height:130px;max-height:310px;overflow:auto;border:1px solid var(--line);border-radius:11px;background:#080b10;padding:12px;color:#bcc7dc;white-space:pre-wrap;font:12px/1.55 ui-monospace,monospace}.split{display:grid;grid-template-columns:1fr 1fr;gap:12px}.small{font-size:.8rem;color:var(--muted)}.check{display:flex;gap:8px;align-items:center;margin-top:12px;color:var(--muted);font-size:.85rem}.check input{width:auto}.locked{color:var(--danger)}
 @media(max-width:780px){header{display:block}.pill{display:inline-block;margin-top:14px}.grid,.split{grid-template-columns:1fr}.wide{grid-column:auto}.three{grid-template-columns:1fr}.metrics{grid-template-columns:1fr 1fr}}
-.ops{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.op-category{grid-column:1/-1;margin:15px 0 1px;padding-top:12px;border-top:1px solid var(--line);font-size:.82rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}.op-category:first-child{margin-top:0;border-top:0;padding-top:0}.op{border:1px solid var(--line);border-radius:13px;padding:14px;background:var(--card2)}.op h3{margin:0 0 7px;font-size:.95rem}.op p{font-size:.8rem;margin:0;min-height:42px}.op .tag{display:inline-block;font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);margin-bottom:8px}.op.physical{border-color:#664c28}.op.physical .tag{color:var(--warn)}.taskbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.tasklog{height:280px}.confirm-list{display:grid;gap:7px;margin-top:10px}.confirm-list label{display:flex;gap:8px;align-items:flex-start;color:var(--text);font-size:.75rem}.confirm-list input{width:auto;margin-top:2px}@media(max-width:900px){.ops{grid-template-columns:1fr 1fr}}@media(max-width:600px){.ops{grid-template-columns:1fr}}
+.ops{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.op-category{grid-column:1/-1;margin:15px 0 1px;padding-top:12px;border-top:1px solid var(--line);font-size:.82rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}.op-category:first-child{margin-top:0;border-top:0;padding-top:0}.op{border:1px solid var(--line);border-radius:13px;padding:14px;background:var(--card2)}.op h3{margin:0 0 7px;font-size:.95rem}.op p{font-size:.8rem;margin:0;min-height:42px}.op .tag{display:inline-block;font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);margin-bottom:8px}.op.physical{border-color:#664c28}.op.physical .tag{color:var(--warn)}.taskbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.tasklog{height:280px}.confirm-list{display:grid;gap:7px;margin-top:10px}.confirm-list label{display:flex;gap:8px;align-items:flex-start;color:var(--text);font-size:.75rem}.confirm-list input{width:auto;margin-top:2px}.position-box{border:1px solid #426858;background:#101d1a;border-radius:14px;padding:15px;margin-top:14px}.position-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.position-value{font:700 1.35rem/1.1 ui-monospace,monospace;color:var(--accent)}.jog-layout{display:grid;grid-template-columns:180px 1fr;gap:18px;align-items:center}.jog-pad{display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(3,52px);gap:6px;justify-content:center}.jog-pad button{font-size:1.35rem;padding:0}.jog-up{grid-column:2}.jog-left{grid-column:1;grid-row:2}.jog-home{grid-column:2;grid-row:2}.jog-right{grid-column:3;grid-row:2}.jog-down{grid-column:2;grid-row:3}.keyboard-ready{color:var(--accent)}@media(max-width:900px){.ops{grid-template-columns:1fr 1fr}}@media(max-width:700px){.jog-layout{grid-template-columns:1fr}.position-grid{grid-template-columns:1fr 1fr}}@media(max-width:600px){.ops{grid-template-columns:1fr}}
 </style>
 </head>
 <body><main>
 <header><div><h1>Chess Gantry Controller</h1><p class="subtitle">One local interface for serial diagnostics, coupled outer X/Y motion, independent inner Z motion, and validated chess move JSON.</p></div><div id="pill" class="pill">Starting…</div></header>
 <section class="grid">
 <div class="card"><h2>1. Serial connection</h2><div class="fields"><div><label for="port">USB port</label><select id="port"><option value="">Auto-detect</option></select></div><div><label for="baud">Baud</label><select id="baud"><option value="">Auto / config</option><option>115200</option><option>250000</option></select></div></div><div class="actions"><button id="connect" class="primary">Connect</button><button id="refresh">Refresh ports</button><button id="disconnect">Disconnect</button></div><p id="firmware" class="small">No controller identified.</p></div>
-<div class="card"><h2>2. Machine state</h2><div class="metrics"><div class="metric"><span>Inner Z</span><strong id="xread">—</strong></div><div class="metric"><span>Outer position</span><strong id="yread">—</strong></div><div class="metric"><span>Initialized</span><strong id="homed">No</strong></div><div class="metric"><span>Board rev.</span><strong id="revision">—</strong></div></div><div class="actions"><button id="endstops">Check endstops</button><button id="home" class="primary">Home XYZ gantry</button><button id="stop" class="danger">Emergency stop</button></div><div class="notice">Physical X/Y align independently on their endstops. The inner motor is plugged into E but firmware maps it as logical Z and homes it against the Z switch.</div></div>
-<div class="card wide"><h2>3. Manual coordinate test</h2><div class="fields three"><div><label for="xmm">X (mm)</label><input id="xmm" type="number" step="0.1" value="10"></div><div><label for="ymm">Y (mm)</label><input id="ymm" type="number" step="0.1" value="10"></div><div><label for="feed">Feed (mm/min)</label><input id="feed" type="number" step="10" value="600"></div></div><div class="actions"><button id="move" class="primary">Move to coordinate</button></div><p id="limits" class="small">Workspace loading…</p></div>
+<div class="card"><h2>2. Machine state</h2><div class="metrics"><div class="metric"><span>Logical inner</span><strong id="xread">—</strong></div><div class="metric"><span>Logical outer</span><strong id="yread">—</strong></div><div class="metric"><span>Initialized</span><strong id="homed">No</strong></div><div class="metric"><span>Board rev.</span><strong id="revision">—</strong></div></div><div class="position-box"><label>Live Marlin position</label><div class="position-grid"><div><span class="small">Outer X</span><div id="machineX" class="position-value">—</div></div><div><span class="small">Outer Y</span><div id="machineY" class="position-value">—</div></div><div><span class="small">Inner Z</span><div id="machineZ" class="position-value">—</div></div></div><p id="positionAge" class="small">Connect to read M114.</p></div><div class="actions"><button id="endstops">Check endstops</button><button id="home" class="primary">Home XYZ gantry</button><button id="stop" class="danger">Emergency stop</button></div><div class="notice">Physical X/Y align independently on their endstops. The inner motor is plugged into E but firmware maps it as logical Z and homes it against the Z switch.</div></div>
+<div class="card wide"><h2>3. Keyboard jog and manual coordinates</h2><div class="jog-layout"><div class="jog-pad"><button id="jogUp" class="jog-up" title="Arrow Up">↑</button><button id="jogLeft" class="jog-left" title="Arrow Left">←</button><button id="jogHome" class="jog-home" title="Home first">⌂</button><button id="jogRight" class="jog-right" title="Arrow Right">→</button><button id="jogDown" class="jog-down" title="Arrow Down">↓</button></div><div><div class="fields three"><div><label for="jogStep">Jog step (mm)</label><select id="jogStep"><option>0.5</option><option selected>1</option><option>5</option><option>10</option></select></div><div><label for="jogFeed">Jog feed (mm/min)</label><input id="jogFeed" type="number" step="10" value="600"></div><div><label>Keyboard safety</label><label class="check"><input id="keyboardArm" type="checkbox"> Enable arrow-key motion</label></div></div><p id="keyboardState" class="small">Home and enable keyboard motion. Arrow Left/Right move the inner gantry; Up/Down move the outer gantry. Escape disarms.</p></div></div><hr><div class="fields three"><div><label for="xmm">Logical inner (mm)</label><input id="xmm" type="number" step="0.1" value="10"></div><div><label for="ymm">Logical outer (mm)</label><input id="ymm" type="number" step="0.1" value="10"></div><div><label for="feed">Feed (mm/min)</label><input id="feed" type="number" step="10" value="600"></div></div><div class="actions"><button id="move" class="primary">Move to coordinate</button><button id="refreshPosition">Read M114 now</button></div><p id="limits" class="small">Workspace loading…</p></div>
 <div class="card wide"><h2>4. Chess move JSON</h2><div class="split"><div><label for="movejson">Incoming move</label><textarea id="movejson">{
   "event_id": "web-test-001",
   "position": "white_pawn_e",
@@ -88,10 +88,11 @@ HTML = r"""<!doctype html>
 <div class="card"><h2>Activity</h2><pre id="log">Page ready.</pre></div>
 </section></main>
 <script>
-const $=id=>document.getElementById(id);let state={},busy=false,taskData={run:null,logs:''},operations=[];
+const $=id=>document.getElementById(id);let state={},busy=false,jogBusy=false,taskData={run:null,logs:''},operations=[],lastPositionRead=0;
 function log(msg){const e=$('log');e.textContent+=`\n[${new Date().toLocaleTimeString()}] ${msg}`;e.scrollTop=e.scrollHeight}
 async function api(path,options={}){const r=await fetch(path,{headers:{'Content-Type':'application/json'},...options});const d=await r.json();if(!r.ok||d.ok===false)throw new Error(d.error||`HTTP ${r.status}`);return d}
-function render(s){state=s||{};const c=!!s.connected;$('pill').className=`pill ${c?'good':(s.last_error?'bad':'')}`;$('pill').textContent=c?`${s.port} · ${s.baudrate}`:'Disconnected';$('firmware').textContent=s.firmware||s.last_error||'No controller identified.';$('xread').textContent=s.position_mm?.x==null?'—':`${s.position_mm.x.toFixed(2)} mm`;$('yread').textContent=s.position_mm?.y==null?'—':`${s.position_mm.y.toFixed(2)} mm`;$('homed').textContent=s.homed?'Yes':'No';$('revision').textContent=s.board_revision??'—';const w=s.workspace_mm||{};$('limits').textContent=`Allowed workspace: X ${w.min_x??'?'}–${w.max_x??'?'} mm, Y ${w.min_y??'?'}–${w.max_y??'?'} mm. Manual feed limit: ${s.max_manual_feed_mm_min??'?'} mm/min.`;$('lockState').textContent=s.calibrated?'Hardware execution is unlocked by config.':'Chess execution is locked: safety.calibrated is false.';$('connect').disabled=busy||c;$('disconnect').disabled=busy||!c;$('refresh').disabled=busy;$('endstops').disabled=busy||!c;$('home').disabled=busy||!c;$('move').disabled=busy||!c||!s.homed;$('execute').disabled=busy||!c||!s.calibrated;$('plan').disabled=busy;$('stop').disabled=!c}
+function taskRunning(){return !!taskData.run&&['starting','running','stopping'].includes(taskData.run.state)}
+function render(s){state=s||{};const c=!!s.connected;const task=taskRunning();$('pill').className=`pill ${c?'good':(s.last_error?'bad':'')}`;$('pill').textContent=c?`${s.port} · ${s.baudrate}`:'Disconnected';$('firmware').textContent=s.firmware||s.last_error||'No controller identified.';$('xread').textContent=s.position_mm?.x==null?'—':`${s.position_mm.x.toFixed(2)} mm`;$('yread').textContent=s.position_mm?.y==null?'—':`${s.position_mm.y.toFixed(2)} mm`;const m=s.machine_position_mm||{};$('machineX').textContent=m.x==null?'—':m.x.toFixed(2);$('machineY').textContent=m.y==null?'—':m.y.toFixed(2);$('machineZ').textContent=m.z==null?'—':m.z.toFixed(2);$('positionAge').textContent=m.x==null?'No M114 position received.':`Updated ${new Date(lastPositionRead||Date.now()).toLocaleTimeString()} · millimetres`;$('homed').textContent=s.homed?'Yes':'No';$('revision').textContent=s.board_revision??'—';const w=s.workspace_mm||{};$('limits').textContent=`Logical workspace: inner ${w.min_x??'?'}–${w.max_x??'?'} mm, outer ${w.min_y??'?'}–${w.max_y??'?'} mm. Manual feed limit: ${s.max_manual_feed_mm_min??'?'} mm/min.`;$('lockState').textContent=s.calibrated?'Hardware execution is unlocked by config.':'Chess execution is locked: safety.calibrated is false.';$('connect').disabled=busy||c||task;$('disconnect').disabled=busy||!c||task;$('refresh').disabled=busy||task;$('endstops').disabled=busy||!c||task;$('home').disabled=busy||!c||task;$('move').disabled=busy||jogBusy||!c||!s.homed||task;$('refreshPosition').disabled=busy||jogBusy||!c||task;for(const id of ['jogUp','jogDown','jogLeft','jogRight'])$(id).disabled=busy||jogBusy||!c||!s.homed||task;$('jogHome').disabled=busy||!c||task;$('keyboardArm').disabled=!c||!s.homed||task;if(!c||!s.homed||task)$('keyboardArm').checked=false;$('keyboardState').className=`small ${$('keyboardArm').checked?'keyboard-ready':''}`;$('keyboardState').textContent=$('keyboardArm').checked?'Arrow-key motion armed. Escape disarms immediately.':'Home and enable keyboard motion. Arrow Left/Right move the inner gantry; Up/Down move the outer gantry. Escape disarms.';$('execute').disabled=busy||!c||!s.calibrated||task;$('plan').disabled=busy||task;$('stop').disabled=!c&&!task}
 async function status(){try{render((await api('/api/status')).status)}catch(e){log(`Status error: ${e.message}`)}}
 async function ports(){try{const selected=$('port').value;const d=await api('/api/ports');$('port').innerHTML='<option value="">Auto-detect</option>';for(const p of d.ports){const o=document.createElement('option');o.value=p.device;o.textContent=`${p.device} — ${p.description}${p.likely_printer?' ★':''}`;$('port').appendChild(o)}if([...$('port').options].some(o=>o.value===selected))$('port').value=selected;log(`Found ${d.ports.length} serial port(s).`)}catch(e){log(`Port scan: ${e.message}`)}}
 async function action(label,fn){if(busy)return;busy=true;render(state);log(label);try{const d=await fn();if(d.status)render(d.status);return d}catch(e){log(`ERROR: ${e.message}`);await status()}finally{busy=false;render(state)}}
@@ -100,17 +101,23 @@ $('disconnect').onclick=()=>action('Disconnecting…',()=>api('/api/disconnect',
 $('endstops').onclick=()=>action('Checking endstops…',async()=>{const d=await api('/api/endstops',{method:'POST',body:'{}'});log(d.lines.join('\n'));return d});
 $('home').onclick=()=>{if(confirm('Run firmware G28 X Y Z now? Clear all homing paths and keep the emergency cutoff ready.'))action('Running firmware XYZ homing…',()=>api('/api/home',{method:'POST',body:JSON.stringify({confirm_motion:true})}))};
 $('move').onclick=()=>{if(confirm('Move the gantry to this absolute X/Y coordinate?'))action('Sending manual coordinate move…',()=>api('/api/move',{method:'POST',body:JSON.stringify({x_mm:Number($('xmm').value),y_mm:Number($('ymm').value),feed_mm_min:Number($('feed').value),confirm_motion:true})}))};
+$('jogHome').onclick=$('home').onclick;
+async function readPosition(){if(!state.connected||busy||jogBusy||taskRunning())return;try{const d=await api('/api/position',{method:'POST',body:'{}'});lastPositionRead=Date.now();render(d.status)}catch(e){log(`Position read: ${e.message}`)}}
+async function jog(dx,dy){if(jogBusy||busy||taskRunning())return;jogBusy=true;render(state);try{const d=await api('/api/jog',{method:'POST',body:JSON.stringify({delta_x_mm:dx,delta_y_mm:dy,feed_mm_min:Number($('jogFeed').value),confirm_motion:true})});lastPositionRead=Date.now();render(d.status)}catch(e){log(`Jog blocked: ${e.message}`);await status()}finally{jogBusy=false;render(state)}}
+function jogStep(){return Number($('jogStep').value)}
+$('jogLeft').onclick=()=>jog(-jogStep(),0);$('jogRight').onclick=()=>jog(jogStep(),0);$('jogUp').onclick=()=>jog(0,jogStep());$('jogDown').onclick=()=>jog(0,-jogStep());$('refreshPosition').onclick=readPosition;$('keyboardArm').onchange=()=>render(state);
+document.addEventListener('keydown',event=>{if(event.key==='Escape'){$('keyboardArm').checked=false;render(state);return}if(!$('keyboardArm').checked||event.repeat||event.ctrlKey||event.metaKey||event.altKey)return;const tag=event.target?.tagName?.toLowerCase();if(['input','textarea','select','button'].includes(tag)||event.target?.isContentEditable)return;const step=jogStep();const moves={ArrowLeft:[-step,0],ArrowRight:[step,0],ArrowUp:[0,step],ArrowDown:[0,-step]};const move=moves[event.key];if(!move)return;event.preventDefault();jog(move[0],move[1])});
 function moveObject(){let obj;try{obj=JSON.parse($('movejson').value)}catch(e){throw new Error(`Move JSON: ${e.message}`)}return obj}
 $('plan').onclick=()=>action('Planning without moving hardware…',async()=>{const d=await api('/api/plan',{method:'POST',body:JSON.stringify({move:moveObject()})});$('planout').textContent=JSON.stringify(d.summary,null,2)+'\n\n'+d.gcode;log('Plan generated; board state was not changed.');return d});
 $('execute').onclick=()=>{if(!$('confirm').checked){log('Execution blocked: check the motion confirmation box.');return}if(!confirm('Execute this generated chess move now?'))return;action('Executing validated chess move…',async()=>{const d=await api('/api/execute',{method:'POST',body:JSON.stringify({move:moveObject(),confirm_motion:true})});$('planout').textContent=JSON.stringify(d.summary,null,2)+'\n\n'+d.gcode;await board();log('Move completed and board state committed.');return d})};
 $('stop').onclick=()=>{if(confirm('Send M112 emergency stop? The controller will require reset/power-cycle and re-homing.'))action('EMERGENCY STOP…',()=>api('/api/stop',{method:'POST',body:'{}'}))};
 async function board(){try{$('boardout').textContent=JSON.stringify((await api('/api/board')).board_state,null,2)}catch(e){$('boardout').textContent=`ERROR: ${e.message}`}}$('boardRefresh').onclick=board;
 function renderOperations(){const root=$('ops');root.innerHTML='';let category='';for(const op of operations){if(op.category!==category){category=op.category;const heading=document.createElement('h3');heading.className='op-category';heading.textContent=category;root.appendChild(heading)}const card=document.createElement('div');card.className=`op ${op.physical?'physical':''}`;const tag=document.createElement('span');tag.className='tag';tag.textContent=op.physical?'Physical hardware':(op.long_running?'Managed process':'Safe task');const title=document.createElement('h3');title.textContent=op.title;const desc=document.createElement('p');desc.textContent=op.enabled?op.description:`${op.description} Physical tasks are disabled in demo mode.`;const checks=document.createElement('div');checks.className='confirm-list';for(const c of op.confirmations){const label=document.createElement('label');const input=document.createElement('input');input.type='checkbox';input.dataset.confirm=c.key;input.disabled=!op.enabled;label.append(input,document.createTextNode(c.label));checks.appendChild(label)}const actions=document.createElement('div');actions.className='actions';const run=document.createElement('button');run.className=op.physical?'danger':'primary';run.textContent=op.long_running?'Start':'Run';run.disabled=!op.enabled||(!!taskData.run&&['starting','running','stopping'].includes(taskData.run.state));run.onclick=async()=>{const confirmations={};for(const input of checks.querySelectorAll('input'))confirmations[input.dataset.confirm]=input.checked;if(op.physical&&!confirm(`Run physical task “${op.title}”? Keep the emergency cutoff ready.`))return;try{taskData=await api('/api/tasks/start',{method:'POST',body:JSON.stringify({operation_id:op.id,confirmations})});renderTask();renderOperations()}catch(e){log(`Task blocked: ${e.message}`)}};actions.appendChild(run);card.append(tag,title,desc,checks,actions);root.appendChild(card)}}
-function renderTask(){const r=taskData.run;$('taskState').textContent=r?`${r.title}: ${r.state}`:'Idle';$('tasklog').textContent=taskData.logs||'No dashboard task has run.';$('tasklog').scrollTop=$('tasklog').scrollHeight;$('taskStop').disabled=!r||!['starting','running','stopping'].includes(r.state)}
+function renderTask(){const r=taskData.run;$('taskState').textContent=r?`${r.title}: ${r.state}`:'Idle';$('tasklog').textContent=taskData.logs||'No dashboard task has run.';$('tasklog').scrollTop=$('tasklog').scrollHeight;$('taskStop').disabled=!r||!['starting','running','stopping'].includes(r.state);render(state)}
 async function loadOperations(){try{const d=await api('/api/operations');operations=d.operations;renderOperations()}catch(e){$('ops').textContent=`ERROR: ${e.message}`}}
 async function taskStatus(){try{const prior=taskData.run?.state;taskData=await api('/api/tasks/status');renderTask();const next=taskData.run?.state;if(prior!==next)renderOperations()}catch(e){log(`Task status: ${e.message}`)}}
 $('taskStop').onclick=async()=>{if(!confirm('Stop the running task? Physical tasks also receive M112 and require a controller reset.'))return;try{taskData=await api('/api/tasks/stop',{method:'POST',body:'{}'});renderTask();renderOperations()}catch(e){log(`Stop task: ${e.message}`)}};
-(async()=>{await ports();await status();await board();await loadOperations();await taskStatus();setInterval(()=>{if(!busy)status();taskStatus()},1200)})();
+(async()=>{await ports();await status();await board();await loadOperations();await taskStatus();setInterval(()=>{if(!busy)status();taskStatus()},1200);setInterval(readPosition,750)})();
 </script></body></html>"""
 
 
@@ -122,6 +129,12 @@ class RequestHandler(BaseHTTPRequestHandler):
         if manager is None:
             raise ValidationError("operations dashboard is not configured")
         return manager
+
+    def _require_no_task(self, action: str) -> None:
+        if self._operations().running():
+            raise ValidationError(
+                f"{action} is unavailable while a dashboard task is running"
+            )
 
     def _authenticated(self) -> bool:
         token_hash = getattr(self.server, "auth_token_hash", None)
@@ -271,6 +284,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         try:
             payload = self._read_json()
             if self.path == "/api/connect":
+                self._require_no_task("serial connection")
                 port = payload.get("port")
                 baudrate = payload.get("baudrate")
                 if port is not None and not isinstance(port, str):
@@ -288,9 +302,11 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self._send_json({"ok": True, "status": status})
                 return
             if self.path == "/api/disconnect":
+                self._require_no_task("serial disconnect")
                 self._send_json({"ok": True, "status": self.controller.disconnect()})
                 return
             if self.path == "/api/endstops":
+                self._require_no_task("endstop reading")
                 lines = self.controller.check_endstops()
                 self._send_json(
                     {
@@ -300,7 +316,17 @@ class RequestHandler(BaseHTTPRequestHandler):
                     }
                 )
                 return
+            if self.path == "/api/position":
+                if self._operations().running():
+                    raise ValidationError(
+                        "position polling is unavailable while a dashboard task is running"
+                    )
+                self._send_json(
+                    {"ok": True, "status": self.controller.query_position()}
+                )
+                return
             if self.path == "/api/home":
+                self._require_no_task("homing")
                 if payload.get("confirm_motion") is not True:
                     raise ValidationError(
                         "homing requires explicit motion confirmation"
@@ -308,6 +334,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self._send_json({"ok": True, "status": self.controller.home_xy()})
                 return
             if self.path == "/api/move":
+                self._require_no_task("manual movement")
                 if payload.get("confirm_motion") is not True:
                     raise ValidationError(
                         "manual movement requires explicit motion confirmation"
@@ -327,6 +354,36 @@ class RequestHandler(BaseHTTPRequestHandler):
                 )
                 self._send_json({"ok": True, "status": status})
                 return
+            if self.path == "/api/jog":
+                if self._operations().running():
+                    raise ValidationError(
+                        "keyboard jog is unavailable while a dashboard task is running"
+                    )
+                if payload.get("confirm_motion") is not True:
+                    raise ValidationError(
+                        "keyboard jog requires explicit motion confirmation"
+                    )
+                try:
+                    delta_x = float(payload["delta_x_mm"])
+                    delta_y = float(payload["delta_y_mm"])
+                    feed = float(payload["feed_mm_min"])
+                except KeyError as exc:
+                    raise ValidationError(f"missing field: {exc.args[0]}") from exc
+                except (TypeError, ValueError) as exc:
+                    raise ValidationError(
+                        "jog deltas and feed rate must be numbers"
+                    ) from exc
+                self._send_json(
+                    {
+                        "ok": True,
+                        "status": self.controller.jog(
+                            delta_x_mm=delta_x,
+                            delta_y_mm=delta_y,
+                            feed_mm_min=feed,
+                        ),
+                    }
+                )
+                return
             if self.path == "/api/plan":
                 plan = self.controller.plan_move(self._move_payload(payload))
                 self._send_json(
@@ -339,6 +396,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                 )
                 return
             if self.path == "/api/execute":
+                self._require_no_task("chess execution")
                 plan = self.controller.execute_move(
                     self._move_payload(payload),
                     confirm_motion=payload.get("confirm_motion") is True,

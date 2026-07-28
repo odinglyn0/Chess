@@ -96,6 +96,7 @@ class GantryController:
         self._operation_lock = threading.RLock()
         self._homed = False
         self._position: Optional[MachinePoint] = None
+        self._machine_position: Optional[tuple[float, float, float]] = None
         self._last_error: Optional[str] = None
 
     @property
@@ -127,6 +128,15 @@ class GantryController:
                 {"x": self._position.x, "y": self._position.y}
                 if self._position is not None
                 else {"x": None, "y": None}
+            ),
+            "machine_position_mm": (
+                {
+                    "x": self._machine_position[0],
+                    "y": self._machine_position[1],
+                    "z": self._machine_position[2],
+                }
+                if self._machine_position is not None
+                else {"x": None, "y": None, "z": None}
             ),
             "workspace_mm": {
                 "min_x": self.config.workspace.min_x_mm,
@@ -172,6 +182,7 @@ class GantryController:
             self._link = link
             self._homed = False
             self._position = None
+            self._machine_position = None
             self._last_error = None
             return self.status()
 
@@ -183,6 +194,7 @@ class GantryController:
                 link.close()
             self._homed = False
             self._position = None
+            self._machine_position = None
             return self.status()
 
     def _require_link(self) -> Any:
@@ -203,6 +215,15 @@ class GantryController:
                     ),
                     float(match.group(2)),
                 )
+                self._machine_position = (
+                    float(match.group(1)),
+                    float(match.group(2)),
+                    (
+                        float(inner_match.group(1))
+                        if inner_match is not None
+                        else float(match.group(1))
+                    ),
+                )
                 return self._position
         return None
 
@@ -212,6 +233,40 @@ class GantryController:
             result = link.send_command("M114", timeout_s=10.0)
             self._update_position(result.responses)
             return self.status()
+
+    def jog(
+        self, *, delta_x_mm: float, delta_y_mm: float, feed_mm_min: float
+    ) -> dict[str, Any]:
+        values = (delta_x_mm, delta_y_mm, feed_mm_min)
+        if not all(
+            isinstance(value, (int, float)) and not isinstance(value, bool)
+            for value in values
+        ):
+            raise ValidationError("jog deltas and feed rate must be numbers")
+        delta_x_mm, delta_y_mm, feed_mm_min = map(float, values)
+        if not all(math.isfinite(value) for value in values):
+            raise ValidationError("jog deltas and feed rate must be finite")
+        if (delta_x_mm == 0) == (delta_y_mm == 0):
+            raise ValidationError("a jog must move exactly one logical axis")
+        if max(abs(delta_x_mm), abs(delta_y_mm)) > 20.0:
+            raise ValidationError("a single jog cannot exceed 20 mm")
+        with self._operation_lock:
+            if not self._homed:
+                raise ConfigurationError("home the gantry before using keyboard jog")
+            if self._position is None:
+                result = self._require_link().send_command("M114", timeout_s=10.0)
+                if self._update_position(result.responses) is None:
+                    raise SerialProtocolError(
+                        "M114 did not return a parseable position"
+                    )
+            assert self._position is not None
+            target_x = self._position.x + delta_x_mm
+            target_y = self._position.y + delta_y_mm
+            return self.move_to_mm(
+                x_mm=target_x,
+                y_mm=target_y,
+                feed_mm_min=feed_mm_min,
+            )
 
     def check_endstops(self) -> tuple[str, ...]:
         with self._operation_lock:

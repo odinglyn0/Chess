@@ -67,7 +67,7 @@ def main() -> int:
                 break
         if position is None:
             raise GantryError("M114 did not return parseable X/Y/Z coordinates")
-        expected_position = (2.0, 268.0, 328.0)
+        expected_position = (2.0, 298.0, 328.0)
         if any(
             abs(actual - wanted) > 0.1
             for actual, wanted in zip(position, expected_position)
@@ -77,7 +77,7 @@ def main() -> int:
             )
         print("\n".join(endstops.responses))
         print("\n".join(positions.responses))
-        print("Firmware homing passed: X2 Y268 Z328 after 2 mm backoff.")
+        print("Firmware homing passed: X2 Y298 Z328 after 2 mm backoff.")
     return 0
 
 
@@ -89,6 +89,6 @@ if __name__ == "__main__":
         print(
             "If /dev/ttyUSB0 exists but no baud responds, verify the Ender 24 V "
             "supply, USB cable, and serial-port ownership. Reflashing is not required "
-            "for the 330 x 270 host-side dimension remap."
+            "for the 330 x 300 host-side dimension remap."
         )
         raise SystemExit(1)

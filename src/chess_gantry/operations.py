@@ -135,7 +135,7 @@ def operation_catalog(
         OperationSpec(
             "simulate-perimeter",
             "Simulate full perimeter",
-            "Trace the home-origin 330 x 270 mm machine perimeter without hardware.",
+            "Trace the home-origin 330 x 300 mm machine perimeter without hardware.",
             "Simulation",
             demo_base
             + (
@@ -143,9 +143,25 @@ def operation_catalog(
                 "--width-mm",
                 "330",
                 "--height-mm",
-                "270",
+                "300",
                 "--feed-mm-min",
                 "1800",
+                "--confirm-motion",
+                "--demo",
+            ),
+        ),
+        OperationSpec(
+            "simulate-square-centers",
+            "Simulate all 64 square centers",
+            "Home and visit every measured 40 mm square center without hardware.",
+            "Simulation",
+            demo_base
+            + (
+                "square-center-demo",
+                "--feed-mm-min",
+                "1800",
+                "--dwell-ms",
+                "150",
                 "--confirm-motion",
                 "--demo",
             ),
@@ -236,7 +252,7 @@ def operation_catalog(
         OperationSpec(
             "perimeter-demo",
             "Run full perimeter",
-            "Home and trace the complete 330 x 270 mm machine perimeter, magnet off.",
+            "Home and trace the complete 330 x 300 mm machine perimeter, magnet off.",
             "Physical hardware",
             base
             + (
@@ -244,7 +260,7 @@ def operation_catalog(
                 "--width-mm",
                 "330",
                 "--height-mm",
-                "270",
+                "300",
                 "--feed-mm-min",
                 "1800",
                 "--confirm-motion",
@@ -279,6 +295,46 @@ def operation_catalog(
             serial=True,
             physical=True,
             confirmations=(clear_workspace, at_switches),
+        ),
+        OperationSpec(
+            "square-centers",
+            "Visit all 64 square centers",
+            "Home and snake through every measured 40 mm center with the magnet off.",
+            "Physical hardware",
+            base
+            + (
+                "square-center-demo",
+                "--feed-mm-min",
+                "1800",
+                "--dwell-ms",
+                "150",
+                "--confirm-motion",
+                "--confirm-clear-workspace",
+            ),
+            serial=True,
+            physical=True,
+            confirmations=(clear_workspace,),
+        ),
+        OperationSpec(
+            "square-centers-magnet",
+            "Visit 64 centers with magnet on",
+            "Keep fan P0 energized continuously while visiting every measured center.",
+            "Physical hardware",
+            base
+            + (
+                "square-center-demo",
+                "--feed-mm-min",
+                "1800",
+                "--dwell-ms",
+                "150",
+                "--magnet-on",
+                "--confirm-motion",
+                "--confirm-clear-workspace",
+                "--confirm-magnet",
+            ),
+            serial=True,
+            physical=True,
+            confirmations=(clear_workspace, magnet_safe),
         ),
         OperationSpec(
             "piece-demo",

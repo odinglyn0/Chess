@@ -465,8 +465,8 @@ def _parser() -> ArgumentParser:
     perimeter_demo.add_argument(
         "--height-mm",
         type=float,
-        default=270.0,
-        help="outer-gantry height from the home corner (default: 270)",
+        default=300.0,
+        help="outer-gantry height from the home corner (default: 300)",
     )
     perimeter_demo.add_argument(
         "--feed-mm-min",
@@ -497,6 +497,39 @@ def _parser() -> ArgumentParser:
     )
     perimeter_demo.add_argument(
         "--demo", action="store_true", help="simulate Marlin without opening serial"
+    )
+
+    square_center_demo = commands.add_parser(
+        "square-center-demo",
+        help="home and visit all 64 measured chess-square centers",
+    )
+    square_center_demo.add_argument(
+        "--feed-mm-min", type=float, default=1800.0, help="movement feed (default: 1800)"
+    )
+    square_center_demo.add_argument(
+        "--dwell-ms", type=int, default=150, help="pause at each center (default: 150)"
+    )
+    square_center_demo.add_argument(
+        "--magnet-on", action="store_true", help="keep the magnet on through all 64 centers"
+    )
+    square_center_demo.add_argument(
+        "--output", "-o", help="write generated square-center G-code"
+    )
+    square_center_demo.add_argument(
+        "--confirm-motion", action="store_true", help="stream the test to Marlin"
+    )
+    square_center_demo.add_argument(
+        "--confirm-clear-workspace",
+        action="store_true",
+        help="required confirmation that the board path is clear",
+    )
+    square_center_demo.add_argument(
+        "--confirm-magnet",
+        action="store_true",
+        help="required for physical continuous-magnet traversal",
+    )
+    square_center_demo.add_argument(
+        "--demo", action="store_true", help="simulate Marlin without serial"
     )
 
     board_sweep = commands.add_parser(
@@ -649,6 +682,7 @@ _COMMANDS = frozenset(
         "magnet-test",
         "circle-demo",
         "perimeter-demo",
+        "square-center-demo",
         "board-sweep",
         "workspace-test",
         "stop",
@@ -1110,6 +1144,41 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
                 output.parent.mkdir(parents=True, exist_ok=True)
                 output.write_text(text, encoding="ascii")
                 print(f"; wrote perimeter-demo G-code to {output}")
+            else:
+                print(text, end="")
+            return 0
+
+        if args.command == "square-center-demo":
+            program = service.square_center_demo_program(
+                args.feed_mm_min, args.dwell_ms, args.magnet_on
+            )
+            if not args.confirm_motion:
+                print("; DRY RUN ONLY: no serial port was opened")
+            elif args.demo:
+                link = DemoMarlinSerial(config.serial)
+                with link:
+                    link.send_program(config.safety.preflight_commands)
+                    link.send_program(program)
+                print("; DEMO ONLY: no serial port was opened")
+            else:
+                if not args.confirm_clear_workspace:
+                    parser.error(
+                        "physical square-center-demo requires --confirm-clear-workspace"
+                    )
+                if args.magnet_on and not args.confirm_magnet:
+                    parser.error(
+                        "physical square-center-demo --magnet-on requires --confirm-magnet"
+                    )
+                program = service.square_center_demo(
+                    args.feed_mm_min, args.dwell_ms, args.magnet_on
+                )
+                print("; physical square-center traversal completed successfully")
+            text = "\n".join(program) + "\n"
+            if args.output:
+                output = Path(args.output)
+                output.parent.mkdir(parents=True, exist_ok=True)
+                output.write_text(text, encoding="ascii")
+                print(f"; wrote square-center G-code to {output}")
             else:
                 print(text, end="")
             return 0

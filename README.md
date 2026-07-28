@@ -21,6 +21,20 @@ Cartesian gantry. It plans routes around occupied squares, moves pieces,
 mirrors public Lichess games, and keeps recoverable local state if a physical
 move is interrupted.
 
+Current calibrated geometry:
+
+```text
+Inner gantry width: 330 mm
+Outer gantry height: 300 mm
+Chess grid: 300 x 300 mm
+Software square size: 37.5 x 37.5 mm
+```
+
+The physical squares were described as 4 cm, but eight exact 40 mm squares need
+320 mm of height. Because the selected safe travel height is 300 mm, software
+uses 37.5 mm square centers so all eight ranks remain reachable. No firmware
+reflash is required; host homing remaps to `X2 Y298 Z328`.
+
 ## What it does
 
 - Plans collision-aware piece paths with A*
@@ -91,6 +105,20 @@ For a physical browser controller:
 ```bash
 uv run chess-gantry --config config.json web
 ```
+
+For authenticated access from other devices on the same trusted LAN:
+
+```bash
+./scripts/run_network_ui.sh
+```
+
+Open the complete token URL printed by the launcher. All commands and serial
+access still run on the gantry computer.
+
+After connecting and homing in the UI, enable **arrow-key motion** to jog the
+gantry. Left/Right move the inner gantry, Up/Down move the paired outer gantry,
+and Escape disarms keyboard motion. The live coordinate panel polls Marlin
+`M114` and displays raw outer X/Y and inner Z positions in real time.
 
 The checked-in firmware image targets only a Creality 4.2.2 board with an
 STM32F103RET6 MCU. Verify the board and follow the exact flashing procedure in

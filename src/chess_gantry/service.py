@@ -811,7 +811,7 @@ class GantryService:
     def perimeter_demo_program(
         self,
         width_mm: float = 330.0,
-        height_mm: float = 270.0,
+        height_mm: float = 300.0,
         feed_mm_min: float = 1800.0,
         magnet_on: bool = False,
     ) -> Tuple[str, ...]:
@@ -893,7 +893,7 @@ class GantryService:
     def perimeter_demo(
         self,
         width_mm: float = 330.0,
-        height_mm: float = 270.0,
+        height_mm: float = 300.0,
         feed_mm_min: float = 1800.0,
         magnet_on: bool = False,
     ) -> Tuple[str, ...]:
@@ -916,6 +916,132 @@ class GantryService:
                 "width_mm": width_mm,
                 "height_mm": height_mm,
                 "feed_mm_min": feed_mm_min,
+                "magnet_on": magnet_on,
+                "commands": list(program),
+            }
+        )
+        return program
+
+    def square_center_demo_program(
+        self,
+        feed_mm_min: float = 1800.0,
+        dwell_ms: int = 150,
+        magnet_on: bool = False,
+    ) -> Tuple[str, ...]:
+        if not math.isfinite(feed_mm_min) or feed_mm_min <= 0:
+            raise ConfigurationError(
+                "square-center-demo feed rate must be finite and greater than zero"
+            )
+        if feed_mm_min > self.config.motion.travel_feed_mm_min:
+            raise ConfigurationError(
+                "square-center-demo feed rate cannot exceed motion.travel_feed_mm_min "
+                f"({self.config.motion.travel_feed_mm_min:g} mm/min)"
+            )
+        if dwell_ms < 0 or dwell_ms > 5000:
+            raise ConfigurationError(
+                "square-center-demo dwell must be between zero and 5000 ms"
+            )
+        geometry = self.config.board
+        logical_rows = []
+        for y in range(geometry.height - 1, -1, -1):
+            columns = (
+                range(geometry.width - 1, -1, -1)
+                if (geometry.height - 1 - y) % 2 == 0
+                else range(geometry.width)
+            )
+            logical_rows.extend(
+                grid_to_machine(GridPosition(x, y), geometry) for x in columns
+            )
+        points = tuple(logical_rows)
+        if len(points) != geometry.width * geometry.height:
+            raise ConfigurationError("square-center-demo did not generate every square")
+        for point in points:
+            if not self.config.workspace.contains(point):
+                raise ConfigurationError(
+                    "square-center-demo center is outside the configured workspace"
+                )
+        traversal_mm = sum(
+            math.hypot(second.x - first.x, second.y - first.y)
+            for first, second in zip(points, points[1:])
+        )
+        energized_s = (
+            traversal_mm / feed_mm_min * 60.0
+            + geometry.width * geometry.height * dwell_ms / 1000.0
+            + self.config.motion.magnet_on_dwell_ms / 1000.0
+        )
+        if magnet_on and energized_s > 120.0:
+            raise ConfigurationError(
+                "square-center-demo would energize the electromagnet for more than 120 seconds; "
+                "increase feed rate or disable the magnet"
+            )
+        mirror_origin = (
+            self.config.workspace.min_y_mm + self.config.workspace.max_y_mm
+        )
+
+        def number(value: float) -> str:
+            return f"{value:.3f}".rstrip("0").rstrip(".")
+
+        def movement(point: MachinePoint) -> str:
+            return (
+                f"G1 X{number(mirror_origin - point.y)} Y{number(point.y)} "
+                f"Z{number(point.x)} F{number(feed_mm_min)}"
+            )
+
+        home_x, home_y, home_z = self._gantry_home_reference()
+        program = [
+            *self.config.magnet.off_commands,
+            "G21",
+            "G90",
+            *self.config.safety.home_commands,
+            "M211 S1",
+            movement(points[0]),
+            "M400",
+        ]
+        if magnet_on:
+            program.extend(self.config.magnet.on_commands)
+            if self.config.motion.magnet_on_dwell_ms:
+                program.append(f"G4 P{self.config.motion.magnet_on_dwell_ms}")
+        if dwell_ms:
+            program.append(f"G4 P{dwell_ms}")
+        for point in points[1:]:
+            program.extend((movement(point), "M400"))
+            if dwell_ms:
+                program.append(f"G4 P{dwell_ms}")
+        program.extend(("M400", *self.config.magnet.off_commands))
+        if magnet_on and self.config.motion.magnet_off_dwell_ms:
+            program.append(f"G4 P{self.config.motion.magnet_off_dwell_ms}")
+        program.extend(
+            (
+                f"G1 X{number(home_x)} Y{number(home_y)} Z{number(home_z)} "
+                f"F{number(feed_mm_min)}",
+                "M400",
+                "M84",
+            )
+        )
+        return tuple(program)
+
+    def square_center_demo(
+        self,
+        feed_mm_min: float = 1800.0,
+        dwell_ms: int = 150,
+        magnet_on: bool = False,
+    ) -> Tuple[str, ...]:
+        self._require_execution_unlocked()
+        program = self.square_center_demo_program(feed_mm_min, dwell_ms, magnet_on)
+        link = self._link_factory(self.config.serial)
+        with link:
+            if self.config.safety.preflight_commands:
+                link.send_program(self.config.safety.preflight_commands)
+            try:
+                link.send_program(program)
+            except Exception:
+                link.best_effort((*self.config.magnet.off_commands, "M84"))
+                raise
+        self.audit.append(
+            {
+                "status": "square_center_demo_completed",
+                "feed_mm_min": feed_mm_min,
+                "dwell_ms": dwell_ms,
                 "magnet_on": magnet_on,
                 "commands": list(program),
             }

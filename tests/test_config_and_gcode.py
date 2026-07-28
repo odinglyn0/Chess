@@ -26,26 +26,26 @@ class ConfigAndGCodeTests(unittest.TestCase):
     def test_machine_and_playing_board_dimensions(self) -> None:
         config = AppConfig.from_mapping(self.raw_config())
         self.assertEqual(config.workspace.max_x_mm, 330.0)
-        self.assertEqual(config.workspace.max_y_mm, 270.0)
-        self.assertEqual(config.board.square_size_mm, 33.75)
-        self.assertEqual(config.board.origin_x_mm, 46.875)
-        self.assertEqual(config.board.origin_y_mm, 16.875)
+        self.assertEqual(config.workspace.max_y_mm, 300.0)
+        self.assertEqual(config.board.square_size_mm, 40.0)
+        self.assertEqual(config.board.origin_x_mm, 30.0)
+        self.assertEqual(config.board.origin_y_mm, 17.0)
 
     def test_rejects_capture_slot_outside_workspace(self) -> None:
         raw = self.raw_config()
-        raw["capture"]["slots"][0] = [999.0, 999.0]
+        raw["capture"] = {"enabled": True, "slots": [[999.0, 999.0]]}
         with self.assertRaisesRegex(ConfigurationError, "outside the workspace"):
             AppConfig.from_mapping(raw)
 
     def test_rejects_capture_slot_inside_board(self) -> None:
         raw = self.raw_config()
-        raw["capture"]["slots"][0] = [50.0, 50.0]
+        raw["capture"] = {"enabled": True, "slots": [[50.0, 50.0]]}
         with self.assertRaisesRegex(ConfigurationError, "playing-board footprint"):
             AppConfig.from_mapping(raw)
 
     def test_rejects_duplicate_capture_slot(self) -> None:
         raw = self.raw_config()
-        raw["capture"]["slots"][1] = list(raw["capture"]["slots"][0])
+        raw["capture"] = {"enabled": True, "slots": [[5.0, 5.0], [5.0, 5.0]]}
         with self.assertRaisesRegex(ConfigurationError, "duplicates"):
             AppConfig.from_mapping(raw)
 
@@ -70,9 +70,9 @@ class ConfigAndGCodeTests(unittest.TestCase):
         on_index = commands.index("M106 P0 S255")
         self.assertNotIn("M82", commands)
         self.assertFalse(any(command.startswith("M302") for command in commands))
-        self.assertIn("G0 X260 Y10 Z10 F12000", commands)
-        first_drag = commands.index("G1 X255 Y15 Z20 F3000")
-        final_drag = commands.index("G1 X240 Y30 Z30 F3000")
+        self.assertIn("G0 X290 Y10 Z10 F12000", commands)
+        first_drag = commands.index("G1 X285 Y15 Z20 F3000")
+        final_drag = commands.index("G1 X270 Y30 Z30 F3000")
         off_after_drag = next(
             index
             for index in range(final_drag + 1, len(commands))
@@ -88,7 +88,7 @@ class ConfigAndGCodeTests(unittest.TestCase):
             if command.startswith(("G0 ", "G1 ")) and " Y" in command:
                 x_word = next(word for word in command.split() if word.startswith("X"))
                 y_word = next(word for word in command.split() if word.startswith("Y"))
-                self.assertAlmostEqual(float(x_word[1:]) + float(y_word[1:]), 270.0)
+                self.assertAlmostEqual(float(x_word[1:]) + float(y_word[1:]), 300.0)
 
 
 if __name__ == "__main__":

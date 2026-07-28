@@ -974,9 +974,7 @@ class GantryService:
                 "square-center-demo would energize the electromagnet for more than 120 seconds; "
                 "increase feed rate or disable the magnet"
             )
-        mirror_origin = (
-            self.config.workspace.min_y_mm + self.config.workspace.max_y_mm
-        )
+        mirror_origin = self.config.workspace.min_y_mm + self.config.workspace.max_y_mm
 
         def number(value: float) -> str:
             return f"{value:.3f}".rstrip("0").rstrip(".")

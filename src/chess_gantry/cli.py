@@ -504,13 +504,18 @@ def _parser() -> ArgumentParser:
         help="home and visit all 64 measured chess-square centers",
     )
     square_center_demo.add_argument(
-        "--feed-mm-min", type=float, default=1800.0, help="movement feed (default: 1800)"
+        "--feed-mm-min",
+        type=float,
+        default=1800.0,
+        help="movement feed (default: 1800)",
     )
     square_center_demo.add_argument(
         "--dwell-ms", type=int, default=150, help="pause at each center (default: 150)"
     )
     square_center_demo.add_argument(
-        "--magnet-on", action="store_true", help="keep the magnet on through all 64 centers"
+        "--magnet-on",
+        action="store_true",
+        help="keep the magnet on through all 64 centers",
     )
     square_center_demo.add_argument(
         "--output", "-o", help="write generated square-center G-code"

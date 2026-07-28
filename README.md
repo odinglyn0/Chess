@@ -57,6 +57,37 @@ signal and share ground where required by the driver design.
 
 ## Flash The Gantry Firmware
 
+> [!IMPORTANT]
+> No new flash is required for the 330 mm inner by 270 mm outer dimensions if
+> the last working Relay Chess firmware is already installed. That firmware has
+> native 350 mm limits, which safely contain the smaller physical envelope.
+> Host configuration now runs native `G28 X Y Z`, waits for completion, then
+> applies `G92 X2 Y268 Z328` to remap the backed-off home into the measured
+> coordinate system. Every generated movement remains bounded to outer
+> `0..270` and inner `0..330`.
+
+Verify the installed firmware without flashing:
+
+```bash
+uv run python scripts/check_firmware.py
+```
+
+Test homing and the host remap:
+
+```bash
+uv run python scripts/check_firmware.py \
+  --home --confirm-clear-path
+```
+
+Expected final host coordinates:
+
+```text
+X:2.00 Y:268.00 Z:328.00
+```
+
+The binary below is retained only for reproducible future rebuilds. Flashing it
+is optional for this dimension change.
+
 The flashable binary is:
 
 ```text
@@ -86,7 +117,7 @@ cd ..
 The corrected inner-axis-direction binary has SHA-256:
 
 ```text
-a03c8448a4aa80dab0b14cb31e1938b509760e05ad8012db7977d279111bc861
+d18b76a2901b299b372d9187b030fe9bd06d258be9eaf14efc8ffe914f85430b
 ```
 
 Do not flash an earlier binary with a different checksum. Earlier builds either
@@ -107,7 +138,7 @@ Rebuild it from source when needed:
 4. Rename the copied file to a short unique name not previously flashed, such
    as `RCG0727.bin`.
 5. Run `sync`, then verify that the on-card file is 82,192 bytes and its SHA-256
-   is `a03c8448a4aa80dab0b14cb31e1938b509760e05ad8012db7977d279111bc861`.
+   is `d18b76a2901b299b372d9187b030fe9bd06d258be9eaf14efc8ffe914f85430b`.
    A zero-byte file will be silently ignored by the bootloader.
 6. Unmount or safely eject the card before removing it. Never unplug the reader
    immediately after `cp`.

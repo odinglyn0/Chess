@@ -508,9 +508,9 @@ class DemoMarlinSerial:
         upper = stripped.upper()
         if upper.startswith("G28"):
             self._x = 0.0
-            self._y = 270.0
-            self._z = 330.0
-        elif upper.startswith(("G0 ", "G1 ")):
+            self._y = 350.0
+            self._z = 350.0
+        elif upper.startswith(("G0 ", "G1 ", "G92 ")):
             match = self.POSITION_RE.search(upper)
             if match:
                 self._x = float(match.group(1))

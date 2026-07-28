@@ -45,7 +45,9 @@ def main() -> int:
                 )
                 return 0
 
-            link.send_program((*config.magnet.off_commands, "G28 X Y Z", "M400"))
+            link.send_program(
+                (*config.magnet.off_commands, *config.safety.home_commands)
+            )
             endstops = link.send_command("M119", timeout_s=10.0)
             positions = link.send_command("M114", timeout_s=10.0)
         except KeyboardInterrupt:
@@ -86,6 +88,7 @@ if __name__ == "__main__":
         print(f"Firmware check failed: {exc}")
         print(
             "If /dev/ttyUSB0 exists but no baud responds, verify the Ender 24 V "
-            "supply and LCD are on, then reflash the corrected binary by SD card."
+            "supply, USB cable, and serial-port ownership. Reflashing is not required "
+            "for the 330 x 270 host-side dimension remap."
         )
         raise SystemExit(1)

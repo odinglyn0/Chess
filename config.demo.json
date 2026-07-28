@@ -87,7 +87,7 @@
   "safety": {
     "calibrated": true,
     "home_before_execute": false,
-    "home_commands": ["G28 X Y Z", "M400"],
+    "home_commands": ["G28 X Y Z", "M400", "G92 X2 Y268 Z328", "M400"],
     "preflight_commands": ["M115"],
     "emergency_stop_command": "M112"
   }

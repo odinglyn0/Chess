@@ -180,7 +180,19 @@ class ServiceTests(unittest.TestCase):
             )
             record_path = temp / "gantry_home.json"
             record = service.home_gantry(record_path)
-            self.assertEqual(fake.programs, [("M107 P0", "G21", "G28 X Y Z", "M400")])
+            self.assertEqual(
+                fake.programs,
+                [
+                    (
+                        "M107 P0",
+                        "G21",
+                        "G28 X Y Z",
+                        "M400",
+                        "G92 X2 Y268 Z328",
+                        "M400",
+                    )
+                ],
+            )
             self.assertEqual(record["method"], "marlin_g28")
             saved = read_json(record_path)
             self.assertIn("x_min: TRIGGERED", saved["endstop_response"])

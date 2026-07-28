@@ -49,9 +49,9 @@ class FirmwareConfigurationTests(unittest.TestCase):
         self.assert_define(self.pins, "Z_DIR_PIN", "PB3")
         self.assert_define(self.configuration, "INVERT_Z_DIR", "true")
         self.assert_define(self.configuration, "Z_HOME_DIR", "1")
-        self.assert_define(self.configuration, "X_BED_SIZE", "270")
-        self.assert_define(self.configuration, "Y_BED_SIZE", "270")
-        self.assert_define(self.configuration, "Z_MAX_POS", "330")
+        self.assert_define(self.configuration, "X_BED_SIZE", "350")
+        self.assert_define(self.configuration, "Y_BED_SIZE", "350")
+        self.assert_define(self.configuration, "Z_MAX_POS", "350")
         self.assertNotRegex(self.configuration, r"(?m)^\s*#define\s+BLTOUCH\b")
         self.assertNotRegex(
             self.configuration,
@@ -70,13 +70,18 @@ class FirmwareConfigurationTests(unittest.TestCase):
         )
         self.assertRegex(self.advanced, r"(?m)^\s*#define\s+EMERGENCY_PARSER\b")
 
-    def test_host_workspace_matches_firmware_axis_limits(self) -> None:
+    def test_host_workspace_uses_safe_no_flash_remap_inside_firmware_limits(
+        self,
+    ) -> None:
         config = json.loads((ROOT / "config.json").read_text(encoding="utf-8"))
         self.assertEqual(config["workspace"]["max_y_mm"], 270.0)
         self.assertEqual(config["workspace"]["max_x_mm"], 330.0)
-        self.assert_define(self.configuration, "X_BED_SIZE", "270")
-        self.assert_define(self.configuration, "Y_BED_SIZE", "270")
-        self.assert_define(self.configuration, "Z_MAX_POS", "330")
+        self.assertLessEqual(config["workspace"]["max_y_mm"], 350.0)
+        self.assertLessEqual(config["workspace"]["max_x_mm"], 350.0)
+        self.assertEqual(
+            config["safety"]["home_commands"],
+            ["G28 X Y Z", "M400", "G92 X2 Y268 Z328", "M400"],
+        )
 
 
 if __name__ == "__main__":

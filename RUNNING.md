@@ -3,6 +3,29 @@
 Run all commands from the repository root. State is stored only in local JSON
 and JSONL files.
 
+## Current Dimensions Without Reflashing
+
+The installed working firmware may retain native 350 mm axis limits. No reflash
+is required for the measured smaller machine envelope:
+
+```text
+Inner gantry / logical Z width: 330 mm
+Outer paired X/Y gantry height: 270 mm
+```
+
+Every configured home runs:
+
+```gcode
+G28 X Y Z
+M400
+G92 X2 Y268 Z328
+M400
+```
+
+The `G92` remap converts the installed firmware's backed-off home into the new
+physical coordinates. Host-generated movement is restricted to X/Y `0..270`
+and Z `0..330`.
+
 ## Install And Verify
 
 ```bash

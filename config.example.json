@@ -17,7 +17,7 @@
     "origin_x_mm": 40.0,
     "origin_y_mm": 18.0,
     "flip_x": false,
-    "flip_y": false,
+    "flip_y": true,
     "swap_xy": false
   },
   "workspace": {

@@ -387,9 +387,9 @@ class RunCommandTests(unittest.TestCase):
         output = buffer.getvalue()
         self.assertIn("DRY RUN ONLY", output)
         self.assertEqual(output.count("G0 ") + output.count("G1 "), 64)
-        self.assertIn("G0 X282 Y18 Z40 F1800", output)
-        self.assertIn("G1 X282 Y18 Z320 F1800", output)
-        self.assertIn("G1 X242 Y58 Z320 F1800", output)
+        self.assertIn("G0 X2 Y298 Z40 F1800", output)
+        self.assertIn("G1 X2 Y298 Z320 F1800", output)
+        self.assertIn("G1 X42 Y258 Z320 F1800", output)
         self.assertEqual(output.count("M106 P0 S255"), 64)
         self.assertGreater(output.rfind("M107 P0"), output.rfind("M106 P0 S255"))
 

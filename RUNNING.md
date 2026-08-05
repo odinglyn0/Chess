@@ -100,6 +100,26 @@ Start with a standard physical board and a reset JSON state. Keep the command
 running. Successfully executed event IDs in `board_state.json` prevent replay
 after restart.
 
+## Web TV Live Game
+
+Use the web dashboard for the lowest-latency presentation workflow:
+
+```bash
+./scripts/run_network_ui.sh
+```
+
+Create a new public Lichess game with zero moves, reset the physical board, and
+enter the game ID in **Live Lichess TV game**. Confirm the board and motion,
+then press **Start immediate live play** before White's first move.
+
+The nearest-home square is h1 at raw `X2 Y298 Z320`. The server creates fresh
+standard JSON state for each Start, homes once, and uses Lichess's streaming API
+to trigger immediate PGN processing and physical execution. A game that already
+contains moves is rejected rather than replayed.
+
+Captures currently stop the follower because physical capture slots are
+disabled. Promotion also requires manual piece replacement and is rejected.
+
 ## Reset
 
 Arrange the physical board in its standard starting position, then run:

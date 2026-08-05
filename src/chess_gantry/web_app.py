@@ -15,6 +15,7 @@ import webbrowser
 from .config import AppConfig
 from .controller import GantryController
 from .errors import GantryError, ValidationError
+from .live_game import LiveGameManager
 from .operations import OperationManager, operation_catalog
 from .service import GantryService
 
@@ -65,7 +66,7 @@ HTML = r"""<!doctype html>
 :root{color-scheme:dark;--bg:#0b0e14;--card:#151a24;--card2:#1d2431;--line:#30394a;--text:#eef3ff;--muted:#9eabc2;--accent:#67e8b5;--danger:#ff6b7a;--warn:#f4c66d;font-family:Inter,system-ui,sans-serif}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top left,#16213b,transparent 32rem),var(--bg);color:var(--text)}main{width:min(1120px,calc(100% - 30px));margin:auto;padding:34px 0 60px}header{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;margin-bottom:22px}h1{margin:0;font-size:clamp(2rem,5vw,3.2rem);letter-spacing:-.045em}h2{font-size:1.05rem;margin:0 0 16px}p{color:var(--muted);line-height:1.55}.subtitle{max-width:720px;margin:8px 0 0}.pill{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:9px 12px;white-space:nowrap;color:var(--muted)}.pill.good{color:var(--accent)}.pill.bad{color:var(--danger)}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.card{border:1px solid var(--line);border-radius:17px;padding:20px;background:rgba(21,26,36,.96);box-shadow:0 20px 55px rgba(0,0,0,.18)}.wide{grid-column:1/-1}.fields{display:grid;grid-template-columns:1fr 1fr;gap:11px}.three{grid-template-columns:1fr 1fr 1fr}label{display:block;font-size:.8rem;color:var(--muted);margin-bottom:6px}input,select,textarea{width:100%;border:1px solid var(--line);border-radius:10px;background:var(--card2);color:var(--text);padding:11px 12px;font:inherit;outline:none}textarea{min-height:190px;resize:vertical;font:13px/1.5 ui-monospace,monospace}input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(103,232,181,.12)}.actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:14px}button{border:1px solid var(--line);border-radius:10px;background:var(--card2);color:var(--text);padding:10px 14px;font-weight:700;cursor:pointer}button:hover:not(:disabled){border-color:#64718f;transform:translateY(-1px)}button:disabled{opacity:.38;cursor:not-allowed}.primary{background:var(--accent);border-color:var(--accent);color:#07130f}.danger{background:#421b24;border-color:#7d3040;color:#ffdce2}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}.metric{border:1px solid var(--line);background:var(--card2);border-radius:11px;padding:12px}.metric span{display:block;color:var(--muted);font-size:.74rem;margin-bottom:4px}.metric strong{font-size:1.05rem}.notice{border-left:3px solid var(--warn);background:#292318;color:#f2dba9;padding:10px 12px;margin-top:14px;font-size:.84rem;line-height:1.45}.safe{border-left-color:var(--accent);background:#162a24;color:#c9f7e4}pre{margin:0;min-height:130px;max-height:310px;overflow:auto;border:1px solid var(--line);border-radius:11px;background:#080b10;padding:12px;color:#bcc7dc;white-space:pre-wrap;font:12px/1.55 ui-monospace,monospace}.split{display:grid;grid-template-columns:1fr 1fr;gap:12px}.small{font-size:.8rem;color:var(--muted)}.check{display:flex;gap:8px;align-items:center;margin-top:12px;color:var(--muted);font-size:.85rem}.check input{width:auto}.locked{color:var(--danger)}
 @media(max-width:780px){header{display:block}.pill{display:inline-block;margin-top:14px}.grid,.split{grid-template-columns:1fr}.wide{grid-column:auto}.three{grid-template-columns:1fr}.metrics{grid-template-columns:1fr 1fr}}
-.ops{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.op-category{grid-column:1/-1;margin:15px 0 1px;padding-top:12px;border-top:1px solid var(--line);font-size:.82rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}.op-category:first-child{margin-top:0;border-top:0;padding-top:0}.op{border:1px solid var(--line);border-radius:13px;padding:14px;background:var(--card2)}.op h3{margin:0 0 7px;font-size:.95rem}.op p{font-size:.8rem;margin:0;min-height:42px}.op .tag{display:inline-block;font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);margin-bottom:8px}.op.physical{border-color:#664c28}.op.physical .tag{color:var(--warn)}.taskbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.tasklog{height:280px}.confirm-list{display:grid;gap:7px;margin-top:10px}.confirm-list label{display:flex;gap:8px;align-items:flex-start;color:var(--text);font-size:.75rem}.confirm-list input{width:auto;margin-top:2px}.position-box{border:1px solid #426858;background:#101d1a;border-radius:14px;padding:15px;margin-top:14px}.position-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.position-value{font:700 1.35rem/1.1 ui-monospace,monospace;color:var(--accent)}.jog-layout{display:grid;grid-template-columns:180px 1fr;gap:18px;align-items:center}.jog-pad{display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(3,52px);gap:6px;justify-content:center}.jog-pad button{font-size:1.35rem;padding:0}.jog-up{grid-column:2}.jog-left{grid-column:1;grid-row:2}.jog-home{grid-column:2;grid-row:2}.jog-right{grid-column:3;grid-row:2}.jog-down{grid-column:2;grid-row:3}.keyboard-ready{color:var(--accent)}@media(max-width:900px){.ops{grid-template-columns:1fr 1fr}}@media(max-width:700px){.jog-layout{grid-template-columns:1fr}.position-grid{grid-template-columns:1fr 1fr}}@media(max-width:600px){.ops{grid-template-columns:1fr}}
+.ops{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.op-category{grid-column:1/-1;margin:15px 0 1px;padding-top:12px;border-top:1px solid var(--line);font-size:.82rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}.op-category:first-child{margin-top:0;border-top:0;padding-top:0}.op{border:1px solid var(--line);border-radius:13px;padding:14px;background:var(--card2)}.op h3{margin:0 0 7px;font-size:.95rem}.op p{font-size:.8rem;margin:0;min-height:42px}.op .tag{display:inline-block;font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);margin-bottom:8px}.op.physical{border-color:#664c28}.op.physical .tag{color:var(--warn)}.taskbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.tasklog{height:280px}.confirm-list{display:grid;gap:7px;margin-top:10px}.confirm-list label{display:flex;gap:8px;align-items:flex-start;color:var(--text);font-size:.75rem}.confirm-list input{width:auto;margin-top:2px}.position-box{border:1px solid #426858;background:#101d1a;border-radius:14px;padding:15px;margin-top:14px}.position-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.position-value{font:700 1.35rem/1.1 ui-monospace,monospace;color:var(--accent)}.jog-layout{display:grid;grid-template-columns:180px 1fr;gap:18px;align-items:center}.jog-pad{display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(3,52px);gap:6px;justify-content:center}.jog-pad button{font-size:1.35rem;padding:0}.jog-up{grid-column:2}.jog-left{grid-column:1;grid-row:2}.jog-home{grid-column:2;grid-row:2}.jog-right{grid-column:3;grid-row:2}.jog-down{grid-column:2;grid-row:3}.keyboard-ready{color:var(--accent)}.live-game{border-color:#5f4d90;background:linear-gradient(135deg,rgba(68,45,112,.45),rgba(21,26,36,.96))}.live-status{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:12px 0}.live-status>div{padding:10px;border:1px solid var(--line);border-radius:10px;background:rgba(0,0,0,.18)}@media(max-width:900px){.ops{grid-template-columns:1fr 1fr}}@media(max-width:700px){.jog-layout{grid-template-columns:1fr}.position-grid{grid-template-columns:1fr 1fr}}@media(max-width:600px){.ops{grid-template-columns:1fr}}
 </style>
 </head>
 <body><main>
@@ -82,16 +83,18 @@ HTML = r"""<!doctype html>
   "nx": 4,
   "ny": 3
 }</textarea><div class="actions"><button id="plan" class="primary">Plan only</button><button id="execute">Execute move</button></div><label class="check"><input id="confirm" type="checkbox"> I checked the workspace and understand this can move hardware.</label><p id="lockState" class="small locked"></p></div><div><label>Plan / generated G-code</label><pre id="planout">No plan yet.</pre></div></div></div>
-<div class="card wide"><div class="taskbar"><div><h2>5. Operations dashboard</h2><p class="small">Allowlisted tests, simulations, hardware demos, state tools, and Lichess workflows. Only one task can run at a time.</p></div><button id="taskStop" class="danger" disabled>Stop task</button></div><div id="ops" class="ops"><p>Loading operations…</p></div></div>
+<div class="card wide live-game"><div class="taskbar"><div><h2>5. Live Lichess TV game</h2><p class="small">Enter a new public game ID before White's first move. The server creates fresh standard state, homes once, and streams every new Lichess move to this computer's serial port.</p></div><button id="liveStop" class="danger" disabled>Stop live game</button></div><div class="fields three"><div><label for="liveGameId">Lichess game ID</label><input id="liveGameId" maxlength="12" placeholder="6RkOwfp1"></div><div><label>Physical board</label><label class="check"><input id="liveBoardReset" type="checkbox"> Board is reset to the standard starting position</label></div><div><label>Motion safety</label><label class="check"><input id="liveMotion" type="checkbox"> Paths are clear and physical motion is approved</label></div></div><div class="actions"><button id="liveStart" class="primary">Start immediate live play</button></div><div class="live-status"><div><span class="small">State</span><strong id="liveState">Idle</strong></div><div><span class="small">Executed</span><strong id="liveCount">0</strong></div><div><span class="small">Last event</span><strong id="liveLast">—</strong></div></div><pre id="liveLog">No live game started in this server session.</pre><p class="small">Nearest-home square is h1 on White's side. Start is rejected if the Lichess game already contains moves. Captures stop the follower while physical capture storage is disabled.</p></div>
+<div class="card wide"><div class="taskbar"><div><h2>6. Operations dashboard</h2><p class="small">Allowlisted tests, simulations, hardware demos, state tools, and Lichess workflows. Only one task can run at a time.</p></div><button id="taskStop" class="danger" disabled>Stop task</button></div><div id="ops" class="ops"><p>Loading operations…</p></div></div>
 <div class="card wide"><div class="taskbar"><h2>Task output</h2><strong id="taskState" class="small">Idle</strong></div><pre id="tasklog" class="tasklog">No dashboard task has run.</pre></div>
 <div class="card"><h2>Board state</h2><div class="actions"><button id="boardRefresh">Refresh state</button></div><pre id="boardout">Loading…</pre></div>
 <div class="card"><h2>Activity</h2><pre id="log">Page ready.</pre></div>
 </section></main>
 <script>
-const $=id=>document.getElementById(id);let state={},busy=false,jogBusy=false,taskData={run:null,logs:''},operations=[],lastPositionRead=0;
+const $=id=>document.getElementById(id);let state={},busy=false,jogBusy=false,taskData={run:null,logs:''},operations=[],lastPositionRead=0,liveData={status:{state:'idle',executed_count:0,last_event_id:null},logs:''};
 function log(msg){const e=$('log');e.textContent+=`\n[${new Date().toLocaleTimeString()}] ${msg}`;e.scrollTop=e.scrollHeight}
 async function api(path,options={}){const r=await fetch(path,{headers:{'Content-Type':'application/json'},...options});const d=await r.json();if(!r.ok||d.ok===false)throw new Error(d.error||`HTTP ${r.status}`);return d}
-function taskRunning(){return !!taskData.run&&['starting','running','stopping'].includes(taskData.run.state)}
+function liveRunning(){return ['starting','homing','following','executing'].includes(liveData.status?.state)}
+function taskRunning(){return (!!taskData.run&&['starting','running','stopping'].includes(taskData.run.state))||liveRunning()}
 function render(s){state=s||{};const c=!!s.connected;const task=taskRunning();$('pill').className=`pill ${c?'good':(s.last_error?'bad':'')}`;$('pill').textContent=c?`${s.port} · ${s.baudrate}`:'Disconnected';$('firmware').textContent=s.firmware||s.last_error||'No controller identified.';$('xread').textContent=s.position_mm?.x==null?'—':`${s.position_mm.x.toFixed(2)} mm`;$('yread').textContent=s.position_mm?.y==null?'—':`${s.position_mm.y.toFixed(2)} mm`;const m=s.machine_position_mm||{};$('machineX').textContent=m.x==null?'—':m.x.toFixed(2);$('machineY').textContent=m.y==null?'—':m.y.toFixed(2);$('machineZ').textContent=m.z==null?'—':m.z.toFixed(2);$('positionAge').textContent=m.x==null?'No M114 position received.':`Updated ${new Date(lastPositionRead||Date.now()).toLocaleTimeString()} · millimetres`;$('homed').textContent=s.homed?'Yes':'No';$('revision').textContent=s.board_revision??'—';const w=s.workspace_mm||{};$('limits').textContent=`Logical workspace: inner ${w.min_x??'?'}–${w.max_x??'?'} mm, outer ${w.min_y??'?'}–${w.max_y??'?'} mm. Manual feed limit: ${s.max_manual_feed_mm_min??'?'} mm/min.`;$('lockState').textContent=s.calibrated?'Hardware execution is unlocked by config.':'Chess execution is locked: safety.calibrated is false.';$('connect').disabled=busy||c||task;$('disconnect').disabled=busy||!c||task;$('refresh').disabled=busy||task;$('endstops').disabled=busy||!c||task;$('home').disabled=busy||!c||task;$('move').disabled=busy||jogBusy||!c||!s.homed||task;$('refreshPosition').disabled=busy||jogBusy||!c||task;for(const id of ['jogUp','jogDown','jogLeft','jogRight'])$(id).disabled=busy||jogBusy||!c||!s.homed||task;$('jogHome').disabled=busy||!c||task;$('keyboardArm').disabled=!c||!s.homed||task;if(!c||!s.homed||task)$('keyboardArm').checked=false;$('keyboardState').className=`small ${$('keyboardArm').checked?'keyboard-ready':''}`;$('keyboardState').textContent=$('keyboardArm').checked?'Arrow-key motion armed. Escape disarms immediately.':'Home and enable keyboard motion. Arrow Left/Right move the inner gantry; Up/Down move the outer gantry. Escape disarms.';$('execute').disabled=busy||!c||!s.calibrated||task;$('plan').disabled=busy||task;$('stop').disabled=!c&&!task}
 async function status(){try{render((await api('/api/status')).status)}catch(e){log(`Status error: ${e.message}`)}}
 async function ports(){try{const selected=$('port').value;const d=await api('/api/ports');$('port').innerHTML='<option value="">Auto-detect</option>';for(const p of d.ports){const o=document.createElement('option');o.value=p.device;o.textContent=`${p.device} — ${p.description}${p.likely_printer?' ★':''}`;$('port').appendChild(o)}if([...$('port').options].some(o=>o.value===selected))$('port').value=selected;log(`Found ${d.ports.length} serial port(s).`)}catch(e){log(`Port scan: ${e.message}`)}}
@@ -112,12 +115,16 @@ $('plan').onclick=()=>action('Planning without moving hardware…',async()=>{con
 $('execute').onclick=()=>{if(!$('confirm').checked){log('Execution blocked: check the motion confirmation box.');return}if(!confirm('Execute this generated chess move now?'))return;action('Executing validated chess move…',async()=>{const d=await api('/api/execute',{method:'POST',body:JSON.stringify({move:moveObject(),confirm_motion:true})});$('planout').textContent=JSON.stringify(d.summary,null,2)+'\n\n'+d.gcode;await board();log('Move completed and board state committed.');return d})};
 $('stop').onclick=()=>{if(confirm('Send M112 emergency stop? The controller will require reset/power-cycle and re-homing.'))action('EMERGENCY STOP…',()=>api('/api/stop',{method:'POST',body:'{}'}))};
 async function board(){try{$('boardout').textContent=JSON.stringify((await api('/api/board')).board_state,null,2)}catch(e){$('boardout').textContent=`ERROR: ${e.message}`}}$('boardRefresh').onclick=board;
+function renderLive(){const s=liveData.status||{};$('liveState').textContent=s.state||'idle';$('liveCount').textContent=s.executed_count??0;$('liveLast').textContent=s.last_event_id||'—';$('liveLog').textContent=liveData.logs||'No live game started in this server session.';$('liveLog').scrollTop=$('liveLog').scrollHeight;$('liveStart').disabled=liveRunning()||taskRunning();$('liveStop').disabled=!liveRunning();render(state)}
+async function liveStatus(){try{liveData=await api('/api/live/status');renderLive()}catch(e){log(`Live game status: ${e.message}`)}}
+$('liveStart').onclick=async()=>{if(taskRunning()){log('Live play blocked: another task is running.');return}const gameId=$('liveGameId').value.trim();if(!gameId){log('Enter a Lichess game ID.');return}if(!$('liveBoardReset').checked||!$('liveMotion').checked){log('Confirm the standard board and physical motion before live play.');return}if(!confirm(`Start immediate physical following for Lichess game ${gameId}?`))return;try{liveData=await api('/api/live/start',{method:'POST',body:JSON.stringify({game_id:gameId,confirm_standard_position:true,confirm_motion:true})});renderLive();renderOperations()}catch(e){log(`Live play blocked: ${e.message}`)}};
+$('liveStop').onclick=async()=>{if(!confirm('Stop live play and send an emergency stop to physical hardware?'))return;try{liveData=await api('/api/live/stop',{method:'POST',body:'{}'});renderLive();renderOperations()}catch(e){log(`Stop live play: ${e.message}`)}};
 function renderOperations(){const root=$('ops');root.innerHTML='';let category='';for(const op of operations){if(op.category!==category){category=op.category;const heading=document.createElement('h3');heading.className='op-category';heading.textContent=category;root.appendChild(heading)}const card=document.createElement('div');card.className=`op ${op.physical?'physical':''}`;const tag=document.createElement('span');tag.className='tag';tag.textContent=op.physical?'Physical hardware':(op.long_running?'Managed process':'Safe task');const title=document.createElement('h3');title.textContent=op.title;const desc=document.createElement('p');desc.textContent=op.enabled?op.description:`${op.description} Physical tasks are disabled in demo mode.`;const checks=document.createElement('div');checks.className='confirm-list';for(const c of op.confirmations){const label=document.createElement('label');const input=document.createElement('input');input.type='checkbox';input.dataset.confirm=c.key;input.disabled=!op.enabled;label.append(input,document.createTextNode(c.label));checks.appendChild(label)}const actions=document.createElement('div');actions.className='actions';const run=document.createElement('button');run.className=op.physical?'danger':'primary';run.textContent=op.long_running?'Start':'Run';run.disabled=!op.enabled||(!!taskData.run&&['starting','running','stopping'].includes(taskData.run.state));run.onclick=async()=>{const confirmations={};for(const input of checks.querySelectorAll('input'))confirmations[input.dataset.confirm]=input.checked;if(op.physical&&!confirm(`Run physical task “${op.title}”? Keep the emergency cutoff ready.`))return;try{taskData=await api('/api/tasks/start',{method:'POST',body:JSON.stringify({operation_id:op.id,confirmations})});renderTask();renderOperations()}catch(e){log(`Task blocked: ${e.message}`)}};actions.appendChild(run);card.append(tag,title,desc,checks,actions);root.appendChild(card)}}
 function renderTask(){const r=taskData.run;$('taskState').textContent=r?`${r.title}: ${r.state}`:'Idle';$('tasklog').textContent=taskData.logs||'No dashboard task has run.';$('tasklog').scrollTop=$('tasklog').scrollHeight;$('taskStop').disabled=!r||!['starting','running','stopping'].includes(r.state);render(state)}
 async function loadOperations(){try{const d=await api('/api/operations');operations=d.operations;renderOperations()}catch(e){$('ops').textContent=`ERROR: ${e.message}`}}
 async function taskStatus(){try{const prior=taskData.run?.state;taskData=await api('/api/tasks/status');renderTask();const next=taskData.run?.state;if(prior!==next)renderOperations()}catch(e){log(`Task status: ${e.message}`)}}
 $('taskStop').onclick=async()=>{if(!confirm('Stop the running task? Physical tasks also receive M112 and require a controller reset.'))return;try{taskData=await api('/api/tasks/stop',{method:'POST',body:'{}'});renderTask();renderOperations()}catch(e){log(`Stop task: ${e.message}`)}};
-(async()=>{await ports();await status();await board();await loadOperations();await taskStatus();setInterval(()=>{if(!busy)status();taskStatus()},1200);setInterval(readPosition,750)})();
+(async()=>{await ports();await status();await board();await loadOperations();await taskStatus();await liveStatus();setInterval(()=>{if(!busy)status();taskStatus();liveStatus()},750);setInterval(readPosition,750)})();
 </script></body></html>"""
 
 
@@ -130,8 +137,14 @@ class RequestHandler(BaseHTTPRequestHandler):
             raise ValidationError("operations dashboard is not configured")
         return manager
 
+    def _live_game(self) -> LiveGameManager:
+        manager = getattr(self.server, "live_game_manager", None)
+        if manager is None:
+            raise ValidationError("live game manager is not configured")
+        return manager
+
     def _require_no_task(self, action: str) -> None:
-        if self._operations().running():
+        if self._operations().running() or self._live_game().running():
             raise ValidationError(
                 f"{action} is unavailable while a dashboard task is running"
             )
@@ -274,6 +287,9 @@ class RequestHandler(BaseHTTPRequestHandler):
             return
         if self.path == "/api/tasks/status":
             self._send_json({"ok": True, **self._operations().status()})
+            return
+        if self.path == "/api/live/status":
+            self._send_json({"ok": True, **self._live_game().status()})
             return
         self._send_json({"ok": False, "error": "not found"}, HTTPStatus.NOT_FOUND)
 
@@ -420,6 +436,10 @@ class RequestHandler(BaseHTTPRequestHandler):
                     )
                 return
             if self.path == "/api/tasks/start":
+                if self._live_game().running():
+                    raise ValidationError(
+                        "stop the live Lichess game before starting a dashboard task"
+                    )
                 operation_id = payload.get("operation_id")
                 if not isinstance(operation_id, str):
                     raise ValidationError("operation_id must be a string")
@@ -435,6 +455,33 @@ class RequestHandler(BaseHTTPRequestHandler):
                 return
             if self.path == "/api/tasks/stop":
                 self._send_json({"ok": True, **self._operations().stop()})
+                return
+            if self.path == "/api/live/start":
+                if self._operations().running():
+                    raise ValidationError(
+                        "stop the dashboard task before starting live play"
+                    )
+                game_id = payload.get("game_id")
+                if not isinstance(game_id, str):
+                    raise ValidationError("game_id must be a string")
+                if self.controller.connected:
+                    self.controller.disconnect()
+                self._send_json(
+                    {
+                        "ok": True,
+                        **self._live_game().start(
+                            game_id,
+                            confirm_standard_position=payload.get(
+                                "confirm_standard_position"
+                            )
+                            is True,
+                            confirm_motion=payload.get("confirm_motion") is True,
+                        ),
+                    }
+                )
+                return
+            if self.path == "/api/live/stop":
+                self._send_json({"ok": True, **self._live_game().stop()})
                 return
             self._send_json({"ok": False, "error": "not found"}, HTTPStatus.NOT_FOUND)
         except GantryError as exc:
@@ -453,6 +500,7 @@ class GantryHTTPServer(ThreadingHTTPServer):
     daemon_threads = True
     operation_manager: Optional[OperationManager] = None
     auth_token_hash: Optional[bytes] = None
+    live_game_manager: Optional[LiveGameManager] = None
 
 
 def run_web_server(
@@ -491,6 +539,7 @@ def run_web_server(
         ),
         allow_physical=not demo,
     )
+    server.live_game_manager = LiveGameManager(root, config, demo=demo)
     display_host = _lan_address() if host in {"0.0.0.0", "::"} else host
     url = f"http://{display_host}:{port}"
     print(f"Chess Gantry Controller running at {url}")
@@ -510,5 +559,7 @@ def run_web_server(
     finally:
         if server.operation_manager is not None and server.operation_manager.running():
             server.operation_manager.stop()
+        if server.live_game_manager is not None and server.live_game_manager.running():
+            server.live_game_manager.stop()
         controller.disconnect()
         server.server_close()

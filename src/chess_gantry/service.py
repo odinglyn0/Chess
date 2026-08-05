@@ -943,10 +943,10 @@ class GantryService:
             )
         geometry = self.config.board
         logical_rows = []
-        for y in range(geometry.height - 1, -1, -1):
+        for y in range(geometry.height):
             columns = (
                 range(geometry.width - 1, -1, -1)
-                if (geometry.height - 1 - y) % 2 == 0
+                if y % 2 == 0
                 else range(geometry.width)
             )
             logical_rows.extend(

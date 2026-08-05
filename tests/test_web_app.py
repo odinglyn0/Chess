@@ -13,6 +13,7 @@ from chess_gantry.config import AppConfig
 from chess_gantry.controller import GantryController
 from chess_gantry.errors import ValidationError
 from chess_gantry.models import BoardState
+from chess_gantry.live_game import LiveGameManager
 from chess_gantry.operations import OperationManager, OperationSpec
 from chess_gantry.persistence import atomic_write_json
 from chess_gantry.service import GantryService
@@ -63,6 +64,7 @@ class WebAppTests(unittest.TestCase):
                 ),
             ),
         )
+        self.server.live_game_manager = LiveGameManager(root, self.config, demo=True)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
         self.base = f"http://127.0.0.1:{self.server.server_port}"
@@ -94,7 +96,7 @@ class WebAppTests(unittest.TestCase):
             "ny": 3,
         }
         _, plan = self.request("/api/plan", {"move": move})
-        self.assertIn("G1 X162 Y138 Z200", plan["gcode"])
+        self.assertIn("G1 X122 Y178 Z200", plan["gcode"])
         _, board_before = self.request("/api/board")
         self.assertEqual(board_before["board_state"]["revision"], 0)
 
@@ -170,6 +172,25 @@ class WebAppTests(unittest.TestCase):
         self.assertIn('id="machineZ"', html)
         self.assertIn("ArrowLeft", html)
         self.assertIn("/api/jog", html)
+        self.assertIn('id="liveGameId"', html)
+        self.assertIn("/api/live/start", html)
+
+    def test_live_game_status_and_start_validation_api(self) -> None:
+        _, status = self.request("/api/live/status")
+        self.assertEqual(status["status"]["state"], "idle")
+        request = urllib.request.Request(
+            self.base + "/api/live/start",
+            data=json.dumps(
+                {"game_id": "game1234", "confirm_standard_position": False}
+            ).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+        )
+        with self.assertRaises(urllib.error.HTTPError) as raised:
+            urllib.request.urlopen(request, timeout=3)
+        self.assertEqual(raised.exception.code, 409)
+        missing = json.loads(raised.exception.read())
+        raised.exception.close()
+        self.assertIn("standard", missing["error"])
 
     def test_network_bind_requires_explicit_flag_and_strong_token(self) -> None:
         with self.assertRaisesRegex(ValidationError, "--allow-network"):

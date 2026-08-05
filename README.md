@@ -513,6 +513,73 @@ Normal moves, en passant conversion, and castling planning are supported by the
 software, but physical captures require configured capture storage and promotion
 requires physical piece replacement.
 
+### Live Lichess TV Demo
+
+The browser dashboard has a dedicated **Live Lichess TV game** panel for a
+fresh public game. It is designed for a presentation where the board begins in
+the standard position and every new Lichess move should reach the gantry with
+minimal delay.
+
+Physical orientation:
+
+```text
+h1 is the square closest to home on White's side.
+h1 raw center: X2 Y298 Z320
+a1 raw center: X2 Y298 Z40
+h8 raw center: X282 Y18 Z320
+a8 raw center: X282 Y18 Z40
+```
+
+Start the authenticated network UI on the gantry computer:
+
+```bash
+./scripts/run_network_ui.sh
+```
+
+Then:
+
+1. Create a new public standard chess game on Lichess.
+2. Do not make the first move yet.
+3. Put every physical piece in its standard starting square.
+4. Open the authenticated dashboard URL on the TV/demo control device.
+5. Enter the 8-12 character Lichess game ID from the game URL.
+6. Check **Board is reset to the standard starting position**.
+7. Check **Paths are clear and physical motion is approved**.
+8. Press **Start immediate live play**.
+9. Wait for the state to show `following`.
+10. Play the game on Lichess.
+
+The web server creates a fresh isolated JSON state directory for every Start,
+homes the gantry once, opens Lichess's streaming game-move API, and executes
+each newly published ply through one persistent serial connection. It does not
+use the older fixed polling interval, so the only normal delay is Lichess event
+delivery, planning, serial transmission, and physical motion.
+
+Start is rejected if the game already contains moves. This avoids replaying an
+existing game onto a freshly reset physical board. Stop and restart with a new
+empty game if needed.
+
+State and logs are per web-server process and per Start. Restarting the web
+server or pressing Start for another game creates a new standard state; no move
+history from the previous TV session is reused.
+
+The panel displays:
+
+- current state (`starting`, `homing`, `following`, `executing`, `failed`)
+- executed move count
+- last stable event ID
+- live execution log
+
+Press **Stop live game** to stop the stream and attempt `M112`. Reset and re-home
+the controller afterward.
+
+> [!WARNING]
+> Physical capture storage is disabled for the measured 40 mm grid. The TV
+> follower stops safely with a visible error when a capture occurs. Promotion
+> also stops because it requires physical piece replacement. For a guaranteed
+> uninterrupted TV sequence, use a prepared non-capturing line or add and
+> calibrate external capture storage before the presentation.
+
 ## State And Recovery
 
 Runtime state is local:

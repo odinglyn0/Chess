@@ -130,7 +130,7 @@ class ServiceTests(unittest.TestCase):
             self.assertIn("M107 P0", commands)
             self.assertLess(
                 commands.index("M106 P0 S255"),
-                commands.index("G1 X162 Y138 Z200 F3000"),
+                commands.index("G1 X122 Y178 Z200 F3000"),
             )
 
     def test_reference_gantry_requires_all_three_endstops(self) -> None:
@@ -299,9 +299,9 @@ class ServiceTests(unittest.TestCase):
             plan = service.plan(move)
             self.assertEqual(plan.transfers[0].purpose, "capture")
             self.assertEqual(plan.transfers[0].start.x, 160.0)
-            self.assertEqual(plan.transfers[0].start.y, 178.0)
+            self.assertEqual(plan.transfers[0].start.y, 138.0)
             self.assertEqual(plan.transfers[1].end.x, 160.0)
-            self.assertEqual(plan.transfers[1].end.y, 218.0)
+            self.assertEqual(plan.transfers[1].end.y, 98.0)
 
     def test_successful_execute_commits_state_and_clears_journal(self) -> None:
         with TemporaryDirectory() as directory:
@@ -743,11 +743,11 @@ class ServiceTests(unittest.TestCase):
                 command for command in program if command.startswith(("G0 ", "G1 "))
             )
             self.assertEqual(len(moves), 64)
-            self.assertEqual(moves[0], "G0 X282 Y18 Z40 F1800")
-            self.assertEqual(moves[7], "G1 X282 Y18 Z320 F1800")
-            self.assertEqual(moves[8], "G1 X242 Y58 Z320 F1800")
-            self.assertEqual(moves[15], "G1 X242 Y58 Z40 F1800")
-            self.assertEqual(moves[-1], "G1 X2 Y298 Z40 F1800")
+            self.assertEqual(moves[0], "G0 X2 Y298 Z40 F1800")
+            self.assertEqual(moves[7], "G1 X2 Y298 Z320 F1800")
+            self.assertEqual(moves[8], "G1 X42 Y258 Z320 F1800")
+            self.assertEqual(moves[15], "G1 X42 Y258 Z40 F1800")
+            self.assertEqual(moves[-1], "G1 X282 Y18 Z40 F1800")
             on_index = program.index("M106 P0 S255")
             final_off = len(program) - 1 - program[::-1].index("M107 P0")
             self.assertEqual(program.count("M106 P0 S255"), 64)

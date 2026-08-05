@@ -260,7 +260,6 @@ def follow_game(
         client=client,
     )
     if finished:
-        service.finish_game()
         return
     if once:
         return
@@ -280,7 +279,6 @@ def follow_game(
                     client=client,
                 )
                 if finished:
-                    service.finish_game()
                     return
         except GantryError:
             raise
@@ -304,6 +302,5 @@ def follow_game(
             client=client,
         )
         if finished:
-            service.finish_game()
             return
         sleep(interval_s)

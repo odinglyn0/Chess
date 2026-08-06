@@ -147,66 +147,90 @@ Use **Raspberry Pi OS Lite 64-bit** when possible. The Pi 3B+ has a 64-bit Arm
 Cortex-A53 processor, and the 64-bit image avoids mixed ARMv7/aarch64 package
 resolution issues.
 
-The normal runtime is lightweight:
+The recommended Pi deployment uses Docker. The Pi host does not need `uv`, a
+Python virtual environment, Node.js, Redis, or a desktop environment. Ubuntu
+24.04 is used only during image construction. The final container is distroless:
+it contains the managed Python runtime, `uv`, application dependencies, the
+Lichess client, and authenticated dashboard, but no shell, package manager, or
+full userspace distribution.
+
+The container runtime includes:
 
 - Python 3.9 or newer
 - `pyserial`, `python-chess`, and `berserk`
 - local JSON/JSONL persistence
 - USB serial communication with Marlin
 - built-in HTTP operations dashboard
-- no Redis, database server, desktop environment, or Docker requirement
+- no Redis or database server
 
-Node.js is only required for `npm run check`, Prettier, and dashboard operations
-that run repository quality checks. Normal movement, Lichess following, and the
-web server do not depend on Node.js at runtime.
+Build architecture:
 
-### Install Raspberry Pi Packages
+```text
+Builder: ubuntu:24.04
+Python: uv-managed standalone CPython 3.11
+Runtime: gcr.io/distroless/cc-debian12
+```
+
+The Ubuntu and distroless base images support `linux/arm64` and `linux/arm/v7`,
+covering Raspberry Pi OS Lite 64-bit and 32-bit on the Pi 3B+.
+
+The image is built locally on the Pi, so Docker automatically selects the Pi's
+native architecture. No emulation or cross-compiled application image is
+required.
+
+### Docker Installation
 
 On Raspberry Pi OS Lite:
 
 ```bash
 sudo apt update
-sudo apt install -y \
-  git \
-  curl \
-  python3 \
-  python3-venv \
-  nodejs \
-  npm
+sudo apt install -y git curl
 ```
 
-Install `uv` using its official standalone installer:
-
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-source "$HOME/.local/bin/env"
-```
-
-Verify the toolchain:
-
-```bash
-uv --version
-python3 --version
-node --version
-npm --version
-```
-
-Clone and install the project:
+Clone the project and run the installer:
 
 ```bash
 git clone --recurse-submodules https://github.com/odinglyn0/Chess.git
 cd Chess
-uv sync
-npm ci
 ./scripts/install_pi.sh
+```
+
+The installer:
+
+- installs Docker Engine and the Compose plugin when missing
+- enables the Docker service
+- adds the Pi user to `docker` and `dialout`
+- initializes persistent `data/board_state.json`
+- generates a random authenticated-dashboard token in `.env.docker`
+- builds the native ARM image
+- passes `/dev/ttyUSB0` into the container
+- starts the service when the controller is connected
+- prints the complete authenticated LAN URL
+
+`.env.docker` is mode 600 and ignored by Git. It contains the dashboard token,
+serial-device path, and web port.
+
+If the controller was not connected during installation:
+
+```bash
+./scripts/pi_docker.sh up
+```
+
+Docker resolves the serial device when the container starts. If the Ender
+controller is unplugged and returns under a different device path, update
+`CHESS_GANTRY_SERIAL_DEVICE` in `.env.docker` and run:
+
+```bash
+./scripts/pi_docker.sh down
+./scripts/pi_docker.sh up
 ```
 
 ### Serial Permissions
 
-Add the current Pi user to the serial-port group:
+The installer adds the user to the required groups. Log out and back in, or
+reboot once after first installation:
 
 ```bash
-sudo usermod -aG dialout "$USER"
 sudo reboot
 ```
 
@@ -214,8 +238,7 @@ After reboot:
 
 ```bash
 cd ~/Chess
-uv run chess-gantry --config config.json ports
-uv run chess-gantry --config config.json diagnose
+./scripts/pi_docker.sh firmware-check
 ```
 
 ### Headless Network UI
@@ -225,7 +248,8 @@ LAN interface on the Pi:
 
 ```bash
 cd ~/Chess
-./scripts/run_network_ui.sh
+./scripts/pi_docker.sh status
+./scripts/pi_docker.sh logs
 ```
 
 Open the complete token URL printed by the launcher from a phone, tablet, or
@@ -238,36 +262,60 @@ http://192.168.1.50:8000/?token=LONG_RANDOM_TOKEN
 All serial commands continue to run on the Pi. The remote browser does not
 access `/dev/ttyUSB0` directly.
 
-For localhost-only headless startup:
+Manage the container with:
 
 ```bash
-uv run chess-gantry --config config.json web --no-browser
+./scripts/pi_docker.sh up
+./scripts/pi_docker.sh down
+./scripts/pi_docker.sh restart
+./scripts/pi_docker.sh logs
+./scripts/pi_docker.sh status
+./scripts/pi_docker.sh rebuild
+./scripts/pi_docker.sh update
 ```
+
+The distroless runtime intentionally has no shell. Use dashboard task logs,
+`pi_docker.sh logs`, or `pi_docker.sh firmware-check` for diagnostics.
+
+### Updating The Pi
+
+After future changes are committed and pushed, deploy them with one command:
+
+```bash
+cd ~/Chess
+./scripts/pi_docker.sh update
+```
+
+`update` refuses a dirty checkout, runs `git pull --ff-only`, initializes or
+updates submodules, pulls current base layers, rebuilds the image, recreates the
+service, and prints container status. Persistent files in `data/` and the token
+in `.env.docker` are not replaced.
 
 ### Tests On The Pi
 
 Runtime test suite:
 
 ```bash
-./scripts/check.sh
+./scripts/pi_docker.sh test
 ```
 
-Formatting, policy, and Git hygiene checks:
+Formatting, policy, and Git hygiene checks run on a development machine or in
+CI because the distroless production runtime intentionally excludes Node and
+Git metadata:
 
 ```bash
-npm run check
+./scripts/pi_docker.sh check
 ```
 
-Complete simulated readiness workflow:
+This command prints the corresponding development-machine instruction rather
+than attempting to install tools in the running container.
 
-```bash
-./scripts/demo_check.sh
-```
-
-The Pi 3B+ can run the complete suite, but installation and formatting checks
-will be slower than on a desktop. Normal serial control, position polling,
-planning, Lichess following, and the browser dashboard are substantially
-lighter.
+The Pi 3B+ can build and run the complete image. `pi_docker.sh test` builds the
+Ubuntu `test` stage and executes the suite there, leaving the production runtime
+distroless. The first build and test stage will be slower than on a desktop.
+Normal serial control,
+position polling, planning, Lichess streaming, and the browser dashboard are
+substantially lighter.
 
 Build Marlin firmware on a faster desktop when practical. The Pi only needs the
 host software after the Ender controller has been flashed.

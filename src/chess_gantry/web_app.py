@@ -7,6 +7,7 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import socket
+import os
 import threading
 from typing import Any, Mapping, Optional
 from urllib.parse import parse_qs, urlsplit
@@ -538,6 +539,7 @@ def run_web_server(
             Path(audit_path).resolve(),
         ),
         allow_physical=not demo,
+        allow_development=os.environ.get("CHESS_GANTRY_DISTROLESS") != "1",
     )
     server.live_game_manager = LiveGameManager(root, config, demo=demo)
     display_host = _lan_address() if host in {"0.0.0.0", "::"} else host

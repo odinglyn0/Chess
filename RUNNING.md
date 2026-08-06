@@ -3,6 +3,57 @@
 Run all commands from the repository root. State is stored only in local JSON
 and JSONL files.
 
+## Raspberry Pi Docker Deployment
+
+Raspberry Pi OS Lite does not need host `uv` or Node.js. Install Docker and
+build/start the container with:
+
+```bash
+sudo apt update
+sudo apt install -y git curl
+git clone --recurse-submodules https://github.com/odinglyn0/Chess.git
+cd Chess
+./scripts/install_pi.sh
+```
+
+The service exposes the authenticated dashboard on port 8000, passes the host
+`/dev/ttyUSB0` into the container, mounts `config.json` read-only, and persists
+JSON state under host `data/`.
+
+Ubuntu 24.04 is used only as the build stage. The production image is based on
+`gcr.io/distroless/cc-debian12`, with a uv-managed CPython 3.11 environment
+and the `uv` binary copied into runtime. There is no runtime shell or package
+manager.
+
+```bash
+./scripts/pi_docker.sh status
+./scripts/pi_docker.sh logs
+./scripts/pi_docker.sh firmware-check
+./scripts/pi_docker.sh test
+./scripts/pi_docker.sh check
+./scripts/pi_docker.sh restart
+./scripts/pi_docker.sh update
+./scripts/pi_docker.sh down
+```
+
+If the serial device uses another path, set `CHESS_GANTRY_SERIAL_DEVICE` before
+running `install_pi.sh`, or update `.env.docker` and recreate the service.
+
+The serial device must exist when Compose starts the container. After changing
+the USB path, recreate with `./scripts/pi_docker.sh down` followed by
+`./scripts/pi_docker.sh up`.
+
+For future deployments after pushing changes:
+
+```bash
+cd ~/Chess
+./scripts/pi_docker.sh update
+```
+
+This performs a fast-forward-only pull, updates submodules, rebuilds using the
+Ubuntu stage, and recreates the distroless runtime while preserving `data/` and
+`.env.docker`.
+
 ## Current Dimensions Without Reflashing
 
 The installed working firmware may retain native 350 mm axis limits. No reflash

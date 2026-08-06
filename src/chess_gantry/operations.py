@@ -30,6 +30,7 @@ class OperationSpec:
     physical: bool = False
     long_running: bool = False
     confirmations: tuple[Confirmation, ...] = ()
+    development_only: bool = False
 
     def public(self) -> dict[str, Any]:
         return {
@@ -43,6 +44,7 @@ class OperationSpec:
             "confirmations": [
                 {"key": item.key, "label": item.label} for item in self.confirmations
             ],
+            "development_only": self.development_only,
         }
 
 
@@ -99,6 +101,7 @@ def operation_catalog(
             "Compile Python and run the complete automated test suite.",
             "Checks",
             ("./scripts/check.sh",),
+            development_only=True,
         ),
         OperationSpec(
             "quality-checks",
@@ -106,6 +109,7 @@ def operation_catalog(
             "Run Black, Prettier, and repository policy checks.",
             "Checks",
             ("npm", "run", "check"),
+            development_only=True,
         ),
         OperationSpec(
             "demo-readiness",
@@ -113,6 +117,7 @@ def operation_catalog(
             "Run tests, quality checks, planning, magnet simulation, and sweep simulation.",
             "Checks",
             ("./scripts/demo_check.sh",),
+            development_only=True,
         ),
         OperationSpec(
             "simulate-circle",
@@ -420,14 +425,29 @@ def operation_catalog(
             "Check Lichess game 6RkOwfp1",
             "Run readiness checks and plan the current public game without movement.",
             "State and games",
-            ("./scripts/lichess_game.sh", "check", "6RkOwfp1"),
+            demo_base
+            + (
+                "lichess-pgn",
+                "6RkOwfp1",
+                "--output-dir",
+                str(root / "data" / "lichess" / "6RkOwfp1-check"),
+            ),
         ),
         OperationSpec(
             "lichess-dry-run",
             "Follow Lichess without hardware",
             "Continuously poll game 6RkOwfp1 and generate plans. Stop from the dashboard.",
             "State and games",
-            ("./scripts/lichess_game.sh", "dry-run", "6RkOwfp1"),
+            demo_base
+            + (
+                "lichess-follow",
+                "6RkOwfp1",
+                "--output-dir",
+                str(root / "data" / "lichess" / "6RkOwfp1-dry"),
+                "--session",
+                str(root / "data" / "lichess" / "6RkOwfp1-dry.session.json"),
+                "--reset-session",
+            ),
             long_running=True,
         ),
         OperationSpec(
@@ -435,7 +455,18 @@ def operation_catalog(
             "Play Lichess physically",
             "Home, then continuously mirror game 6RkOwfp1 on the physical board.",
             "State and games",
-            ("./scripts/lichess_game.sh", "play", "6RkOwfp1"),
+            base
+            + (
+                "lichess-follow",
+                "6RkOwfp1",
+                "--output-dir",
+                str(root / "data" / "lichess" / "6RkOwfp1-physical"),
+                "--session",
+                str(root / "data" / "lichess" / "6RkOwfp1-physical.session.json"),
+                "--reset-session",
+                "--execute",
+                "--confirm-motion",
+            ),
             serial=True,
             physical=True,
             long_running=True,
@@ -460,12 +491,14 @@ class OperationManager:
         *,
         process_factory: Callable[..., subprocess.Popen[str]] = subprocess.Popen,
         allow_physical: bool = True,
+        allow_development: bool = True,
     ) -> None:
         self.root = root
         self.controller = controller
         self._operations = {item.operation_id: item for item in operations}
         self._process_factory = process_factory
         self.allow_physical = allow_physical
+        self.allow_development = allow_development
         self._lock = threading.RLock()
         self._process: Optional[subprocess.Popen[str]] = None
         self._thread: Optional[threading.Thread] = None
@@ -477,7 +510,9 @@ class OperationManager:
         catalog = []
         for item in self._operations.values():
             value = item.public()
-            value["enabled"] = self.allow_physical or not item.physical
+            value["enabled"] = (self.allow_physical or not item.physical) and (
+                self.allow_development or not item.development_only
+            )
             catalog.append(value)
         return catalog
 
@@ -529,6 +564,10 @@ class OperationManager:
             if spec.physical and not self.allow_physical:
                 raise ConfigurationError(
                     "physical dashboard tasks are disabled while web mode uses --demo"
+                )
+            if spec.development_only and not self.allow_development:
+                raise ConfigurationError(
+                    "development dashboard tasks are unavailable in the distroless runtime"
                 )
             if self.controller.connected:
                 self.controller.disconnect()

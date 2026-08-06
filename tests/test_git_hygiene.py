@@ -20,6 +20,10 @@ class GitHygieneTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_container_without_git_metadata_is_supported(self) -> None:
+        source = (ROOT / "scripts" / "check_git_hygiene.py").read_text(encoding="utf-8")
+        self.assertIn('if not (ROOT / ".git").exists()', source)
+
 
 if __name__ == "__main__":
     unittest.main()

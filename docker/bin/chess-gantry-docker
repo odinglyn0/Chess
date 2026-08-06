@@ -1,0 +1,161 @@
+#!/usr/bin/python3
+from __future__ import annotations
+
+import os
+import secrets
+import shutil
+import sys
+from pathlib import Path
+
+APP_ROOT = Path(os.environ.get("CHESS_GANTRY_ROOT", "/app"))
+LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
+DEVICE_REPORT = (
+    ("Marlin serial", os.environ.get("CHESS_GANTRY_SERIAL_PORT", "/dev/ttyUSB0")),
+    ("GPIO (sysfs/mem)", "/dev/gpiomem"),
+    ("GPIO (character dev)", "/dev/gpiochip0"),
+    ("I2C bus 1", "/dev/i2c-1"),
+    ("SPI 0.0", "/dev/spidev0.0"),
+    ("SPI 0.1", "/dev/spidev0.1"),
+    ("USB bus", "/dev/bus/usb"),
+)
+
+
+def _env(name: str, default: str) -> str:
+    value = os.environ.get(name)
+    return value.strip() if value and value.strip() else default
+
+
+def _truthy(name: str) -> bool:
+    return _env(name, "0").lower() in {"1", "true", "yes", "on"}
+
+
+def _log(message: str) -> None:
+    sys.stderr.write("[entrypoint] " + message + "\n")
+
+
+def _report_devices() -> None:
+    for label, path in DEVICE_REPORT:
+        node = Path(path)
+        if not node.exists():
+            _log("missing " + label + " at " + path)
+            continue
+        readable = os.access(path, os.R_OK)
+        writable = os.access(path, os.W_OK)
+        access = "rw" if readable and writable else ("ro" if readable else "no access")
+        _log("found " + label + " at " + path + " (" + access + ")")
+
+
+def _seed(target: Path, source: Path) -> None:
+    if target.exists() or not source.exists():
+        return
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, target)
+    except OSError as error:
+        _log("could not seed " + str(target) + ": " + str(error))
+        return
+    _log("seeded " + str(target) + " from " + str(source))
+
+
+def _prepare_state(config: Path, state: Path, journal: Path, audit: Path) -> None:
+    try:
+        state.parent.mkdir(parents=True, exist_ok=True)
+        journal.parent.mkdir(parents=True, exist_ok=True)
+        audit.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as error:
+        _log("data directory is not writable: " + str(error))
+    _seed(config, APP_ROOT / "config.example.json")
+    _seed(state, APP_ROOT / "examples" / "board_state.standard.json")
+    if not config.exists():
+        _log("no configuration found at " + str(config))
+        _log("mount a calibrated config.json at that path before controlling hardware")
+
+
+def _token(name: str, label: str) -> str:
+    value = os.environ.get(name, "").strip()
+    if value:
+        return value
+    value = secrets.token_urlsafe(32)
+    os.environ[name] = value
+    _log("generated " + label + " access token: " + value)
+    _log("anyone holding this token can move the gantry; keep it private")
+    return value
+
+
+def _global_flags(config: Path, state: Path, journal: Path, audit: Path) -> list:
+    return [
+        "--config",
+        str(config),
+        "--state",
+        str(state),
+        "--journal",
+        str(journal),
+        "--audit",
+        str(audit),
+    ]
+
+
+def _web_command(base: list) -> list:
+    host = _env("CHESS_GANTRY_WEB_HOST", "0.0.0.0")
+    port = _env("CHESS_GANTRY_WEB_PORT", "8000")
+    command = base + ["web", "--host", host, "--web-port", port, "--no-browser"]
+    if host not in LOOPBACK_HOSTS:
+        command.append("--allow-network")
+        command += ["--auth-token", _token("CHESS_GANTRY_WEB_TOKEN", "web dashboard")]
+    if _truthy("CHESS_GANTRY_DEMO"):
+        command.append("--demo")
+    _log("web dashboard listening on http://" + host + ":" + port)
+    return command
+
+
+def _console_command(base: list) -> list:
+    host = _env("CHESS_GANTRY_CONSOLE_HOST", "0.0.0.0")
+    port = _env("CHESS_GANTRY_CONSOLE_PORT", "8300")
+    command = base + [
+        "debug-console",
+        "--host",
+        host,
+        "--console-port",
+        port,
+        "--no-browser",
+    ]
+    if host not in LOOPBACK_HOSTS:
+        command.append("--allow-network")
+    _token("CHESS_GANTRY_DEBUG_TOKEN", "debug console")
+    if _truthy("CHESS_GANTRY_DEMO"):
+        command.append("--demo")
+    _log("debug console listening on http://" + host + ":" + port)
+    return command
+
+
+def main() -> int:
+    args = list(sys.argv[1:])
+    config = Path(_env("CHESS_GANTRY_CONFIG", str(APP_ROOT / "config.json")))
+    state = Path(_env("CHESS_GANTRY_STATE", str(APP_ROOT / "data/board_state.json")))
+    journal = Path(
+        _env("CHESS_GANTRY_JOURNAL", str(APP_ROOT / "data/pending_move.json"))
+    )
+    audit = Path(_env("CHESS_GANTRY_AUDIT", str(APP_ROOT / "data/audit.jsonl")))
+
+    os.chdir(APP_ROOT)
+    _report_devices()
+    _prepare_state(config, state, journal, audit)
+
+    base = ["/usr/bin/chess-gantry"] + _global_flags(config, state, journal, audit)
+    if not args or args[0] == "web":
+        command = _web_command(base) + args[1:]
+    elif args[0] in {"debug-console", "console"}:
+        command = _console_command(base) + args[1:]
+    elif args[0] == "shell-check":
+        _log("this image is distroless and ships no shell")
+        return 1
+    else:
+        command = base + args
+
+    _log("exec " + " ".join(command))
+    os.execv(command[0], command)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

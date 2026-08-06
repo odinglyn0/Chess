@@ -1,0 +1,76 @@
+#!/usr/bin/python3
+from __future__ import annotations
+
+import os
+import sys
+
+NO_OP_COMMANDS = {"sync", "lock", "pip", "venv", "tool", "cache", "python", "self"}
+VALUE_FLAGS = {
+    "--extra",
+    "--group",
+    "--with",
+    "--with-requirements",
+    "--python",
+    "--project",
+    "--directory",
+    "--package",
+    "--index",
+    "--index-url",
+    "--extra-index-url",
+    "--color",
+    "--cache-dir",
+}
+TARGET_ALIASES = {
+    "python": "/usr/bin/python3",
+    "python3": "/usr/bin/python3",
+    "chess-gantry": "/usr/bin/chess-gantry",
+}
+
+
+def _fail(message: str) -> int:
+    sys.stderr.write("uv shim: " + message + "\n")
+    return 2
+
+
+def main() -> int:
+    args = list(sys.argv[1:])
+    if not args:
+        return _fail("no arguments; only 'uv run <command>' is supported")
+
+    while args and args[0].startswith("-"):
+        flag = args.pop(0)
+        if flag in VALUE_FLAGS and args:
+            args.pop(0)
+    if not args:
+        return _fail("no subcommand after global options")
+
+    command = args.pop(0)
+    if command in NO_OP_COMMANDS:
+        sys.stderr.write(
+            "uv shim: '"
+            + command
+            + "' is a no-op in the container; dependencies are baked into the image\n"
+        )
+        return 0
+    if command != "run":
+        return _fail("unsupported subcommand '" + command + "'")
+
+    while args and args[0].startswith("-"):
+        flag = args.pop(0)
+        if flag == "--":
+            break
+        if flag in VALUE_FLAGS and args:
+            args.pop(0)
+    if not args:
+        return _fail("'uv run' requires a command to execute")
+
+    target = TARGET_ALIASES.get(args[0], args[0])
+    try:
+        os.execvp(target, [target] + args[1:])
+    except OSError as error:
+        return _fail("cannot execute '" + target + "': " + str(error))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

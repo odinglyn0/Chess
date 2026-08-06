@@ -1,0 +1,86 @@
+#!/usr/bin/python3
+from __future__ import annotations
+
+import importlib
+import importlib.util
+import sys
+
+REQUIRED = (
+    "ssl",
+    "sqlite3",
+    "zlib",
+    "bz2",
+    "lzma",
+    "ctypes",
+    "decimal",
+    "asyncio",
+    "http.server",
+    "serial",
+    "serial.tools.list_ports",
+    "chess",
+    "chess.pgn",
+    "berserk",
+    "django",
+    "websockets.asyncio.client",
+    "upstash_redis",
+    "redis",
+    "httpx",
+    "requests",
+    "chess_gantry.cli",
+    "chess_gantry.web_app",
+    "chess_gantry.operations",
+    "chess_gantry.service",
+    "chess_gantry.serial_link",
+    "chess_gantry.lichess_follow",
+    "chess_gantry.lichess_pgn",
+    "chess_gantry.lichess_watch",
+    "chess_gantry.upstash_persistence",
+    "chess_gantry.debug_console.server",
+)
+GPIO_MODULES = ("RPi.GPIO", "gpiozero", "smbus2", "spidev")
+TRUST_STORE = "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"
+
+
+def main(argv: list) -> int:
+    failures = []
+
+    for name in REQUIRED:
+        try:
+            importlib.import_module(name)
+        except Exception as error:
+            failures.append("import " + name + ": " + repr(error))
+
+    if argv and argv[0] == "1":
+        for name in GPIO_MODULES:
+            if importlib.util.find_spec(name) is None:
+                failures.append("missing GPIO module " + name)
+
+    import ssl
+
+    context = ssl.create_default_context()
+    if context.cert_store_stats()["x509_ca"] < 1:
+        failures.append("no trusted CA certificates were loaded")
+
+    from pathlib import Path
+
+    if not Path(TRUST_STORE).is_file():
+        failures.append("missing extracted CA bundle at " + TRUST_STORE)
+
+    from chess_gantry.config import AppConfig
+
+    try:
+        AppConfig.load(Path("/app/config.example.json"))
+    except Exception as error:
+        failures.append("AppConfig.load(config.example.json): " + repr(error))
+
+    if failures:
+        for failure in failures:
+            sys.stderr.write("FAIL " + failure + "\n")
+        return 1
+
+    sys.stdout.write("runtime verification passed on " + sys.version + "\n")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

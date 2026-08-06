@@ -22,5 +22,11 @@ data/
 # Python is handled by Black, not Prettier
 *.py
 
+# prettier-plugin-sh parses these as shell and destroys line continuations
+Dockerfile
+Dockerfile.*
+.dockerignore
+docker/bin/
+
 # Lock files
 package-lock.json

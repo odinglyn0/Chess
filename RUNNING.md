@@ -42,6 +42,113 @@ npm ci
 the electromagnet output against simulated Marlin, and streams a simulated
 64-square sweep.
 
+## Container On A Raspberry Pi 3B+
+
+The image is built by a Fedora builder that resolves dependencies with `uv` from
+`uv.lock`, then hands a complete root filesystem to a `scratch` runner. The
+runner carries Python, curl, the CA trust store, tzdata and the application. It
+has no shell and no package manager.
+
+Only `linux/arm64` is produced, so the Pi must run a 64-bit OS. Fedora has
+published no 32-bit arm tree since Fedora 37, so there is no armv7 builder.
+
+Enable the buses the container expects, then reboot:
+
+```text
+/boot/firmware/config.txt
+dtparam=i2c_arm=on
+dtparam=spi=on
+```
+
+Prepare the host and build:
+
+```bash
+./scripts/docker_host_setup.sh
+docker compose build
+docker compose up -d gantry
+```
+
+`docker_host_setup.sh` writes the real `dialout`, `gpio`, `i2c` and `spi` group
+IDs into `.env`, confirms every passed-through device node exists, creates
+`config.json` and `data/`, and refuses to pass a host that is not ready.
+
+### What Is Passed Through
+
+| Path                               | Purpose                                |
+| ---------------------------------- | -------------------------------------- |
+| `/dev/ttyUSB0`                     | Marlin serial link                     |
+| `/dev/bus/usb`                     | USB re-enumeration after a magnet drop |
+| `/dev/gpiomem`, `/dev/gpiochip0`   | GPIO, memory-mapped and character      |
+| `/dev/i2c-1`                       | I2C bus 1                              |
+| `/dev/spidev0.0`, `/dev/spidev0.1` | SPI chip selects 0 and 1               |
+
+Character-major cgroup rules accompany the device list, so a controller that
+re-enumerates as a different node stays reachable without recreating the
+container. The container runs as UID 65532 with a read-only root filesystem, all
+capabilities dropped, and `no-new-privileges`. It reaches the devices through the
+supplementary groups in `.env`, not through `--privileged`.
+
+`RPi.GPIO`, `gpiozero`, `smbus2` and `spidev` are installed for GPIO, I2C and
+SPI work. Build with `INCLUDE_GPIO=0` to leave them out.
+
+### Reaching The Dashboard
+
+`docker compose up -d gantry` publishes port 8000 on every host interface, so the
+dashboard answers on loopback and across the LAN. The application refuses a
+non-loopback bind without a token; set `CHESS_GANTRY_WEB_TOKEN` in `.env` or read
+the token the entrypoint generates:
+
+```bash
+docker compose logs gantry | grep 'access token'
+```
+
+For a first-class intranet address instead of a published host port, fill in
+`LAN_PARENT`, `LAN_SUBNET`, `LAN_GATEWAY` and `LAN_IP`, then start the macvlan
+service:
+
+```bash
+docker compose --profile lan up -d gantry-lan
+```
+
+This is plain HTTP. Keep it off the public internet.
+
+### Debug Console
+
+The console owns the same serial port, so run it instead of `gantry`, never
+alongside it:
+
+```bash
+docker compose stop gantry
+docker compose --profile console up -d console
+docker compose logs console | grep 'access token'
+```
+
+### Other Commands
+
+Any CLI subcommand runs in the container with the correct state paths already
+applied:
+
+```bash
+docker compose run --rm gantry ports
+docker compose run --rm gantry diagnose
+docker compose run --rm gantry show-state
+docker compose run --rm gantry plan examples/move_e2_e4.json --summary-json
+docker compose run --rm gantry stop
+```
+
+### Dashboard Buttons That Need A Shell
+
+**Run all tests**, **Formatting and policy** and **Complete demo readiness**
+shell out to `scripts/*.sh` and `npm`, which the distroless runner does not
+carry. Build with `INCLUDE_DEV_TOOLS=1` to add bash, Node and npm for those
+buttons. That image is no longer distroless, so keep the default of `0` for
+deployment and run those checks on a development machine with `uv` and `npm`.
+
+Everything else that shells out works, because `uv` resolves to a shim that
+drops `uv run` and execs the real target: `uv sync` is a no-op, and
+`uv run chess-gantry ...` and `uv run python scripts/check_firmware.py` behave as
+they do outside the container.
+
 ## Local Files
 
 Global defaults:

@@ -10,17 +10,16 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class DockerConfigurationTests(unittest.TestCase):
-    def test_dockerfile_uses_ubuntu_builder_and_distroless_runtime(self) -> None:
+    def test_dockerfile_uses_fedora_builder_and_scratch_distroless_runtime(
+        self,
+    ) -> None:
         dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
-        self.assertIn("FROM ubuntu:24.04 AS build", dockerfile)
-        self.assertIn("FROM gcr.io/distroless/cc-debian12:latest", dockerfile)
-        self.assertIn("uv python install 3.11", dockerfile)
-        self.assertIn("uv sync --frozen", dockerfile)
-        self.assertIn(
-            "COPY --from=build /root/.local/bin/uv /opt/uv/bin/uv", dockerfile
-        )
-        self.assertIn('ENTRYPOINT ["/app/.venv/bin/python",', dockerfile)
-        self.assertNotIn("apt-get", dockerfile.split("FROM gcr.io/distroless", 1)[1])
+        self.assertIn("FROM fedora:${FEDORA_VERSION} AS builder", dockerfile)
+        self.assertIn("FROM scratch AS runtime", dockerfile)
+        self.assertIn("uv export --frozen --no-dev", dockerfile)
+        self.assertIn("COPY --from=builder /rootfs/ /", dockerfile)
+        self.assertIn('ENTRYPOINT ["/usr/bin/python3",', dockerfile)
+        self.assertIn('test ! -e "${ROOTFS}/usr/bin/sh"', dockerfile)
 
     def test_compose_passes_serial_persists_data_and_requires_token(self) -> None:
         compose = (ROOT / "docker-compose.pi.yml").read_text(encoding="utf-8")
@@ -38,12 +37,12 @@ class DockerConfigurationTests(unittest.TestCase):
     def test_python_entrypoint_runs_authenticated_network_ui_without_shell(
         self,
     ) -> None:
-        entrypoint = (ROOT / "docker" / "entrypoint.py").read_text(encoding="utf-8")
-        self.assertIn('"--host",', entrypoint)
-        self.assertIn('"0.0.0.0",', entrypoint)
-        self.assertIn('"--allow-network",', entrypoint)
-        self.assertIn('"--auth-token",', entrypoint)
-        self.assertFalse((ROOT / "docker" / "entrypoint.sh").exists())
+        entrypoint = (ROOT / "docker" / "bin" / "chess-gantry-docker").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('"--allow-network"', entrypoint)
+        self.assertIn('"--auth-token"', entrypoint)
+        self.assertIn("this image is distroless and ships no shell", entrypoint)
 
     def test_pi_scripts_exist_and_are_executable(self) -> None:
         for path in (

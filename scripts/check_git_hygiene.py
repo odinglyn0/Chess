@@ -15,10 +15,16 @@ FORBIDDEN_PREFIXES = (
 )
 FORBIDDEN_PARTS = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"}
 FORBIDDEN_SUFFIXES = (".json.lock", ".gcode", ".pyc")
+FORBIDDEN_NAMES = {".env.docker"}
 ALLOWED = {"data/.gitkeep"}
 
 
 def main() -> int:
+    if not (ROOT / ".git").exists():
+        print(
+            "Git hygiene skipped: repository metadata is not present in this container."
+        )
+        return 0
     result = subprocess.run(
         ("git", "ls-files", "-z"),
         cwd=ROOT,
@@ -35,6 +41,7 @@ def main() -> int:
             path.startswith(FORBIDDEN_PREFIXES)
             or parts.intersection(FORBIDDEN_PARTS)
             or path.endswith(FORBIDDEN_SUFFIXES)
+            or Path(path).name in FORBIDDEN_NAMES
         ):
             invalid.append(path)
     if invalid:

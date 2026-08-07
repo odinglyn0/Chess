@@ -81,17 +81,15 @@ To try the stack with no hardware attached, drop every `--device` and `--group-a
 
 ## Reaching the dashboard
 
-Binding `0.0.0.0` is the default, so the entrypoint requires a token and generates one when `CHESS_GANTRY_WEB_TOKEN` is unset. Read it from the log:
+The dashboard binds every interface and authenticates with Clerk. Open `http://<pi-ip>:8000/` and sign in. There is no token and no URL to keep secret.
 
 ```bash
 docker logs chess-gantry
 ```
 
-The log opens with a device report, one line per node, marked `rw`, `ro`, `no access` or `missing`. Check that before debugging anything else. The generated token follows.
+The log opens with a device report, one line per node, marked `rw`, `ro`, `no access` or `missing`. Check that before debugging anything else.
 
-Then open `http://<pi-ip>:8000/?token=<token>`.
-
-Anyone holding the token can move the gantry. To pin your own instead of reading it from the log, pass `-e CHESS_GANTRY_WEB_TOKEN=...`, and keep it out of shared shell history.
+Anyone who can route to the host reaches the sign-in page, including the public internet once you forward the port or run a tunnel. Access is exactly the set of people who can sign in to your Clerk instance, so control that in the Clerk dashboard.
 
 ## Debug console
 
@@ -113,22 +111,21 @@ Only one process can hold the serial port at a time. Stop the web container firs
 
 Set with `-e` on the run command. `.env.example` documents the full set.
 
-| Variable                   | Default        | Purpose                                                               |
-| -------------------------- | -------------- | --------------------------------------------------------------------- |
-| `CHESS_GANTRY_SERIAL_PORT` | `/dev/ttyUSB0` | Serial device the controller opens.                                   |
-| `CHESS_GANTRY_WEB_HOST`    | `0.0.0.0`      | Use `127.0.0.1` to keep the dashboard on loopback and skip the token. |
-| `CHESS_GANTRY_WEB_PORT`    | `8000`         | In-container dashboard port.                                          |
-| `CHESS_GANTRY_WEB_TOKEN`   | generated      | Dashboard token, printed to the log if unset.                         |
-| `CHESS_GANTRY_DEBUG_TOKEN` | generated      | Debug console token.                                                  |
-| `CHESS_GANTRY_DEMO`        | `0`            | Simulated hardware, no devices needed.                                |
-| `LICHESS_TOKEN`            | empty          | Raises Lichess rate limits and reads own games.                       |
-| `CLERK_PUBLISHABLE_KEY`    | empty          | Enables Clerk sign-in on the dashboard. See below.                    |
-| `CLERK_ALLOWED_USER_IDS`   | empty          | Comma-separated Clerk user IDs allowed to control the gantry.         |
-| `TZ`                       | `UTC`          | Container time zone.                                                  |
+| Variable                   | Default        | Purpose                                                      |
+| -------------------------- | -------------- | ------------------------------------------------------------ |
+| `CHESS_GANTRY_SERIAL_PORT` | `/dev/ttyUSB0` | Serial device the controller opens.                          |
+| `CLERK_PUBLISHABLE_KEY`    | empty          | Required. Without it the dashboard refuses to start.         |
+| `CLERK_SECRET_KEY`         | empty          | Accepted for completeness, unused by session checks.         |
+| `CHESS_GANTRY_WEB_HOST`    | `0.0.0.0`      | Every interface. Use `127.0.0.1` to restrict it to the host. |
+| `CHESS_GANTRY_WEB_PORT`    | `8000`         | In-container dashboard port.                                 |
+| `CHESS_GANTRY_DEBUG_TOKEN` | generated      | Debug console token. Separate app, unchanged.                |
+| `CHESS_GANTRY_DEMO`        | `0`            | Simulated hardware, no devices needed.                       |
+| `LICHESS_TOKEN`            | empty          | Raises Lichess rate limits and reads own games.              |
+| `TZ`                       | `UTC`          | Container time zone.                                         |
 
 ## Clerk sign-in
 
-Set `CLERK_PUBLISHABLE_KEY` and the dashboard asks for a Clerk sign-in instead of a shared token. Nothing else is required: the frontend API host, the JWT issuer and the JWKS URL are all decoded from the publishable key, and the entrypoint stops generating `CHESS_GANTRY_WEB_TOKEN`.
+Clerk is the only authentication the dashboard has. `CLERK_PUBLISHABLE_KEY` is required and the server exits with a clear error when it is missing. Nothing else needs configuring: the frontend API host, the JWT issuer and the JWKS URL are all decoded from the publishable key.
 
 ```bash
 docker run -d --name chess-gantry --restart unless-stopped \
@@ -137,16 +134,17 @@ docker run -d --name chess-gantry --restart unless-stopped \
   --publish 8000:8000 \
   --volume "$PWD/config.json:/app/config.json:ro" \
   --volume "$PWD/data:/app/data" \
-  -e CLERK_PUBLISHABLE_KEY=pk_live_... \
-  -e CLERK_ALLOWED_USER_IDS=user_2abc...,user_2def... \
+  -e CLERK_PUBLISHABLE_KEY=pk_test_dGhhbmtmdWwtcmF5LTU4LmNsZXJrLmFjY291bnRzLmRldiQ \
   chess:latest
 ```
 
-`CLERK_ALLOWED_USER_IDS` is the access control that matters. A Clerk instance accepts new sign-ups by default, so with the list empty anyone who can register can move the gantry; the server prints a warning on startup when that is the case. Copy the `user_...` IDs from the Clerk dashboard.
+How it works: `GET /` is public because it has to serve the sign-in page. Clerk's JS runs sign-in and maintains the `__session` cookie on the dashboard origin. Every `/api/*` route reads that cookie and verifies it as an RS256 JWT against the instance JWKS, checking the issuer and requiring `exp`, `iat` and `sub`. No bearer headers, no shared secret, nothing to copy around.
 
-With Clerk on, `GET /` is public because it has to serve the sign-in page, and every `/api/*` route requires a Clerk session token verified against the instance JWKS over RS256. The container needs outbound HTTPS to the Clerk frontend API for that. Setting `CHESS_GANTRY_WEB_TOKEN` alongside Clerk keeps the token path working too, which is useful for scripted `curl` access.
+Because the cookie alone authorises requests, state-changing requests arriving with `Sec-Fetch-Site: cross-site` are refused, which stops another site from driving the gantry through a signed-in browser.
 
-`CLERK_SECRET_KEY` is accepted but unused: session verification only needs public keys. `CLERK_AUTHORIZED_PARTIES`, `CLERK_JWT_ISSUER` and `CLERK_JWKS_URL` are optional overrides documented in `.env.example`.
+Anyone who can sign in to your Clerk instance can move the gantry. Clerk allows open sign-ups by default, so set whatever restrictions you want in the Clerk dashboard.
+
+One deployment caveat: a `pk_live_` production instance requires HTTPS, so its `__session` cookie carries `Secure` and will not be sent over plain `http://<ip>:8000`. Use a `pk_test_` development instance for plain-HTTP access, or put the dashboard behind TLS.
 
 ## Operating
 

@@ -21,12 +21,19 @@ if [[ $CLERK_PUBLISHABLE_KEY == pk_test_REPLACE_WITH_YOUR_DEV_KEY ]]; then
   exit 2
 fi
 
+if [[ "$(uname -s)" == Linux ]] && command -v sudo > /dev/null 2>&1; then
+  printf '==> Preparing the Docker service; sudo will ask for your password\n'
+  sudo usermod -aG docker "$USER" || printf '    usermod skipped; is Docker installed?\n'
+  sudo systemctl enable docker || printf '    systemctl enable skipped\n'
+  sudo systemctl start docker || printf '    systemctl start skipped\n'
+fi
+
 if docker info > /dev/null 2>&1; then
   DOCKER=(docker)
-elif sudo -n docker info > /dev/null 2>&1; then
+elif sudo docker info > /dev/null 2>&1; then
   DOCKER=(sudo docker)
 else
-  printf 'Docker is unavailable. Start it, or add this user to the docker group and log back in.\n' >&2
+  printf 'Docker is unavailable. Install it, then rerun this script.\n' >&2
   exit 2
 fi
 

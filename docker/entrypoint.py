@@ -9,10 +9,10 @@ from chess_gantry.cli import run
 
 
 def main() -> int:
-    token = os.environ.get("CHESS_GANTRY_WEB_TOKEN", "")
-    if len(token) < 24:
+    if not os.environ.get("CLERK_PUBLISHABLE_KEY", "").strip():
         print(
-            "CHESS_GANTRY_WEB_TOKEN with at least 24 characters is required.",
+            "CLERK_PUBLISHABLE_KEY is required; the dashboard has no other way to"
+            " authenticate anyone.",
             file=sys.stderr,
         )
         return 2
@@ -36,9 +36,6 @@ def main() -> int:
             "0.0.0.0",
             "--web-port",
             "8000",
-            "--allow-network",
-            "--auth-token",
-            token,
             "--no-browser",
         )
     )

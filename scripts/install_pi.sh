@@ -55,13 +55,19 @@ if [[ ! -f data/board_state.json ]]; then
 fi
 
 SERIAL_DEVICE="${CHESS_GANTRY_SERIAL_DEVICE:-/dev/ttyUSB0}"
-TOKEN="${CHESS_GANTRY_WEB_TOKEN:-$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')}"
 PORT="${CHESS_GANTRY_WEB_PORT:-8000}"
 
+if [[ -z "${CLERK_PUBLISHABLE_KEY:-}" ]]; then
+  printf 'CLERK_PUBLISHABLE_KEY is not set. The dashboard authenticates with Clerk only.\n' >&2
+  printf 'Export it before running this installer.\n' >&2
+  exit 2
+fi
+
 cat > .env.docker << EOF
-CHESS_GANTRY_WEB_TOKEN=$TOKEN
 CHESS_GANTRY_WEB_PORT=$PORT
 CHESS_GANTRY_SERIAL_DEVICE=$SERIAL_DEVICE
+CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY
+CLERK_SECRET_KEY=${CLERK_SECRET_KEY:-}
 EOF
 chmod 600 .env.docker
 
@@ -90,8 +96,8 @@ cat << EOF
 
 Chess Gantry Docker installation complete.
 
-Authenticated dashboard URL:
-  http://$LAN_IP:$PORT/?token=$TOKEN
+Dashboard URL, open to everyone who can route here, Clerk sign-in required:
+  http://$LAN_IP:$PORT/
 
 Management commands:
   ./scripts/pi_docker.sh status
@@ -105,5 +111,5 @@ If the service was not started, connect the Ender controller and run:
   ./scripts/pi_docker.sh up
 
 The current user was added to the docker and dialout groups. Log out and back in
-before using Docker without sudo. Keep .env.docker private; it contains the UI token.
+before using Docker without sudo. Keep .env.docker private; it holds the Clerk keys.
 EOF

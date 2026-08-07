@@ -20,7 +20,17 @@ Build on the Pi itself. Cross-building from an x86_64 host produces an amd64 ima
 ./run.sh
 ```
 
-It builds `chess:latest`, seeds `config.json` and `data/` if they are missing, makes the dashboard answer to `chess.local`, and runs the container in the foreground so Control-C stops it. When `/dev/ttyUSB0` is absent it starts in demo mode with a simulated controller instead of failing.
+It starts by putting the Docker service in order, which is why sudo asks for your password first:
+
+```bash
+sudo usermod -aG docker $USER
+sudo systemctl enable docker
+sudo systemctl start docker
+```
+
+All three are safe to repeat. The group change only applies at your next login, so until then the script falls back to `sudo docker`, reusing the sudo timestamp it just gained rather than prompting again.
+
+After that it builds `chess:latest`, seeds `config.json` and `data/` if they are missing, makes the dashboard answer to `chess.local`, and runs the container in the foreground so Control-C stops it. When `/dev/ttyUSB0` is absent it starts in demo mode with a simulated controller instead of failing.
 
 The dashboard lands on host port 80 and port 8000, so `http://chess.local` and `http://chess.local:8000` both work.
 

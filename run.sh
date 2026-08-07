@@ -14,6 +14,8 @@ HTTP_PORT="${CHESS_GANTRY_HTTP_PORT:-80}"
 ALT_PORT="${CHESS_GANTRY_ALT_PORT:-8000}"
 APP_PORT=8000
 SERIAL_DEVICE="${CHESS_GANTRY_SERIAL_PORT:-/dev/ttyUSB0}"
+APP_UID="${CHESS_GANTRY_APP_UID:-65532}"
+APP_GID="${CHESS_GANTRY_APP_GID:-65532}"
 
 if [[ $CLERK_PUBLISHABLE_KEY == pk_test_REPLACE_WITH_YOUR_DEV_KEY ]]; then
   printf 'Paste your Clerk development publishable key into %s (CLERK_PUBLISHABLE_KEY) or export it.\n' "$0" >&2
@@ -40,13 +42,38 @@ fi
 printf '==> Building %s\n' "$IMAGE"
 "${DOCKER[@]}" build -t "$IMAGE" .
 
+SUDO=()
+if command -v sudo > /dev/null 2>&1; then
+  SUDO=(sudo)
+fi
+
+as_root() {
+  if [[ ${#SUDO[@]} -eq 0 ]]; then
+    "$@"
+  else
+    "${SUDO[@]}" "$@"
+  fi
+}
+
 if [[ ! -f config.json ]]; then
   cp config.example.json config.json
   printf '==> Created config.json from config.example.json; calibrate it before moving hardware\n'
 fi
-mkdir -p data
+
+mkdir -p data 2> /dev/null || as_root mkdir -p data
 if [[ ! -f data/board_state.json ]]; then
-  cp examples/board_state.standard.json data/board_state.json
+  if cp examples/board_state.standard.json data/board_state.json 2> /dev/null; then
+    printf '==> Seeded data/board_state.json\n'
+  else
+    as_root cp examples/board_state.standard.json data/board_state.json
+    printf '==> Seeded data/board_state.json as root\n'
+  fi
+fi
+
+DATA_OWNER="$(stat -c '%u:%g' data 2> /dev/null || echo unknown)"
+if [[ $DATA_OWNER != "${APP_UID}:${APP_GID}" ]]; then
+  as_root chown -R "${APP_UID}:${APP_GID}" data
+  printf '==> data/ handed to %s:%s so the container can write it\n' "$APP_UID" "$APP_GID"
 fi
 
 MDNS_PID=""

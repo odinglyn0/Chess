@@ -111,8 +111,30 @@ publish_mdns
 
 "${DOCKER[@]}" rm -f "$CONTAINER" > /dev/null 2>&1 || true
 
-LAN_IP="$(hostname -I 2> /dev/null | awk '{print $1}')"
-LAN_IP="${LAN_IP:-127.0.0.1}"
+BIND_INTERFACE="${CHESS_GANTRY_BIND_INTERFACE:-eth0}"
+
+address_of_interface() {
+  local interface="$1"
+  command -v ip > /dev/null 2>&1 || return 1
+  ip -4 -o addr show dev "$interface" 2> /dev/null \
+    | awk '{print $4}' | cut -d/ -f1 | head -n 1
+}
+
+LAN_IP="$(address_of_interface "$BIND_INTERFACE" || true)"
+if [[ -n $LAN_IP ]]; then
+  BIND_ADDRESS="$LAN_IP"
+  printf '==> Binding to %s (%s)\n' "$BIND_INTERFACE" "$BIND_ADDRESS"
+else
+  BIND_ADDRESS=0.0.0.0
+  LAN_IP="$(hostname -I 2> /dev/null | awk '{print $1}')"
+  LAN_IP="${LAN_IP:-127.0.0.1}"
+  printf '==> %s has no IPv4 address; binding every interface instead\n' "$BIND_INTERFACE"
+  printf '    set CHESS_GANTRY_BIND_INTERFACE to the right one, for example wlan0\n'
+  if command -v ip > /dev/null 2>&1; then
+    printf '    interfaces with addresses: %s\n' \
+      "$(ip -4 -o addr show scope global 2> /dev/null | awk '{printf "%s=%s ", $2, $4}')"
+  fi
+fi
 
 port_in_use() {
   local port="$1"
@@ -155,7 +177,7 @@ fi
 
 RUN_ARGS=(
   --name "$CONTAINER"
-  --publish "0.0.0.0:${HTTP_PORT}:${APP_PORT}"
+  --publish "${BIND_ADDRESS}:${HTTP_PORT}:${APP_PORT}"
   --volume "$ROOT/config.json:/app/config.json:ro"
   --volume "$ROOT/data:/app/data"
   --env "CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY"
@@ -166,7 +188,7 @@ RUN_ARGS=(
 )
 
 if [[ $ALT_PORT != "$HTTP_PORT" ]]; then
-  RUN_ARGS+=(--publish "0.0.0.0:${ALT_PORT}:${APP_PORT}")
+  RUN_ARGS+=(--publish "${BIND_ADDRESS}:${ALT_PORT}:${APP_PORT}")
 fi
 
 if [[ -e $SERIAL_DEVICE ]]; then

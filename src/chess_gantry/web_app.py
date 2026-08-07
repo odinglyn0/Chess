@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import json
-import hashlib
-import hmac
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -10,7 +8,6 @@ import socket
 import os
 import threading
 from typing import Any, Mapping, Optional
-from urllib.parse import parse_qs, urlsplit
 import webbrowser
 
 from .clerk_auth import ClerkSettings, ClerkVerifier, render_dashboard
@@ -514,24 +511,22 @@ def run_web_server(
         allow_development=os.environ.get("CHESS_GANTRY_DISTROLESS") != "1",
     )
     server.live_game_manager = LiveGameManager(root, config, demo=demo)
-    display_host = _lan_address() if host in {"0.0.0.0", "::"} else host
+    every_interface = host in {"0.0.0.0", "::"}
+    display_host = _lan_address() if every_interface else host
     url = f"http://{display_host}:{port}"
     print(f"Chess Gantry Controller running at {url}")
-    if clerk_settings is not None:
-        print(f"Clerk sign-in is required; frontend API {clerk_settings.frontend_api}")
-        if clerk_settings.allowed_user_ids:
-            print(
-                f"Access is limited to {len(clerk_settings.allowed_user_ids)} allowlisted Clerk user id(s)."
-            )
-        else:
-            print(
-                "CLERK_ALLOWED_USER_IDS is empty, so every user who can sign up in this Clerk instance can move the gantry."
-            )
-    if auth_token is not None:
-        print(f"Authenticated access URL: {url}/?token={auth_token}")
+    print(f"Bound to {host}:{port}")
+    if every_interface:
         print(
-            "Anyone with this URL can run the enabled gantry operations. Keep it private."
+            "EXPOSED: every interface is listening, so anyone who can route to this host"
+            " can reach the dashboard, including the public internet behind a port"
+            " forward or tunnel."
         )
+    print(f"Clerk sign-in is required; frontend API {clerk_settings.frontend_api}")
+    print(
+        "Every user who can sign up in that Clerk instance can move the gantry."
+        " Restrict sign-ups in the Clerk dashboard if that is not what you want."
+    )
     print("Press Control-C to stop it.")
 
     if open_browser:

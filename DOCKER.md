@@ -14,10 +14,10 @@ Build on the Pi itself. Cross-building from an x86_64 host produces an amd64 ima
 
 ## Quick start
 
-`./scripts/run_docker.sh` builds the image and serves it in one step. Paste a Clerk development publishable key into the `CLERK_PUBLISHABLE_KEY` line near the top of the script first, or export it.
+`./run.sh` in the repository root builds the image and serves it in one step. The Clerk development keys are hardcoded near the top of the script; replace them to point at a different instance, or export the variables to override.
 
 ```bash
-./scripts/run_docker.sh
+./run.sh
 ```
 
 It builds `chess:latest`, seeds `config.json` and `data/` if they are missing, makes the dashboard answer to `chess.local`, and runs the container in the foreground so Control-C stops it. When `/dev/ttyUSB0` is absent it starts in demo mode with a simulated controller instead of failing.

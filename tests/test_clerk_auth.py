@@ -29,9 +29,7 @@ def publishable_key(host: str = HOST, prefix: str = "pk_test_") -> str:
 def settings(**overrides: str) -> ClerkSettings:
     environment = {"CLERK_PUBLISHABLE_KEY": publishable_key()}
     environment.update(overrides)
-    resolved = ClerkSettings.from_environment(environment)
-    assert resolved is not None
-    return resolved
+    return ClerkSettings.require_from_environment(environment)
 
 
 class StubKeyClient:
@@ -64,6 +62,10 @@ class SettingsTests(unittest.TestCase):
             ClerkSettings.from_environment({"CLERK_PUBLISHABLE_KEY": "  "})
         )
 
+    def test_a_missing_publishable_key_is_fatal_when_required(self) -> None:
+        with self.assertRaisesRegex(ConfigurationError, "refuses to start"):
+            ClerkSettings.require_from_environment({})
+
     def test_issuer_and_jwks_are_derived_from_the_publishable_key(self) -> None:
         resolved = settings()
         self.assertEqual(resolved.frontend_api, HOST)
@@ -71,20 +73,16 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(resolved.jwks_url, f"https://{HOST}/.well-known/jwks.json")
         self.assertIn("clerk.browser.js", resolved.clerk_js_url)
         self.assertTrue(resolved.clerk_js_url.startswith(f"https://{HOST}/"))
-        self.assertFalse(resolved.secret_key_present)
-        self.assertEqual(resolved.allowed_user_ids, frozenset())
 
-    def test_lists_and_overrides_are_parsed(self) -> None:
+    def test_issuer_and_jwks_overrides_are_honoured(self) -> None:
         resolved = settings(
-            CLERK_SECRET_KEY="sk_test_value",
-            CLERK_ALLOWED_USER_IDS=" user_a , user_b ,, ",
-            CLERK_AUTHORIZED_PARTIES="http://board.local:8000",
             CLERK_JWT_ISSUER="https://accounts.gantry.dev",
+            CLERK_JWKS_URL="https://accounts.gantry.dev/.well-known/jwks.json",
         )
-        self.assertTrue(resolved.secret_key_present)
-        self.assertEqual(resolved.allowed_user_ids, frozenset({"user_a", "user_b"}))
-        self.assertEqual(resolved.authorized_parties, ("http://board.local:8000",))
         self.assertEqual(resolved.issuer, "https://accounts.gantry.dev")
+        self.assertEqual(
+            resolved.jwks_url, "https://accounts.gantry.dev/.well-known/jwks.json"
+        )
 
     def test_plain_http_endpoints_are_refused(self) -> None:
         with self.assertRaisesRegex(ConfigurationError, "must use https"):

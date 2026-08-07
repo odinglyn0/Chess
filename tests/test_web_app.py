@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 from tempfile import TemporaryDirectory
-import hashlib
 import json
 import threading
 import unittest
@@ -225,7 +224,7 @@ class WebAppTests(unittest.TestCase):
         anonymous.exception.close()
 
         rejected = urllib.request.Request(
-            self.base + "/api/status", headers={"Authorization": "Bearer wrong"}
+            self.base + "/api/status", headers={"Cookie": "__session=wrong"}
         )
         with self.assertRaises(urllib.error.HTTPError) as invalid:
             urllib.request.urlopen(rejected, timeout=3)
@@ -234,82 +233,67 @@ class WebAppTests(unittest.TestCase):
 
         accepted = urllib.request.Request(
             self.base + "/api/status",
-            headers={"Authorization": "Bearer valid-clerk-session-token"},
+            headers={"Cookie": "__session=valid-clerk-session-token"},
         )
         with urllib.request.urlopen(accepted, timeout=3) as response:
             self.assertTrue(json.loads(response.read())["ok"])
 
-    def test_clerk_mode_accepts_the_session_cookie_and_guards_writes(self) -> None:
+    def test_a_bearer_header_is_no_longer_an_authentication_path(self) -> None:
         self._enable_clerk("valid-clerk-session-token")
-        cookie = urllib.request.Request(
-            self.base + "/api/board",
-            headers={"Cookie": "__session=valid-clerk-session-token"},
+        request = urllib.request.Request(
+            self.base + "/api/status",
+            headers={"Authorization": "Bearer valid-clerk-session-token"},
         )
-        with urllib.request.urlopen(cookie, timeout=3) as response:
-            self.assertTrue(json.loads(response.read())["ok"])
+        with self.assertRaises(urllib.error.HTTPError) as bearer:
+            urllib.request.urlopen(request, timeout=3)
+        self.assertEqual(bearer.exception.code, 401)
+        bearer.exception.close()
 
-        write = urllib.request.Request(
+    def test_the_session_cookie_guards_writes(self) -> None:
+        self._enable_clerk("valid-clerk-session-token")
+        anonymous_write = urllib.request.Request(
             self.base + "/api/disconnect",
             data=b"{}",
             headers={"Content-Type": "application/json"},
         )
-        with self.assertRaises(urllib.error.HTTPError) as anonymous:
-            urllib.request.urlopen(write, timeout=3)
-        self.assertEqual(anonymous.exception.code, 401)
-        anonymous.exception.close()
+        with self.assertRaises(urllib.error.HTTPError) as blocked:
+            urllib.request.urlopen(anonymous_write, timeout=3)
+        self.assertEqual(blocked.exception.code, 401)
+        blocked.exception.close()
 
-    def test_clerk_and_the_shared_token_can_run_side_by_side(self) -> None:
-        token = "network-dashboard-test-token-123456"
-        self.server.auth_token_hash = hashlib.sha256(token.encode()).digest()
+        signed_write = urllib.request.Request(
+            self.base + "/api/disconnect",
+            data=b"{}",
+            headers={
+                "Content-Type": "application/json",
+                "Cookie": "__session=valid-clerk-session-token",
+            },
+        )
+        with urllib.request.urlopen(signed_write, timeout=3) as response:
+            self.assertTrue(json.loads(response.read())["ok"])
+
+    def test_cross_site_writes_are_refused_even_with_the_cookie(self) -> None:
         self._enable_clerk("valid-clerk-session-token")
-        for value in (token, "valid-clerk-session-token"):
-            request = urllib.request.Request(
-                self.base + "/api/status", headers={"Authorization": f"Bearer {value}"}
-            )
-            with urllib.request.urlopen(request, timeout=3) as response:
-                self.assertTrue(json.loads(response.read())["ok"])
+        forged = urllib.request.Request(
+            self.base + "/api/home",
+            data=b'{"confirm_motion": true}',
+            headers={
+                "Content-Type": "application/json",
+                "Cookie": "__session=valid-clerk-session-token",
+                "Sec-Fetch-Site": "cross-site",
+            },
+        )
+        with self.assertRaises(urllib.error.HTTPError) as blocked:
+            urllib.request.urlopen(forged, timeout=3)
+        self.assertEqual(blocked.exception.code, 401)
+        blocked.exception.close()
 
-    def test_network_bind_requires_explicit_flag_and_strong_token(self) -> None:
-        with self.assertRaisesRegex(ValidationError, "--allow-network"):
-            validate_web_access("0.0.0.0", False, "a" * 32)
-        with self.assertRaisesRegex(ValidationError, "at least 24"):
-            validate_web_access("0.0.0.0", True, None)
-        with self.assertRaisesRegex(ValidationError, "at least 24"):
-            validate_web_access("0.0.0.0", True, "short")
-        self.assertTrue(validate_web_access("0.0.0.0", True, "a" * 32))
-        self.assertFalse(validate_web_access("127.0.0.1", False, None))
-
-    def test_clerk_satisfies_the_network_bind_requirement(self) -> None:
-        self.assertTrue(validate_web_access("0.0.0.0", True, None, clerk_enabled=True))
-        with self.assertRaisesRegex(ValidationError, "--allow-network"):
-            validate_web_access("0.0.0.0", False, None, clerk_enabled=True)
-
-    def test_authenticated_server_protects_page_and_apis(self) -> None:
-        token = "network-dashboard-test-token-123456"
-        self.server.auth_token_hash = hashlib.sha256(token.encode()).digest()
-        cookie_jar = urllib.request.HTTPCookieProcessor()
-        opener = urllib.request.build_opener(cookie_jar)
-        with self.assertRaises(urllib.error.HTTPError) as unauthorized:
-            opener.open(self.base + "/api/status", timeout=3)
-        self.assertEqual(unauthorized.exception.code, 401)
-        unauthorized.exception.close()
-
-        with self.assertRaises(urllib.error.HTTPError) as bad_token:
-            opener.open(self.base + "/?token=wrong", timeout=3)
-        self.assertEqual(bad_token.exception.code, 401)
-        bad_token.exception.close()
-
-        with opener.open(self.base + f"/?token={token}", timeout=3) as response:
-            html = response.read().decode("utf-8")
-        self.assertIn("Operations dashboard", html)
-        cookie = next(iter(cookie_jar.cookiejar))
-        self.assertEqual(cookie.name, "gantry_session")
-        self.assertTrue(cookie.has_nonstandard_attr("HttpOnly"))
-        self.assertEqual(cookie.get_nonstandard_attr("SameSite"), "Strict")
-
-        with opener.open(self.base + "/api/status", timeout=3) as response:
-            payload = json.loads(response.read())
-        self.assertTrue(payload["ok"])
+    def test_the_dashboard_shell_stays_public_so_sign_in_can_load(self) -> None:
+        self._enable_clerk("valid-clerk-session-token")
+        for path in ("/", "/?redirect=1"):
+            with urllib.request.urlopen(self.base + path, timeout=3) as response:
+                self.assertEqual(response.status, 200)
+                self.assertIn("clerkSignIn", response.read().decode("utf-8"))
 
 
 if __name__ == "__main__":

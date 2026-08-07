@@ -1,0 +1,118 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+
+CLERK_PUBLISHABLE_KEY="${CLERK_PUBLISHABLE_KEY:-pk_test_dGhhbmtmdWwtcmF5LTU4LmNsZXJrLmFjY291bnRzLmRldiQ}"
+CLERK_SECRET_KEY="${CLERK_SECRET_KEY:-sk_test_qC94SlNs7psYuUgRdeRQejA8K2lHS7yggshCXkTwYz}"
+
+IMAGE="${CHESS_GANTRY_IMAGE:-chess:latest}"
+CONTAINER="${CHESS_GANTRY_CONTAINER:-chess-gantry}"
+MDNS_NAME="${CHESS_GANTRY_MDNS_NAME:-chess.local}"
+HTTP_PORT="${CHESS_GANTRY_HTTP_PORT:-80}"
+ALT_PORT="${CHESS_GANTRY_ALT_PORT:-8000}"
+APP_PORT=8000
+SERIAL_DEVICE="${CHESS_GANTRY_SERIAL_PORT:-/dev/ttyUSB0}"
+
+if [[ $CLERK_PUBLISHABLE_KEY == pk_test_REPLACE_WITH_YOUR_DEV_KEY ]]; then
+  printf 'Paste your Clerk development publishable key into %s (CLERK_PUBLISHABLE_KEY) or export it.\n' "$0" >&2
+  printf 'Copy it from the Clerk dashboard; it looks like pk_test_abc123...\n' >&2
+  exit 2
+fi
+
+if docker info > /dev/null 2>&1; then
+  DOCKER=(docker)
+elif sudo -n docker info > /dev/null 2>&1; then
+  DOCKER=(sudo docker)
+else
+  printf 'Docker is unavailable. Start it, or add this user to the docker group and log back in.\n' >&2
+  exit 2
+fi
+
+printf '==> Building %s\n' "$IMAGE"
+"${DOCKER[@]}" build -t "$IMAGE" .
+
+if [[ ! -f config.json ]]; then
+  cp config.example.json config.json
+  printf '==> Created config.json from config.example.json; calibrate it before moving hardware\n'
+fi
+mkdir -p data
+if [[ ! -f data/board_state.json ]]; then
+  cp examples/board_state.standard.json data/board_state.json
+fi
+
+MDNS_PID=""
+publish_mdns() {
+  local short="${MDNS_NAME%.local}"
+  if [[ "$(hostname -s 2> /dev/null || true)" == "$short" ]]; then
+    printf '==> Hostname is already %s, so avahi answers %s\n' "$short" "$MDNS_NAME"
+    return
+  fi
+  if ! command -v avahi-publish > /dev/null 2>&1; then
+    printf '==> %s will not resolve. Install avahi (sudo apt-get install -y avahi-daemon avahi-utils)\n' "$MDNS_NAME"
+    printf '    or rename the host with: sudo hostnamectl set-hostname %s\n' "$short"
+    return
+  fi
+  local address
+  address="$(hostname -I 2> /dev/null | awk '{print $1}')"
+  if [[ -z $address ]]; then
+    printf '==> Could not determine a LAN address, skipping the %s alias\n' "$MDNS_NAME"
+    return
+  fi
+  avahi-publish -a -R "$MDNS_NAME" "$address" > /dev/null 2>&1 &
+  MDNS_PID=$!
+  printf '==> Advertising %s as %s over mDNS (pid %s)\n' "$MDNS_NAME" "$address" "$MDNS_PID"
+}
+
+cleanup() {
+  if [[ -n $MDNS_PID ]]; then
+    kill "$MDNS_PID" 2> /dev/null || true
+  fi
+  "${DOCKER[@]}" rm -f "$CONTAINER" > /dev/null 2>&1 || true
+}
+trap cleanup EXIT INT TERM
+
+publish_mdns
+
+"${DOCKER[@]}" rm -f "$CONTAINER" > /dev/null 2>&1 || true
+
+RUN_ARGS=(
+  --name "$CONTAINER"
+  --publish "${HTTP_PORT}:${APP_PORT}"
+  --volume "$ROOT/config.json:/app/config.json:ro"
+  --volume "$ROOT/data:/app/data"
+  --env "CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY"
+  --env "CLERK_SECRET_KEY=$CLERK_SECRET_KEY"
+  --env "CHESS_GANTRY_PUBLIC_HOST=$MDNS_NAME"
+  --env "CHESS_GANTRY_WEB_HOST=0.0.0.0"
+  --env "CHESS_GANTRY_WEB_PORT=$APP_PORT"
+)
+
+if [[ $ALT_PORT != "$HTTP_PORT" ]]; then
+  RUN_ARGS+=(--publish "${ALT_PORT}:${APP_PORT}")
+fi
+
+if [[ -e $SERIAL_DEVICE ]]; then
+  RUN_ARGS+=(--device "$SERIAL_DEVICE" --env "CHESS_GANTRY_SERIAL_PORT=$SERIAL_DEVICE")
+  if serial_gid="$(stat -c '%g' "$SERIAL_DEVICE" 2> /dev/null)"; then
+    RUN_ARGS+=(--group-add "$serial_gid")
+  fi
+  printf '==> Serial device %s attached\n' "$SERIAL_DEVICE"
+else
+  RUN_ARGS+=(--env "CHESS_GANTRY_DEMO=1")
+  printf '==> %s is absent, starting in demo mode with a simulated controller\n' "$SERIAL_DEVICE"
+fi
+
+if [[ $HTTP_PORT == 80 ]]; then
+  printf '==> Dashboard: http://%s\n' "$MDNS_NAME"
+else
+  printf '==> Dashboard: http://%s:%s\n' "$MDNS_NAME" "$HTTP_PORT"
+fi
+if [[ $ALT_PORT != "$HTTP_PORT" ]]; then
+  printf '==> Also on http://%s:%s\n' "$MDNS_NAME" "$ALT_PORT"
+fi
+printf '==> Open to every host that can route here. Clerk sign-in is required.\n'
+printf '==> Control-C stops the server.\n'
+
+"${DOCKER[@]}" run --rm "${RUN_ARGS[@]}" "$IMAGE"

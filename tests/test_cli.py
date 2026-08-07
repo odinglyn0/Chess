@@ -83,6 +83,26 @@ class RunCommandTests(unittest.TestCase):
         self.assertIn("INITIAL y_max TRIGGERED", output)
         self.assertIn("INITIAL z_max TRIGGERED", output)
 
+    def test_reed_test_demo_prints_gpb0_transitions(self) -> None:
+        buffer = StringIO()
+        with contextlib.redirect_stdout(buffer):
+            code = run(
+                self.args(
+                    "reed-test",
+                    "--demo",
+                    "--samples",
+                    "3",
+                    "--interval",
+                    "0.001",
+                )
+            )
+        self.assertEqual(code, 0)
+        output = buffer.getvalue()
+        self.assertIn("Watching MCP23017 GPB0", output)
+        self.assertIn("INITIAL GPB0 OPEN", output)
+        self.assertIn("CLOSED GPB0", output)
+        self.assertIn("OPENED GPB0", output)
+
     def test_workspace_test_dry_run_generates_full_grid(self) -> None:
         buffer = StringIO()
         with contextlib.redirect_stdout(buffer):

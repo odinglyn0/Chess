@@ -101,6 +101,7 @@ The dashboard includes:
 - homing, movement, magnet, circle, perimeter, and 64-square tests;
 - board state, reset, audit, and recovery tools;
 - immediate live Lichess TV mode;
+- live MCP23017 GPB0 reed-switch state and transition count;
 - task logs, cancellation, and emergency stop.
 
 ### Authenticated LAN Access
@@ -112,6 +113,50 @@ The dashboard includes:
 Open the complete token URL printed by the server from another device on the same trusted network. Commands and serial access remain on the gantry computer.
 
 Do not expose the plain-HTTP dashboard directly to the internet.
+
+## Reed Switch Wiring Test
+
+The first board-state sensor is a normally open reed switch connected through
+an MCP23017 I2C expander.
+
+```text
+Pi pin 3 / GPIO 2  (SDA) -> MCP23017 SDA
+Pi pin 5 / GPIO 3  (SCL) -> MCP23017 SCL
+Pi pin 1            (3V3) -> MCP23017 VDD and RESET
+Pi pin 6            (GND) -> MCP23017 VSS and A0/A1/A2
+MCP23017 GPB0 -> reed switch -> GND
+```
+
+With A0/A1/A2 grounded, the address is `0x20`. The software makes GPB0 an input
+and enables the MCP23017 pull-up:
+
+```text
+No magnet:     OPEN, raw HIGH
+Magnet present: CLOSED, raw LOW
+```
+
+Enable I2C and verify the expander:
+
+```bash
+sudo raspi-config nonint do_i2c 0
+sudo reboot
+sudo apt install -y i2c-tools
+i2cdetect -y 1
+```
+
+Run the terminal test:
+
+```bash
+uv run chess-gantry reed-test --bus 1 --address 0x20
+```
+
+The dashboard's **MCP23017 reed switch** card refreshes four times per second
+and displays OPEN/CLOSED, raw HIGH/LOW, and transition count. The **Test
+MCP23017 reed switch** operation records transitions for ten seconds.
+
+`run.sh` passes `/dev/i2c-1` and its host group into the container when present.
+If the panel reports an error, check `/dev/i2c-1`, `i2cdetect -y 1`, the address
+straps, RESET, 3.3 V, and the shared ground.
 
 ## Raspberry Pi 3B+
 

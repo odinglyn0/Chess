@@ -14,6 +14,7 @@ from chess_gantry.errors import ValidationError
 from chess_gantry.models import BoardState
 from chess_gantry.live_game import LiveGameManager
 from chess_gantry.operations import OperationManager, OperationSpec
+from chess_gantry.reed_switch import SimulatedReedSwitch
 from chess_gantry.persistence import atomic_write_json
 from chess_gantry.service import GantryService
 from chess_gantry.web_app import HTML, GantryHTTPServer, RequestHandler
@@ -77,6 +78,7 @@ class WebAppTests(unittest.TestCase):
             ),
         )
         self.server.live_game_manager = LiveGameManager(root, self.config, demo=True)
+        self.server.reed_switch = SimulatedReedSwitch()
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
         self.base = f"http://127.0.0.1:{self.server.server_port}"
@@ -180,7 +182,6 @@ class WebAppTests(unittest.TestCase):
         self.assertIn("Operations dashboard", html)
         self.assertIn('id="taskStop"', html)
         self.assertIn("/api/tasks/start", html)
-        self.assertIn('id="keyboardArm"', html)
         self.assertIn('id="machineZ"', html)
         self.assertIn("ArrowLeft", html)
         self.assertIn("/api/jog", html)
@@ -190,6 +191,37 @@ class WebAppTests(unittest.TestCase):
         self.assertLess(
             html.index("async function autoConnect"), html.index("await autoConnect()")
         )
+        self.assertIn('id="reedState"', html)
+        self.assertIn("/api/reed", html)
+        self.assertNotIn('id="keyboardArm"', html)
+        self.assertNotIn('id="liveBoardReset"', html)
+        self.assertNotIn('id="confirm"', html)
+
+    def test_reed_switch_api_reports_open_and_closed(self) -> None:
+        _, first = self.request("/api/reed", {})
+        _, second = self.request("/api/reed", {})
+        self.assertEqual(first["reed"]["pin"], "GPB0")
+        self.assertEqual(first["reed"]["state"], "open")
+        self.assertEqual(second["reed"]["state"], "closed")
+        self.assertEqual(second["reed"]["address"], "0x20")
+
+    def test_reed_switch_api_reports_i2c_failure_without_crashing(self) -> None:
+        class BrokenReader:
+            def read(self):
+                raise ValidationError("MCP23017 at 0x20 did not respond")
+
+        self.server.reed_switch = BrokenReader()
+        request = urllib.request.Request(
+            self.base + "/api/reed",
+            data=b"{}",
+            headers={"Content-Type": "application/json"},
+        )
+        with self.assertRaises(urllib.error.HTTPError) as raised:
+            urllib.request.urlopen(request, timeout=3)
+        self.assertEqual(raised.exception.code, 409)
+        payload = json.loads(raised.exception.read())
+        raised.exception.close()
+        self.assertIn("did not respond", payload["error"])
 
     def test_live_game_status_and_start_validation_api(self) -> None:
         _, status = self.request("/api/live/status")

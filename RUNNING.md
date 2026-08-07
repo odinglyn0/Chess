@@ -447,6 +447,23 @@ appended to the audit log.
 
 ## Movement And Magnet Tests
 
+## MCP23017 GPB0 Reed Switch Test
+
+Wire GPB0 to a normally open reed switch and the other switch terminal to GND.
+The reader enables the MCP23017 pull-up, so the state is OPEN/HIGH without a
+magnet and CLOSED/LOW with a magnet.
+
+```bash
+sudo raspi-config nonint do_i2c 0
+sudo reboot
+i2cdetect -y 1
+uv run chess-gantry reed-test --bus 1 --address 0x20
+```
+
+Use `--samples 100 --interval 0.1` for a ten-second finite test. The browser
+dashboard polls the same input continuously and includes a ten-second operation
+card.
+
 Print only:
 
 ```bash

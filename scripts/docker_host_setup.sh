@@ -73,6 +73,12 @@ done
 
 if [[ ! -e /dev/i2c-1 ]]; then
   note "  enable I2C with 'dtparam=i2c_arm=on' in /boot/firmware/config.txt, then reboot"
+elif command -v i2cdetect > /dev/null 2>&1; then
+  if i2cdetect -y 1 | grep -qE '(^|[[:space:]])20([[:space:]]|$)'; then
+    note "  MCP23017 detected at I2C address 0x20"
+  else
+    warn "no MCP23017 detected at address 0x20 on /dev/i2c-1"
+  fi
 fi
 if [[ ! -e /dev/spidev0.0 ]]; then
   note "  enable SPI with 'dtparam=spi=on' in /boot/firmware/config.txt, then reboot"

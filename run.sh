@@ -14,6 +14,7 @@ HTTP_PORT="${CHESS_GANTRY_HTTP_PORT:-80}"
 ALT_PORT="${CHESS_GANTRY_ALT_PORT:-8000}"
 APP_PORT=8000
 SERIAL_DEVICE="${CHESS_GANTRY_SERIAL_PORT:-/dev/ttyUSB0}"
+I2C_DEVICE="${CHESS_GANTRY_I2C_DEVICE:-/dev/i2c-1}"
 APP_UID="${CHESS_GANTRY_APP_UID:-65532}"
 APP_GID="${CHESS_GANTRY_APP_GID:-65532}"
 
@@ -185,10 +186,22 @@ RUN_ARGS=(
   --env "CHESS_GANTRY_PUBLIC_HOST=$MDNS_NAME"
   --env "CHESS_GANTRY_WEB_HOST=0.0.0.0"
   --env "CHESS_GANTRY_WEB_PORT=$APP_PORT"
+  --env "CHESS_GANTRY_I2C_BUS=1"
+  --env "CHESS_GANTRY_MCP23017_ADDRESS=0x20"
 )
 
 if [[ $ALT_PORT != "$HTTP_PORT" ]]; then
   RUN_ARGS+=(--publish "${BIND_ADDRESS}:${ALT_PORT}:${APP_PORT}")
+fi
+
+if [[ -e $I2C_DEVICE ]]; then
+  RUN_ARGS+=(--device "$I2C_DEVICE")
+  if i2c_gid="$(stat -c '%g' "$I2C_DEVICE" 2> /dev/null)"; then
+    RUN_ARGS+=(--group-add "$i2c_gid")
+  fi
+  printf '==> I2C device %s attached for MCP23017 GPB0\n' "$I2C_DEVICE"
+else
+  printf '==> %s is absent; reed switch panel will report an I2C error\n' "$I2C_DEVICE"
 fi
 
 if [[ -e $SERIAL_DEVICE ]]; then

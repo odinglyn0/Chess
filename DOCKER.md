@@ -117,6 +117,17 @@ Add the optional buses when the build includes them:
   --group-add "$(stat -c '%g' /dev/spidev0.0)" \
 ```
 
+For the MCP23017 GPB0 reed test, `/dev/i2c-1` is required and `run.sh` passes it
+automatically when present. The image includes `smbus2`. Verify address `0x20`
+before starting:
+
+```bash
+i2cdetect -y 1
+```
+
+The dashboard defaults to bus 1, address `0x20`, GPB0. Override the bus/address
+with `CHESS_GANTRY_I2C_BUS` and `CHESS_GANTRY_MCP23017_ADDRESS` if needed.
+
 For a board on `/dev/ttyACM0`, pass the node and tell the application about it: `--device /dev/ttyACM0 -e CHESS_GANTRY_SERIAL_PORT=/dev/ttyACM0`.
 
 To try the stack with no hardware attached, drop every `--device` and `--group-add` flag and add `-e CHESS_GANTRY_DEMO=1`.

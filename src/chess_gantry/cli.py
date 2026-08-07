@@ -22,6 +22,7 @@ from .serial_link import (
     parse_endstop_states,
 )
 from .service import GantryService
+from .reed_switch import MCP23017ReedSwitch, ReedState, reed_transition
 from .debug_console.runtime import TOKEN_ENVIRONMENT_KEY
 from .lichess_pgn import fetch_pgn, pgn_moves
 from .lichess_follow import follow_game
@@ -212,6 +213,40 @@ def _parser() -> ArgumentParser:
     endstop_watch.add_argument("--baudrate", type=int, help="try only this baud rate")
     endstop_watch.add_argument(
         "--demo", action="store_true", help="use simulated open endstops"
+    )
+
+    reed_test = commands.add_parser(
+        "reed-test",
+        help="read MCP23017 GPB0 and print reed switch state transitions",
+    )
+    reed_test.add_argument(
+        "--bus", type=int, default=1, help="Linux I2C bus number (default: 1)"
+    )
+    reed_test.add_argument(
+        "--address",
+        type=lambda value: int(value, 0),
+        default=0x20,
+        help="MCP23017 I2C address, decimal or 0x-prefixed (default: 0x20)",
+    )
+    reed_test.add_argument(
+        "--interval",
+        type=float,
+        default=0.1,
+        help="seconds between reads (default: 0.1)",
+    )
+    reed_test.add_argument(
+        "--samples",
+        type=int,
+        default=0,
+        help="stop after this many reads; zero watches until Ctrl+C",
+    )
+    reed_test.add_argument(
+        "--active-high",
+        action="store_true",
+        help="treat a high GPB0 input as closed instead of the default active-low wiring",
+    )
+    reed_test.add_argument(
+        "--demo", action="store_true", help="alternate simulated open/closed states"
     )
 
     reference_gantry = commands.add_parser(
@@ -670,6 +705,7 @@ _COMMANDS = frozenset(
         "ports",
         "diagnose",
         "endstop-watch",
+        "reed-test",
         "reference-gantry",
         "home-gantry",
         "web",
@@ -798,6 +834,42 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
                     sample += 1
                     if args.samples == 0 or sample < args.samples:
                         sleep(args.interval)
+            return 0
+
+        if args.command == "reed-test":
+            if args.interval <= 0:
+                parser.error("--interval must be positive")
+            if args.samples < 0:
+                parser.error("--samples cannot be negative")
+            reader = MCP23017ReedSwitch(
+                bus_number=args.bus,
+                address=args.address,
+                active_low=not args.active_high,
+            )
+            previous: Optional[ReedState] = None
+            sample = 0
+            print(
+                f"Watching MCP23017 GPB0 on /dev/i2c-{args.bus} at "
+                f"0x{args.address:02X}; press Ctrl+C to stop.",
+                flush=True,
+            )
+            while args.samples == 0 or sample < args.samples:
+                if args.demo:
+                    current = ReedState(
+                        closed=bool(sample % 2),
+                        raw_high=not bool(sample % 2),
+                        bus=args.bus,
+                        address=args.address,
+                    )
+                else:
+                    current = reader.read()
+                transition = reed_transition(previous, current)
+                if transition:
+                    print(transition, flush=True)
+                previous = current
+                sample += 1
+                if args.samples == 0 or sample < args.samples:
+                    sleep(args.interval)
             return 0
 
         if args.command == "reference-gantry":

@@ -35,6 +35,20 @@ if ! command -v docker > /dev/null 2>&1 || ! docker compose version > /dev/null 
   trap - EXIT
 fi
 
+sudo apt-get update
+sudo apt-get install -y i2c-tools
+
+BOOT_CONFIG=/boot/firmware/config.txt
+if [[ ! -f $BOOT_CONFIG ]]; then
+  BOOT_CONFIG=/boot/config.txt
+fi
+I2C_REBOOT_REQUIRED=0
+if [[ -f $BOOT_CONFIG ]] && ! grep -qE '^dtparam=i2c_arm=on([[:space:]]|$)' "$BOOT_CONFIG"; then
+  printf '\n# Chess Gantry MCP23017\ndtparam=i2c_arm=on\n' | sudo tee -a "$BOOT_CONFIG" > /dev/null
+  printf 'Enabled Raspberry Pi I2C in %s. Reboot before starting the reed switch test.\n' "$BOOT_CONFIG"
+  I2C_REBOOT_REQUIRED=1
+fi
+
 if ! sudo docker compose version > /dev/null 2>&1; then
   printf 'Installing the Docker Compose plugin...\n'
   sudo apt-get update
@@ -44,6 +58,11 @@ fi
 sudo systemctl enable --now docker
 sudo usermod -aG docker "$USER"
 sudo usermod -aG dialout "$USER"
+
+if [[ $I2C_REBOOT_REQUIRED -eq 1 ]]; then
+  printf 'Reboot now, then rerun ./scripts/install_pi.sh to build and start the container.\n'
+  exit 0
+fi
 
 if [[ ! -f config.json ]]; then
   cp config.example.json config.json
@@ -55,6 +74,7 @@ if [[ ! -f data/board_state.json ]]; then
 fi
 
 SERIAL_DEVICE="${CHESS_GANTRY_SERIAL_DEVICE:-/dev/ttyUSB0}"
+I2C_DEVICE="${CHESS_GANTRY_I2C_DEVICE:-/dev/i2c-1}"
 PORT="${CHESS_GANTRY_WEB_PORT:-8000}"
 
 if [[ -z "${CLERK_PUBLISHABLE_KEY:-}" ]]; then
@@ -66,6 +86,9 @@ fi
 cat > .env.docker << EOF
 CHESS_GANTRY_WEB_PORT=$PORT
 CHESS_GANTRY_SERIAL_DEVICE=$SERIAL_DEVICE
+CHESS_GANTRY_I2C_DEVICE=$I2C_DEVICE
+CHESS_GANTRY_I2C_BUS=1
+CHESS_GANTRY_MCP23017_ADDRESS=0x20
 CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY
 CLERK_SECRET_KEY=${CLERK_SECRET_KEY:-}
 EOF
@@ -83,10 +106,11 @@ compose() {
 printf 'Building the Chess Gantry container for %s. This can take several minutes on a Pi 3B+.\n' "$ARCH"
 compose build
 
-if [[ -e "$SERIAL_DEVICE" ]]; then
+if [[ -e "$SERIAL_DEVICE" && -e "$I2C_DEVICE" ]]; then
   compose up -d
 else
-  printf 'Serial device %s is not connected, so the image was built but the service was not started.\n' "$SERIAL_DEVICE"
+  printf 'Required devices are missing, so the image was built but the service was not started.\n'
+  printf '  serial: %s\n  I2C: %s\n' "$SERIAL_DEVICE" "$I2C_DEVICE"
 fi
 
 LAN_IP="$(hostname -I 2> /dev/null | awk '{print $1}')"

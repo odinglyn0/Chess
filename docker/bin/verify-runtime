@@ -33,7 +33,6 @@ REQUIRED = (
     "chess_gantry.serial_link",
     "chess_gantry.lichess_follow",
     "chess_gantry.lichess_pgn",
-    "chess_gantry.lichess_watch",
     "chess_gantry.upstash_persistence",
     "chess_gantry.debug_console.server",
 )

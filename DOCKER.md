@@ -32,6 +32,8 @@ All three are safe to repeat. The group change only applies at your next login, 
 
 After that it builds `chess:latest`, seeds `config.json` and `data/` if they are missing, makes the dashboard answer to `chess.local`, and runs the container in the foreground so Control-C stops it. When `/dev/ttyUSB0` is absent it starts in demo mode with a simulated controller instead of failing.
 
+The script also settles the `data/` ownership problem for you. The container runs as UID 65532, so `data/` has to belong to that UID, which means your own account cannot write into it. The script seeds the directory with sudo when a plain copy is refused, then hands the directory to 65532. The manual `sudo chown -R 65532:65532 data` step below is only needed if you are not using `run.sh`.
+
 The dashboard lands on host port 80 and port 8000, so `http://chess.local` and `http://chess.local:8000` both work.
 
 For `chess.local` to resolve, the script uses whichever applies:

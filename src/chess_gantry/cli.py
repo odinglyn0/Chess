@@ -242,9 +242,11 @@ def _parser() -> ArgumentParser:
         help="required confirmation that all three paths to the switches are clear",
     )
 
-    web = commands.add_parser("web", help="launch the local browser controller")
+    web = commands.add_parser("web", help="launch the browser controller")
     web.add_argument(
-        "--host", default="127.0.0.1", help="bind address (default: local only)"
+        "--host",
+        default="0.0.0.0",
+        help="bind address (default: every interface)",
     )
     web.add_argument(
         "--web-port", type=int, default=8000, help="browser port (default: 8000)"
@@ -254,16 +256,6 @@ def _parser() -> ArgumentParser:
     )
     web.add_argument(
         "--demo", action="store_true", help="run with a simulated Marlin controller"
-    )
-    web.add_argument(
-        "--allow-network",
-        action="store_true",
-        help="allow a non-loopback bind; local-only is safer and is the default",
-    )
-    web.add_argument(
-        "--auth-token",
-        default=os.environ.get("CHESS_GANTRY_WEB_TOKEN"),
-        help="required access token for network mode (or CHESS_GANTRY_WEB_TOKEN)",
     )
 
     console = commands.add_parser(
@@ -840,8 +832,6 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
                 port=args.web_port,
                 open_browser=not args.no_browser,
                 demo=args.demo,
-                allow_network=args.allow_network,
-                auth_token=args.auth_token,
             )
             return 0
 

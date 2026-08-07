@@ -1,14 +1,3 @@
-# syntax=docker/dockerfile:1.7
-
-# A Fedora builder assembles a complete runtime root filesystem with uv, and a
-# scratch-based distroless runner receives it verbatim.
-#
-# Target platform is linux/arm64. A Raspberry Pi 3B+ can run this image only on
-# a 64-bit OS, because Fedora has published no 32-bit arm (armhfp) tree since
-# Fedora 37, so there is no armv7 builder to use.
-#
-#   docker buildx build --platform linux/arm64 -t chess-gantry:0.2.0 .
-
 ARG FEDORA_VERSION=42
 
 FROM fedora:${FEDORA_VERSION} AS builder
@@ -37,7 +26,6 @@ RUN set -eu; \
     uv --version; \
     dnf clean all
 
-# Runtime root filesystem: interpreter, TLS trust, timezone data, curl. Nothing else.
 RUN set -eu; \
     . /etc/os-release; \
     packages="python3 curl ca-certificates crypto-policies tzdata glibc-langpack-en"; \
@@ -61,9 +49,6 @@ WORKDIR /build
 COPY pyproject.toml uv.lock README.md ./
 COPY docker/requirements-extra.txt docker/requirements-gpio.txt ./docker/
 
-# uv.lock stays the source of truth for the declared dependency tree. The extra
-# files cover imports the lock does not carry: websockets (lichess-watch),
-# upstash-redis and redis (remote state), plus optional GPIO/I2C/SPI libraries.
 RUN set -eu; \
     uv export --frozen --no-dev --all-extras --no-emit-project --no-hashes \
       --format requirements-txt --output-file /build/locked-requirements.txt; \
@@ -83,8 +68,6 @@ RUN set -eu; \
     uv pip install --no-cache --no-deps --system --python /usr/bin/python3 \
       --prefix "${ROOTFS}/usr" /build/dist/chess_gantry-*.whl
 
-# Application working tree. The dashboard shells out with cwd set to this root,
-# and reads config.json, examples/, schemas/ and scripts/ relative to it.
 COPY config*.json relay.html pyproject.toml uv.lock README.md RUNNING.md ./tree/
 COPY package.json package-lock.json .prettierrc.json .prettierignore ./tree/
 COPY examples ./tree/examples/
@@ -103,9 +86,6 @@ RUN set -eu; \
     printf 'gantry:x:%s:%s::/app:/sbin/nologin\n' "${APP_UID}" "${APP_GID}" >> "${ROOTFS}/etc/passwd"; \
     chown -R "${APP_UID}:${APP_GID}" "${ROOTFS}/app"
 
-# Console scripts must resolve to the runner's interpreter. Fedora's site layout
-# can place a --prefix install under usr/local, so normalise both locations and
-# guarantee a canonical /usr/bin/chess-gantry for the uv shim to exec.
 RUN set -eu; \
     find "${ROOTFS}/usr" -maxdepth 5 -type d -name site-packages -print; \
     for dir in "${ROOTFS}/usr/bin" "${ROOTFS}/usr/local/bin"; do \
@@ -122,8 +102,6 @@ RUN set -eu; \
     test -x "${ROOTFS}/usr/bin/chess-gantry"; \
     head -n 1 "${ROOTFS}/usr/bin/chess-gantry" | grep -qx '#!/usr/bin/python3'
 
-# Builder and rootfs share architecture and interpreter version, so the runtime
-# can be exercised in place before the shell is removed.
 RUN set -eu; \
     install -m 0755 /build/tree-bin/verify-runtime "${ROOTFS}/tmp/verify-runtime"; \
     chroot "${ROOTFS}" /usr/bin/python3 /tmp/verify-runtime "${INCLUDE_GPIO}"; \
@@ -132,7 +110,6 @@ RUN set -eu; \
     chroot "${ROOTFS}" /usr/bin/uv sync; \
     rm -f "${ROOTFS}/tmp/verify-runtime"
 
-# Strip everything that would make the runner non-distroless.
 RUN set -eu; \
     if [ "${INCLUDE_DEV_TOOLS}" != "1" ]; then \
       rm -f "${ROOTFS}/usr/bin/sh" "${ROOTFS}/usr/bin/bash" "${ROOTFS}/usr/bin/dash" \

@@ -1,5 +1,0 @@
-include:
-  - path: docker-compose.pi.yml
-
-# Compatibility filename retained for older instructions. The main Chess Gantry
-# container already includes the Lichess streaming client and web TV workflow.

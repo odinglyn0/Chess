@@ -28,21 +28,20 @@ class DockerConfigurationTests(unittest.TestCase):
         self.assertIn("/dev/ttyUSB0", compose)
         self.assertIn("./config.json:/app/config.json:ro,Z", compose)
         self.assertIn("./data:/app/data:Z", compose)
-        self.assertIn("CHESS_GANTRY_WEB_TOKEN:?", compose)
+        self.assertIn("CLERK_PUBLISHABLE_KEY:?", compose)
         self.assertIn("no-new-privileges:true", compose)
         self.assertIn("cap_drop", compose)
         self.assertNotIn("privileged: true", compose)
         self.assertIn("CHESS_GANTRY_DISTROLESS", compose)
         self.assertIn("healthcheck", compose)
 
-    def test_python_entrypoint_runs_authenticated_network_ui_without_shell(
-        self,
-    ) -> None:
+    def test_python_entrypoint_runs_the_clerk_gated_ui_without_shell(self) -> None:
         entrypoint = (ROOT / "docker" / "entrypoint.py").read_text(encoding="utf-8")
         self.assertIn('"--host",', entrypoint)
         self.assertIn('"0.0.0.0",', entrypoint)
-        self.assertIn('"--allow-network",', entrypoint)
-        self.assertIn('"--auth-token",', entrypoint)
+        self.assertIn("CLERK_PUBLISHABLE_KEY", entrypoint)
+        self.assertNotIn("--auth-token", entrypoint)
+        self.assertNotIn("--allow-network", entrypoint)
         self.assertFalse((ROOT / "docker" / "entrypoint.sh").exists())
 
     def test_pi_scripts_exist_and_are_executable(self) -> None:

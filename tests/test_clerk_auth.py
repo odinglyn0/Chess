@@ -113,8 +113,8 @@ class VerifierTests(unittest.TestCase):
         claims = self.verifier().verify(self.token())
         self.assertEqual(claims["sub"], "user_a")
 
-    def test_an_empty_token_is_refused(self) -> None:
-        with self.assertRaisesRegex(ValidationError, "no Clerk session token"):
+    def test_an_empty_cookie_is_refused(self) -> None:
+        with self.assertRaisesRegex(ValidationError, "no Clerk session cookie"):
             self.verifier().verify("")
 
     def test_tokens_from_another_issuer_are_refused(self) -> None:
@@ -148,26 +148,13 @@ class VerifierTests(unittest.TestCase):
         with self.assertRaisesRegex(ValidationError, "rejected"):
             self.verifier().verify(incomplete)
 
-    def test_an_unauthorized_party_is_refused(self) -> None:
-        checked = self.verifier(CLERK_AUTHORIZED_PARTIES="http://board.local:8000")
+    def test_any_signed_in_user_of_the_instance_is_accepted(self) -> None:
         self.assertEqual(
-            checked.verify(self.token(azp="http://board.local:8000"))["sub"], "user_a"
+            self.verifier().verify(self.token(sub="user_z"))["sub"], "user_z"
         )
-        with self.assertRaisesRegex(ValidationError, "unauthorized origin"):
-            checked.verify(self.token(azp="http://evil.test"))
-
-    def test_the_user_allowlist_is_enforced(self) -> None:
-        restricted = self.verifier(CLERK_ALLOWED_USER_IDS="user_a")
-        self.assertEqual(restricted.verify(self.token())["sub"], "user_a")
-        with self.assertRaisesRegex(ValidationError, "not listed"):
-            restricted.verify(self.token(sub="user_b"))
 
 
 class DashboardRenderingTests(unittest.TestCase):
-    def test_the_page_is_untouched_when_clerk_is_disabled(self) -> None:
-        page = "<html><head></head><body>x</body></html>"
-        self.assertEqual(render_dashboard(page, None), page)
-
     def test_the_gate_is_injected_before_the_head_closes(self) -> None:
         resolved = settings()
         page = render_dashboard(
@@ -179,6 +166,8 @@ class DashboardRenderingTests(unittest.TestCase):
         self.assertIn("mountSignIn", page)
         self.assertLess(page.index("clerkSignIn"), page.index("</head>"))
         self.assertTrue(page.endswith("<body></body></html>"))
+        self.assertNotIn("Authorization", page)
+        self.assertNotIn("getToken", page)
 
     def test_injected_configuration_cannot_close_the_script_tag(self) -> None:
         payload = _script_safe_json({"key": "</script><script>alert(1)&"})

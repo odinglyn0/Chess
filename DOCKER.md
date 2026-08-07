@@ -12,6 +12,36 @@ The runtime stage is built `FROM scratch`, so the image has no shell. Everything
 
 Build on the Pi itself. Cross-building from an x86_64 host produces an amd64 image that will not start on ARM.
 
+## Quick start
+
+`./scripts/run_docker.sh` builds the image and serves it in one step. Paste a Clerk development publishable key into the `CLERK_PUBLISHABLE_KEY` line near the top of the script first, or export it.
+
+```bash
+./scripts/run_docker.sh
+```
+
+It builds `chess:latest`, seeds `config.json` and `data/` if they are missing, makes the dashboard answer to `chess.local`, and runs the container in the foreground so Control-C stops it. When `/dev/ttyUSB0` is absent it starts in demo mode with a simulated controller instead of failing.
+
+The dashboard lands on host port 80 and port 8000, so `http://chess.local` and `http://chess.local:8000` both work.
+
+For `chess.local` to resolve, the script uses whichever applies:
+
+- The host is already named `chess`, so avahi answers for it.
+- Otherwise it runs `avahi-publish` to advertise a `chess.local` alias for the LAN address, for as long as the script runs. Install it with `sudo apt-get install -y avahi-daemon avahi-utils`.
+
+It never renames the host. To make the name permanent instead, run `sudo hostnamectl set-hostname chess` once and drop avahi-utils.
+
+Overrides, all optional:
+
+| Variable                   | Default        | Effect                                               |
+| -------------------------- | -------------- | ---------------------------------------------------- |
+| `CHESS_GANTRY_HTTP_PORT`   | `80`           | Primary host port. Use `8080` if 80 is taken.        |
+| `CHESS_GANTRY_ALT_PORT`    | `8000`         | Second host port, skipped when it matches the first. |
+| `CHESS_GANTRY_MDNS_NAME`   | `chess.local`  | Advertised name and the URL that gets printed.       |
+| `CHESS_GANTRY_SERIAL_PORT` | `/dev/ttyUSB0` | Serial device to attach.                             |
+
+The rest of this document covers the manual build and run for anything the script does not fit.
+
 ## Build
 
 ```bash
@@ -81,7 +111,7 @@ To try the stack with no hardware attached, drop every `--device` and `--group-a
 
 ## Reaching the dashboard
 
-The dashboard binds every interface and authenticates with Clerk. Open `http://<pi-ip>:8000/` and sign in. There is no token and no URL to keep secret.
+The dashboard binds every interface and authenticates with Clerk. Open `http://chess.local` or `http://<pi-ip>:8000/` and sign in. There is no token and no URL to keep secret.
 
 ```bash
 docker logs chess-gantry
@@ -118,6 +148,7 @@ Set with `-e` on the run command. `.env.example` documents the full set.
 | `CLERK_SECRET_KEY`         | empty          | Accepted for completeness, unused by session checks.         |
 | `CHESS_GANTRY_WEB_HOST`    | `0.0.0.0`      | Every interface. Use `127.0.0.1` to restrict it to the host. |
 | `CHESS_GANTRY_WEB_PORT`    | `8000`         | In-container dashboard port.                                 |
+| `CHESS_GANTRY_PUBLIC_HOST` | empty          | Hostname printed in the startup URL, e.g. `chess.local`.     |
 | `CHESS_GANTRY_DEBUG_TOKEN` | generated      | Debug console token. Separate app, unchanged.                |
 | `CHESS_GANTRY_DEMO`        | `0`            | Simulated hardware, no devices needed.                       |
 | `LICHESS_TOKEN`            | empty          | Raises Lichess rate limits and reads own games.              |

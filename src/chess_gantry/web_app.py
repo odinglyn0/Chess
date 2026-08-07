@@ -512,9 +512,12 @@ def run_web_server(
     )
     server.live_game_manager = LiveGameManager(root, config, demo=demo)
     every_interface = host in {"0.0.0.0", "::"}
-    display_host = _lan_address() if every_interface else host
+    public_host = os.environ.get("CHESS_GANTRY_PUBLIC_HOST", "").strip()
+    display_host = public_host or (_lan_address() if every_interface else host)
     url = f"http://{display_host}:{port}"
     print(f"Chess Gantry Controller running at {url}")
+    if public_host and every_interface:
+        print(f"Also reachable at http://{_lan_address()}:{port}")
     print(f"Bound to {host}:{port}")
     if every_interface:
         print(

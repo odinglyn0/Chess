@@ -13,6 +13,8 @@ from typing import Any, Mapping, Optional
 from urllib.parse import parse_qs, urlsplit
 import webbrowser
 
+from .clerk_auth import ClerkSettings, ClerkVerifier, render_dashboard
+from .clerk_auth import SESSION_COOKIE as CLERK_SESSION_COOKIE
 from .config import AppConfig
 from .controller import GantryController
 from .errors import GantryError, ValidationError
@@ -40,21 +42,7 @@ def _lan_address() -> str:
     return "127.0.0.1"
 
 
-def validate_web_access(
-    host: str, allow_network: bool, auth_token: Optional[str]
-) -> bool:
-    network_visible = host not in {"127.0.0.1", "localhost", "::1"}
-    if network_visible and not allow_network:
-        raise ValidationError(
-            "refusing a network-visible bind without --allow-network; use 127.0.0.1 for local control"
-        )
-    if network_visible and (auth_token is None or len(auth_token) < 24):
-        raise ValidationError(
-            "network-visible web mode requires --auth-token with at least 24 characters"
-        )
-    if not network_visible and auth_token is not None and len(auth_token) < 24:
-        raise ValidationError("--auth-token must contain at least 24 characters")
-    return network_visible
+SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
 
 HTML = r"""<!doctype html>
@@ -150,28 +138,58 @@ class RequestHandler(BaseHTTPRequestHandler):
                 f"{action} is unavailable while a dashboard task is running"
             )
 
-    def _authenticated(self) -> bool:
-        token_hash = getattr(self.server, "auth_token_hash", None)
-        if token_hash is None:
-            return True
+    def _clerk(self) -> Optional[ClerkVerifier]:
+        return getattr(self.server, "clerk_verifier", None)
+
+    def _bearer_token(self) -> str:
         authorization = self.headers.get("Authorization", "")
-        candidate = ""
         if authorization.startswith("Bearer "):
-            candidate = authorization[7:].strip()
-        if not candidate:
-            cookie = self.headers.get("Cookie", "")
-            for item in cookie.split(";"):
-                name, separator, value = item.strip().partition("=")
-                if separator and name == "gantry_session":
-                    candidate = value
-                    break
+            return authorization[7:].strip()
+        return ""
+
+    def _cookie(self, name: str) -> str:
+        cookie = self.headers.get("Cookie", "")
+        for item in cookie.split(";"):
+            key, separator, value = item.strip().partition("=")
+            if separator and key == name:
+                return value
+        return ""
+
+    def _matches_shared_token(self, candidate: str, token_hash: bytes) -> bool:
         if not candidate:
             return False
         candidate_hash = hashlib.sha256(candidate.encode("utf-8")).digest()
         return hmac.compare_digest(candidate_hash, token_hash)
 
+    def _authenticated(self) -> bool:
+        verifier = self._clerk()
+        token_hash = getattr(self.server, "auth_token_hash", None)
+        if verifier is None and token_hash is None:
+            return True
+        bearer = self._bearer_token()
+        if token_hash is not None and self._matches_shared_token(
+            bearer or self._cookie("gantry_session"), token_hash
+        ):
+            return True
+        if verifier is None:
+            return False
+        session = bearer or self._cookie(CLERK_SESSION_COOKIE)
+        if not session:
+            return False
+        try:
+            verifier.verify(session)
+        except GantryError as error:
+            self.log_message("Clerk denied a request: %s", error)
+            return False
+        return True
+
     def _send_unauthorized(self) -> None:
-        body = b"Authentication required. Open the complete token URL printed by the server."
+        if self._clerk() is not None:
+            body = (
+                b"Authentication required. Sign in through Clerk on the dashboard page."
+            )
+        else:
+            body = b"Authentication required. Open the complete token URL printed by the server."
         self.send_response(HTTPStatus.UNAUTHORIZED)
         self.send_header("Content-Type", "text/plain; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
@@ -249,11 +267,13 @@ class RequestHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         if self.path.startswith("/?token=") and self._accept_token_url():
             return
-        if not self._authenticated():
+        dashboard = self.path == "/" or self.path.startswith("/?")
+        public_shell = dashboard and self._clerk() is not None
+        if not public_shell and not self._authenticated():
             self._send_unauthorized()
             return
-        if self.path == "/" or self.path.startswith("/?"):
-            body = HTML.encode("utf-8")
+        if dashboard:
+            body = getattr(self.server, "dashboard_html", HTML).encode("utf-8")
             self.send_response(HTTPStatus.OK)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
@@ -502,6 +522,8 @@ class GantryHTTPServer(ThreadingHTTPServer):
     operation_manager: Optional[OperationManager] = None
     auth_token_hash: Optional[bytes] = None
     live_game_manager: Optional[LiveGameManager] = None
+    clerk_verifier: Optional[ClerkVerifier] = None
+    dashboard_html: str = HTML
 
 
 def run_web_server(
@@ -516,10 +538,14 @@ def run_web_server(
     demo: bool = False,
     allow_network: bool = False,
     auth_token: Optional[str] = None,
+    clerk: Optional[ClerkSettings] = None,
 ) -> None:
     if not 1 <= port <= 65_535:
         raise ValidationError("web port must be between 1 and 65535")
-    network_visible = validate_web_access(host, allow_network, auth_token)
+    clerk_settings = ClerkSettings.from_environment() if clerk is None else clerk
+    network_visible = validate_web_access(
+        host, allow_network, auth_token, clerk_enabled=clerk_settings is not None
+    )
 
     service = GantryService(config, state_path, journal_path, audit_path)
     controller = GantryController(config, service, demo=demo)
@@ -527,6 +553,9 @@ def run_web_server(
     server = GantryHTTPServer((host, port), RequestHandler)
     if auth_token is not None:
         server.auth_token_hash = hashlib.sha256(auth_token.encode("utf-8")).digest()
+    if clerk_settings is not None:
+        server.clerk_verifier = ClerkVerifier(clerk_settings)
+        server.dashboard_html = render_dashboard(HTML, clerk_settings)
     root = Path.cwd().resolve()
     server.operation_manager = OperationManager(
         root,
@@ -545,6 +574,16 @@ def run_web_server(
     display_host = _lan_address() if host in {"0.0.0.0", "::"} else host
     url = f"http://{display_host}:{port}"
     print(f"Chess Gantry Controller running at {url}")
+    if clerk_settings is not None:
+        print(f"Clerk sign-in is required; frontend API {clerk_settings.frontend_api}")
+        if clerk_settings.allowed_user_ids:
+            print(
+                f"Access is limited to {len(clerk_settings.allowed_user_ids)} allowlisted Clerk user id(s)."
+            )
+        else:
+            print(
+                "CLERK_ALLOWED_USER_IDS is empty, so every user who can sign up in this Clerk instance can move the gantry."
+            )
     if auth_token is not None:
         print(f"Authenticated access URL: {url}/?token={auth_token}")
         print(

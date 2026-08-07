@@ -122,7 +122,31 @@ Set with `-e` on the run command. `.env.example` documents the full set.
 | `CHESS_GANTRY_DEBUG_TOKEN` | generated      | Debug console token.                                                  |
 | `CHESS_GANTRY_DEMO`        | `0`            | Simulated hardware, no devices needed.                                |
 | `LICHESS_TOKEN`            | empty          | Raises Lichess rate limits and reads own games.                       |
+| `CLERK_PUBLISHABLE_KEY`    | empty          | Enables Clerk sign-in on the dashboard. See below.                    |
+| `CLERK_ALLOWED_USER_IDS`   | empty          | Comma-separated Clerk user IDs allowed to control the gantry.         |
 | `TZ`                       | `UTC`          | Container time zone.                                                  |
+
+## Clerk sign-in
+
+Set `CLERK_PUBLISHABLE_KEY` and the dashboard asks for a Clerk sign-in instead of a shared token. Nothing else is required: the frontend API host, the JWT issuer and the JWKS URL are all decoded from the publishable key, and the entrypoint stops generating `CHESS_GANTRY_WEB_TOKEN`.
+
+```bash
+docker run -d --name chess-gantry --restart unless-stopped \
+  --device /dev/ttyUSB0 \
+  --group-add "$(stat -c '%g' /dev/ttyUSB0)" \
+  --publish 8000:8000 \
+  --volume "$PWD/config.json:/app/config.json:ro" \
+  --volume "$PWD/data:/app/data" \
+  -e CLERK_PUBLISHABLE_KEY=pk_live_... \
+  -e CLERK_ALLOWED_USER_IDS=user_2abc...,user_2def... \
+  chess:latest
+```
+
+`CLERK_ALLOWED_USER_IDS` is the access control that matters. A Clerk instance accepts new sign-ups by default, so with the list empty anyone who can register can move the gantry; the server prints a warning on startup when that is the case. Copy the `user_...` IDs from the Clerk dashboard.
+
+With Clerk on, `GET /` is public because it has to serve the sign-in page, and every `/api/*` route requires a Clerk session token verified against the instance JWKS over RS256. The container needs outbound HTTPS to the Clerk frontend API for that. Setting `CHESS_GANTRY_WEB_TOKEN` alongside Clerk keeps the token path working too, which is useful for scripted `curl` access.
+
+`CLERK_SECRET_KEY` is accepted but unused: session verification only needs public keys. `CLERK_AUTHORIZED_PARTIES`, `CLERK_JWT_ISSUER` and `CLERK_JWKS_URL` are optional overrides documented in `.env.example`.
 
 ## Operating
 

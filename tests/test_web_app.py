@@ -17,9 +17,30 @@ from chess_gantry.live_game import LiveGameManager
 from chess_gantry.operations import OperationManager, OperationSpec
 from chess_gantry.persistence import atomic_write_json
 from chess_gantry.service import GantryService
-from chess_gantry.web_app import GantryHTTPServer, RequestHandler, validate_web_access
+from chess_gantry.web_app import (
+    HTML,
+    GantryHTTPServer,
+    RequestHandler,
+    validate_web_access,
+)
+from chess_gantry.clerk_auth import ClerkSettings, render_dashboard
 
 ROOT = Path(__file__).resolve().parents[1]
+CLERK_ENVIRONMENT = {
+    "CLERK_PUBLISHABLE_KEY": "pk_test_Y2xlcmsuZXhhbXBsZS5jb20k",
+    "CLERK_ALLOWED_USER_IDS": "user_allowed",
+}
+
+
+class StubClerkVerifier:
+    def __init__(self, accepted: str) -> None:
+        self.accepted = accepted
+        self.settings = ClerkSettings.from_environment(CLERK_ENVIRONMENT)
+
+    def verify(self, token: str) -> dict:
+        if token != self.accepted:
+            raise ValidationError("the stub verifier rejected the token")
+        return {"sub": "user_allowed"}
 
 
 class WebAppTests(unittest.TestCase):
@@ -192,6 +213,70 @@ class WebAppTests(unittest.TestCase):
         raised.exception.close()
         self.assertIn("standard", missing["error"])
 
+    def _enable_clerk(self, token: str) -> None:
+        verifier = StubClerkVerifier(token)
+        self.server.clerk_verifier = verifier
+        self.server.dashboard_html = render_dashboard(HTML, verifier.settings)
+
+    def test_clerk_mode_serves_a_public_shell_and_guards_the_apis(self) -> None:
+        self._enable_clerk("valid-clerk-session-token")
+        with urllib.request.urlopen(self.base + "/", timeout=3) as response:
+            html = response.read().decode("utf-8")
+        self.assertIn("clerkSignIn", html)
+        self.assertIn("clerk.browser.js", html)
+        self.assertIn("Operations dashboard", html)
+
+        with self.assertRaises(urllib.error.HTTPError) as anonymous:
+            urllib.request.urlopen(self.base + "/api/status", timeout=3)
+        self.assertEqual(anonymous.exception.code, 401)
+        self.assertIn(b"Clerk", anonymous.exception.read())
+        anonymous.exception.close()
+
+        rejected = urllib.request.Request(
+            self.base + "/api/status", headers={"Authorization": "Bearer wrong"}
+        )
+        with self.assertRaises(urllib.error.HTTPError) as invalid:
+            urllib.request.urlopen(rejected, timeout=3)
+        self.assertEqual(invalid.exception.code, 401)
+        invalid.exception.close()
+
+        accepted = urllib.request.Request(
+            self.base + "/api/status",
+            headers={"Authorization": "Bearer valid-clerk-session-token"},
+        )
+        with urllib.request.urlopen(accepted, timeout=3) as response:
+            self.assertTrue(json.loads(response.read())["ok"])
+
+    def test_clerk_mode_accepts_the_session_cookie_and_guards_writes(self) -> None:
+        self._enable_clerk("valid-clerk-session-token")
+        cookie = urllib.request.Request(
+            self.base + "/api/board",
+            headers={"Cookie": "__session=valid-clerk-session-token"},
+        )
+        with urllib.request.urlopen(cookie, timeout=3) as response:
+            self.assertTrue(json.loads(response.read())["ok"])
+
+        write = urllib.request.Request(
+            self.base + "/api/disconnect",
+            data=b"{}",
+            headers={"Content-Type": "application/json"},
+        )
+        with self.assertRaises(urllib.error.HTTPError) as anonymous:
+            urllib.request.urlopen(write, timeout=3)
+        self.assertEqual(anonymous.exception.code, 401)
+        anonymous.exception.close()
+
+    def test_clerk_and_the_shared_token_can_run_side_by_side(self) -> None:
+        token = "network-dashboard-test-token-123456"
+        self.server.auth_token_hash = hashlib.sha256(token.encode()).digest()
+        self._enable_clerk("valid-clerk-session-token")
+        for value in (token, "valid-clerk-session-token"):
+            request = urllib.request.Request(
+                self.base + "/api/status", headers={"Authorization": f"Bearer {value}"}
+            )
+            with urllib.request.urlopen(request, timeout=3) as response:
+                self.assertTrue(json.loads(response.read())["ok"])
+
     def test_network_bind_requires_explicit_flag_and_strong_token(self) -> None:
         with self.assertRaisesRegex(ValidationError, "--allow-network"):
             validate_web_access("0.0.0.0", False, "a" * 32)
@@ -201,6 +286,11 @@ class WebAppTests(unittest.TestCase):
             validate_web_access("0.0.0.0", True, "short")
         self.assertTrue(validate_web_access("0.0.0.0", True, "a" * 32))
         self.assertFalse(validate_web_access("127.0.0.1", False, None))
+
+    def test_clerk_satisfies_the_network_bind_requirement(self) -> None:
+        self.assertTrue(validate_web_access("0.0.0.0", True, None, clerk_enabled=True))
+        with self.assertRaisesRegex(ValidationError, "--allow-network"):
+            validate_web_access("0.0.0.0", False, None, clerk_enabled=True)
 
     def test_authenticated_server_protects_page_and_apis(self) -> None:
         token = "network-dashboard-test-token-123456"

@@ -95,13 +95,33 @@ def _global_flags(config: Path, state: Path, journal: Path, audit: Path) -> list
     ]
 
 
+def _clerk_enabled() -> bool:
+    return bool(os.environ.get("CLERK_PUBLISHABLE_KEY", "").strip())
+
+
+def _web_auth_flags() -> list:
+    if not _clerk_enabled():
+        return ["--auth-token", _token("CHESS_GANTRY_WEB_TOKEN", "web dashboard")]
+    _log("Clerk is configured; the dashboard requires a Clerk sign-in")
+    if not os.environ.get("CLERK_ALLOWED_USER_IDS", "").strip():
+        _log(
+            "CLERK_ALLOWED_USER_IDS is empty; any user of this Clerk instance"
+            " can move the gantry"
+        )
+    preset = os.environ.get("CHESS_GANTRY_WEB_TOKEN", "").strip()
+    if not preset:
+        return []
+    _log("CHESS_GANTRY_WEB_TOKEN is also set and stays valid alongside Clerk")
+    return ["--auth-token", preset]
+
+
 def _web_command(base: list) -> list:
     host = _env("CHESS_GANTRY_WEB_HOST", "0.0.0.0")
     port = _env("CHESS_GANTRY_WEB_PORT", "8000")
     command = base + ["web", "--host", host, "--web-port", port, "--no-browser"]
     if host not in LOOPBACK_HOSTS:
         command.append("--allow-network")
-        command += ["--auth-token", _token("CHESS_GANTRY_WEB_TOKEN", "web dashboard")]
+        command += _web_auth_flags()
     if _truthy("CHESS_GANTRY_DEMO"):
         command.append("--demo")
     _log("web dashboard listening on http://" + host + ":" + port)

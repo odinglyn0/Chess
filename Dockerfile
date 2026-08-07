@@ -33,10 +33,14 @@ RUN set -eu; \
       packages="${packages} bash coreutils findutils grep sed gawk nodejs npm git-core"; \
     fi; \
     mkdir -p "${ROOTFS}"; \
-    dnf -y --installroot="${ROOTFS}" --releasever="${VERSION_ID}" \
+    host_config=""; \
+    if { dnf --help; dnf install --help; } 2>&1 | grep -q -- '--use-host-config'; then \
+      host_config="--use-host-config"; \
+    fi; \
+    dnf -y --installroot="${ROOTFS}" --releasever="${VERSION_ID}" ${host_config} \
       --setopt=install_weak_deps=False --setopt=keepcache=0 --nodocs \
       install ${packages}; \
-    dnf -y --installroot="${ROOTFS}" --releasever="${VERSION_ID}" clean all; \
+    dnf -y --installroot="${ROOTFS}" --releasever="${VERSION_ID}" ${host_config} clean all; \
     test -x "${ROOTFS}/usr/bin/python3"; \
     test -x "${ROOTFS}/usr/bin/curl"; \
     builder_python="$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')"; \

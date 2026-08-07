@@ -39,15 +39,15 @@ No Redis, cloud database, or desktop environment is required.
 
 ## The Machine
 
-| Property | Value |
-| --- | --- |
-| Inner gantry width | 330 mm |
-| Outer paired gantry height | 300 mm |
-| Chessboard | 8 x 8 |
-| Square-center spacing | 40 mm |
-| Nearest-home square | **h1** |
-| Nearest-home center | `X2 Y298 Z320` |
-| Homed host reference | `X2 Y298 Z328` |
+| Property                   | Value          |
+| -------------------------- | -------------- |
+| Inner gantry width         | 330 mm         |
+| Outer paired gantry height | 300 mm         |
+| Chessboard                 | 8 x 8          |
+| Square-center spacing      | 40 mm          |
+| Nearest-home square        | **h1**         |
+| Nearest-home center        | `X2 Y298 Z320` |
+| Homed host reference       | `X2 Y298 Z328` |
 
 ### Motor Mapping
 

@@ -17,30 +17,22 @@ from chess_gantry.live_game import LiveGameManager
 from chess_gantry.operations import OperationManager, OperationSpec
 from chess_gantry.persistence import atomic_write_json
 from chess_gantry.service import GantryService
-from chess_gantry.web_app import (
-    HTML,
-    GantryHTTPServer,
-    RequestHandler,
-    validate_web_access,
-)
+from chess_gantry.web_app import HTML, GantryHTTPServer, RequestHandler
 from chess_gantry.clerk_auth import ClerkSettings, render_dashboard
 
 ROOT = Path(__file__).resolve().parents[1]
-CLERK_ENVIRONMENT = {
-    "CLERK_PUBLISHABLE_KEY": "pk_test_Y2xlcmsuZXhhbXBsZS5jb20k",
-    "CLERK_ALLOWED_USER_IDS": "user_allowed",
-}
+CLERK_ENVIRONMENT = {"CLERK_PUBLISHABLE_KEY": "pk_test_Y2xlcmsuZXhhbXBsZS5jb20k"}
 
 
 class StubClerkVerifier:
     def __init__(self, accepted: str) -> None:
         self.accepted = accepted
-        self.settings = ClerkSettings.from_environment(CLERK_ENVIRONMENT)
+        self.settings = ClerkSettings.require_from_environment(CLERK_ENVIRONMENT)
 
-    def verify(self, token: str) -> dict:
-        if token != self.accepted:
-            raise ValidationError("the stub verifier rejected the token")
-        return {"sub": "user_allowed"}
+    def verify(self, session: str) -> dict:
+        if session != self.accepted:
+            raise ValidationError("the stub verifier rejected the session cookie")
+        return {"sub": "user_stub"}
 
 
 class WebAppTests(unittest.TestCase):

@@ -2,7 +2,7 @@
   "serial": {
     "port": "/dev/ttyUSB0",
     "baudrate": 115200,
-    "fallback_baudrates": [115200, 250000, 96000],
+    "fallback_baudrates": [115200, 250000],
     "read_timeout_s": 0.25,
     "write_timeout_s": 2.0,
     "command_timeout_s": 120.0,

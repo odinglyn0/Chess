@@ -186,6 +186,10 @@ class WebAppTests(unittest.TestCase):
         self.assertIn("/api/jog", html)
         self.assertIn('id="liveGameId"', html)
         self.assertIn("/api/live/start", html)
+        self.assertIn("autoConnect", html)
+        self.assertLess(
+            html.index("async function autoConnect"), html.index("await autoConnect()")
+        )
 
     def test_live_game_status_and_start_validation_api(self) -> None:
         _, status = self.request("/api/live/status")

@@ -21,7 +21,6 @@ REQUIRED = (
     "chess.pgn",
     "berserk",
     "django",
-    "websockets.asyncio.client",
     "upstash_redis",
     "redis",
     "httpx",

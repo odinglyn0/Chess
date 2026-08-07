@@ -111,9 +111,51 @@ publish_mdns
 
 "${DOCKER[@]}" rm -f "$CONTAINER" > /dev/null 2>&1 || true
 
+LAN_IP="$(hostname -I 2> /dev/null | awk '{print $1}')"
+LAN_IP="${LAN_IP:-127.0.0.1}"
+
+port_in_use() {
+  local port="$1"
+  command -v ss > /dev/null 2>&1 || return 1
+  ss -lntH 2> /dev/null | awk '{print $4}' | grep -qE "[:.]${port}\$"
+}
+
+open_firewall_port() {
+  local port="$1"
+  if command -v firewall-cmd > /dev/null 2>&1 && as_root firewall-cmd --state > /dev/null 2>&1; then
+    if as_root firewall-cmd --add-port="${port}/tcp" > /dev/null 2>&1; then
+      printf '    firewalld: opened %s/tcp until the next reboot\n' "$port"
+    else
+      printf '    firewalld: could not open %s/tcp\n' "$port"
+    fi
+  elif command -v ufw > /dev/null 2>&1 && as_root ufw status 2> /dev/null | grep -q 'Status: active'; then
+    if as_root ufw allow "${port}/tcp" > /dev/null 2>&1; then
+      printf '    ufw: allowed %s/tcp\n' "$port"
+    else
+      printf '    ufw: could not allow %s/tcp\n' "$port"
+    fi
+  fi
+}
+
+printf '==> Opening the LAN path on %s\n' "$LAN_IP"
+if port_in_use "$HTTP_PORT"; then
+  printf '    port %s is already in use on this host, skipping it\n' "$HTTP_PORT"
+  printf '    find the holder with: sudo ss -lntp | grep :%s\n' "$HTTP_PORT"
+  HTTP_PORT="$ALT_PORT"
+fi
+open_firewall_port "$HTTP_PORT"
+if [[ $ALT_PORT != "$HTTP_PORT" ]]; then
+  if port_in_use "$ALT_PORT"; then
+    printf '    port %s is already in use on this host, skipping it\n' "$ALT_PORT"
+    ALT_PORT="$HTTP_PORT"
+  else
+    open_firewall_port "$ALT_PORT"
+  fi
+fi
+
 RUN_ARGS=(
   --name "$CONTAINER"
-  --publish "${HTTP_PORT}:${APP_PORT}"
+  --publish "0.0.0.0:${HTTP_PORT}:${APP_PORT}"
   --volume "$ROOT/config.json:/app/config.json:ro"
   --volume "$ROOT/data:/app/data"
   --env "CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY"
@@ -124,7 +166,7 @@ RUN_ARGS=(
 )
 
 if [[ $ALT_PORT != "$HTTP_PORT" ]]; then
-  RUN_ARGS+=(--publish "${ALT_PORT}:${APP_PORT}")
+  RUN_ARGS+=(--publish "0.0.0.0:${ALT_PORT}:${APP_PORT}")
 fi
 
 if [[ -e $SERIAL_DEVICE ]]; then
@@ -138,14 +180,20 @@ else
   printf '==> %s is absent, starting in demo mode with a simulated controller\n' "$SERIAL_DEVICE"
 fi
 
-if [[ $HTTP_PORT == 80 ]]; then
-  printf '==> Dashboard: http://%s\n' "$MDNS_NAME"
-else
-  printf '==> Dashboard: http://%s:%s\n' "$MDNS_NAME" "$HTTP_PORT"
-fi
+url_for() {
+  local host="$1" port="$2"
+  if [[ $port == 80 ]]; then
+    printf 'http://%s' "$host"
+  else
+    printf 'http://%s:%s' "$host" "$port"
+  fi
+}
+
+printf '==> Dashboard on this LAN: %s\n' "$(url_for "$LAN_IP" "$HTTP_PORT")"
 if [[ $ALT_PORT != "$HTTP_PORT" ]]; then
-  printf '==> Also on http://%s:%s\n' "$MDNS_NAME" "$ALT_PORT"
+  printf '==>                   also: %s\n' "$(url_for "$LAN_IP" "$ALT_PORT")"
 fi
+printf '==>              by name: %s\n' "$(url_for "$MDNS_NAME" "$HTTP_PORT")"
 printf '==> Open to every host that can route here. Clerk sign-in is required.\n'
 printf '==> Control-C stops the server.\n'
 

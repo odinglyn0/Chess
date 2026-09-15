@@ -38,7 +38,7 @@ where = ["src"]
 "chess_gantry.debug_console" = ["templates/debug_console/*.html"]
 
 [dependency-groups]
-dev = ["black>=25.9,<26"]
+dev = ["black>=25.9,<27"]
 
 [tool.black]
 target-version = ["py39"]
